@@ -59,3 +59,13 @@ Chỉ khi task chỉnh sửa Liquid/Shopify theme hoặc tối ưu Core Web Vita
 Khi thiết kế hoặc triển khai Agent Harness, đọc [spec](docs/superpowers/specs/2026-09-23-agent-harness-design.md) và dùng phiên bản đã được người dùng duyệt. Đề xuất sửa spec nếu có xung đột; không âm thầm thay requirement.
 
 `AGENTS.md` này có hiệu lực cho workspace Agent Harness. Khi xây chức năng điều phối repo khác, lấy các quy tắc hành vi ở mục 1–6 làm baseline được quản lý bởi harness, kết hợp với hướng dẫn của repo đích; không chép mục 7 hoặc ghi đè `AGENTS.md` của repo đích.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

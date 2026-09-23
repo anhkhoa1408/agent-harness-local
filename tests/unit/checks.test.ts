@@ -1,3 +1,33 @@
-import {test,expect} from 'vitest';import {evaluateCheck,parseEvidence} from '../../src/execution/checks';import {planFixture} from '../support/task-fixture';
-test('zero, skipped and uncounted feature tests block a green exit',()=>{const spec=planFixture().checks[0],run={exitCode:0,timedOut:false,executed:0,failed:0,skipped:0,successMatched:false};expect(evaluateCheck(spec,run)).toBe('blocked');expect(evaluateCheck(spec,{...run,executed:2})).toBe('passed');expect(evaluateCheck(spec,{...run,executed:2,skipped:1})).toBe('blocked');expect(evaluateCheck(spec,{...run,executed:null})).toBe('blocked');});
-test('parses TAP/JUnit and refuses malformed or incomplete reports',async()=>{expect(await parseEvidence('tap','TAP version 13\n1..1\nok 1 - feature\n')).toMatchObject({executed:1,failed:0});expect(await parseEvidence('junit','<testsuites><testsuite tests="2" failures="1" skipped="0"><testcase/><testcase><failure/></testcase></testsuite></testsuites>')).toMatchObject({executed:2,failed:1});expect(await parseEvidence('tap','')).toMatchObject({executed:0});await expect(parseEvidence('junit','<broken>')).rejects.toThrow();});
+import { test, expect } from "vitest";
+import { evaluateCheck, parseEvidence } from "../../src/execution/checks";
+import { planFixture } from "../support/task-fixture";
+test("zero, skipped and uncounted feature tests block a green exit", () => {
+  const spec = planFixture().checks[0],
+    run = {
+      exitCode: 0,
+      timedOut: false,
+      executed: 0,
+      failed: 0,
+      skipped: 0,
+      successMatched: false,
+    };
+  expect(evaluateCheck(spec, run)).toBe("blocked");
+  expect(evaluateCheck(spec, { ...run, executed: 2 })).toBe("passed");
+  expect(evaluateCheck(spec, { ...run, executed: 2, skipped: 1 })).toBe(
+    "blocked",
+  );
+  expect(evaluateCheck(spec, { ...run, executed: null })).toBe("blocked");
+});
+test("parses TAP/JUnit and refuses malformed or incomplete reports", async () => {
+  expect(
+    await parseEvidence("tap", "TAP version 13\n1..1\nok 1 - feature\n"),
+  ).toMatchObject({ executed: 1, failed: 0 });
+  expect(
+    await parseEvidence(
+      "junit",
+      '<testsuites><testsuite tests="2" failures="1" skipped="0"><testcase/><testcase><failure/></testcase></testsuite></testsuites>',
+    ),
+  ).toMatchObject({ executed: 2, failed: 1 });
+  expect(await parseEvidence("tap", "")).toMatchObject({ executed: 0 });
+  await expect(parseEvidence("junit", "<broken>")).rejects.toThrow();
+});
