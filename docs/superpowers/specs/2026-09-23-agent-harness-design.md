@@ -17,6 +17,7 @@ Các quyết định sản phẩm đã chốt:
 - Người dùng duyệt requirement, plan, tiêu chí nghiệm thu và phạm vi test trước khi code.
 - Mỗi feature/task có branch và worktree riêng; reviewer có phiên Codex riêng.
 - Người dùng chọn model và reasoning effort theo stage; hệ thống không tự đổi model.
+- Stage AI dùng skill bundle rõ ràng và baseline hành vi từ `AGENTS.md`; runtime lưu nguồn/phiên bản đã nạp.
 - Viết test cho tính năng mới và bug đang sửa; có thể bỏ qua test cũ ngoài phạm vi feature.
 - Tối đa ba vòng sửa tự động sau lần triển khai đầu; hết giới hạn thì cần người dùng quyết định.
 - Tạo GitHub PR khi đạt điều kiện; bàn giao local nếu remote không được hỗ trợ hoặc không có remote.
@@ -125,6 +126,61 @@ Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có c�
 
 Gói được người dùng mô tả là 25 USD/tháng chưa xác định được tên gói/hạn mức cụ thể. Tích hợp cần kiểm chứng đăng nhập, catalog model và một lượt read-only với tài khoản thực trước khi xây đầy đủ pipeline. Không tự chuyển sang API tính phí.
 
+### 6.1. Rule nền và skill theo stage
+
+Nguồn rule nền là [AGENTS.md](../../../AGENTS.md), mục 1–6: suy nghĩ trước khi code, đơn giản, thay đổi có mục tiêu, thành công có bằng chứng và trả lời tiếng Việt. Mục 7 chỉ phục vụ phát triển chính workspace harness, không truyền sang repo khác.
+
+Harness đọc thêm `AGENTS.md` của repo đích và các hướng dẫn trong phạm vi thư mục liên quan. Nếu repo chỉ có `CLAUDE.md`, có thể dùng nội dung đó làm hướng dẫn dự án và ghi rõ nguồn. Không ghi đè những file này để cài rule của harness.
+
+Rule `rules/lighthouse-performance.md` chỉ được nạp khi task liên quan Liquid/Shopify theme/Core Web Vitals của theme. Workspace hiện chưa có nội dung file này. Đây là dependency điều kiện: task không liên quan tiếp tục bình thường; khi áp dụng mà rule không có thì hỏi người dùng cung cấp rule, không giả lập nội dung.
+
+Mapping dưới đây là thiết kế cho runtime sắp xây, chưa phải registry đã hoạt động. Các skill Superpowers/Matt Pocock được đọc từ bản đã cài để xác định hành vi; một skill có trong phiên Codex hiện tại không có nghĩa worker tương lai tự động truy cập được.
+
+| Stage | Skill/bộ hướng dẫn mặc định | Trách nhiệm và kết quả |
+| --- | --- | --- |
+| discover | Hướng dẫn Repo Profile riêng của harness; chưa có file skill độc lập | Đọc code/manifest/CI, trả profile có căn cứ; không sửa repo. Đây là contract trong mục 3, không giả định có skill Superpowers chuyên discovery |
+| analyze | `mattpocock-skills:grilling` | Hỏi các quyết định chưa rõ theo quan hệ phụ thuộc, đưa đề xuất và chờ câu trả lời; trả requirement/acceptance criteria |
+| analyze — nhánh thiết kế mới | `superpowers:brainstorming`, khi task cần thiết kế kiến trúc/UI/hành vi chưa chốt | Khảo sát lựa chọn và đánh đổi. Dùng chung luồng hỏi/approval của harness, không mở thêm một vòng phỏng vấn trùng lặp |
+| plan | `superpowers:writing-plans` | Kế hoạch có bước thực hiện, nơi thay đổi và điều kiện kiểm chứng; đầu ra gắn với PlanVersion |
+| prepare | Worker thực thi Git/môi trường | Không nạp skill điều phối để agent tự tạo thêm worktree. Quyền và side effect thuộc worker |
+| implement | `superpowers:test-driven-development` + rule mục tiêu/đơn giản/thay đổi có mục tiêu từ AGENTS.md | Red → green cho feature/bug; triển khai tối thiểu theo plan đã duyệt |
+| verify | Runner + nguyên tắc `superpowers:verification-before-completion` | Runner là nguồn bằng chứng; chỉ báo pass khi command/report xác nhận. Không cần thêm lượt AI chỉ để gọi lại test |
+| review | `superpowers:requesting-code-review` cho bước chuẩn bị; `requesting-code-review/code-reviewer.md` cho phiên reviewer riêng | Worker tạo review package gồm plan, diff/revision và test evidence; reviewer chỉ đọc, trả finding có cấu trúc |
+| repair — nhận review | `superpowers:receiving-code-review` | Kiểm tra tính đúng đắn của finding; có thể phản biện bằng căn cứ, không sửa máy móc |
+| repair — chẩn đoán và sửa | `superpowers:systematic-debugging` → `superpowers:test-driven-development` → `superpowers:verification-before-completion` | Tái hiện → thu bằng chứng → xác định nguyên nhân → kiểm chứng giả thuyết → test hồi quy → sửa tối thiểu → xác minh |
+| deliver | Worker + nguyên tắc `superpowers:verification-before-completion` | Đối chiếu gate và evidence của snapshot cuối, tạo PR hoặc bàn giao local; không thêm một phiên AI để tự quyết merge |
+
+`systematic-debugging` cũng kích hoạt ngay khi gặp bug/test failure/unexpected behavior trong analyze hoặc implement. Lỗi có sẵn ngoài phạm vi chỉ được ghi nhận, trừ khi nó chặn kiểm chứng feature. Chưa rõ root cause thì thu thêm bằng chứng hoặc hỏi, không nối tiếp các bản vá phỏng đoán.
+
+Khi dùng TDD, expected failure trong bước red không tự động chuyển pipeline sang repair hoặc tiêu một vòng sửa. Bộ đếm tăng khi worker mở một attempt repair sau một lần verify/review không đạt. Trong repair, các giả thuyết/sửa thử được ghi lại; khi ba lần thử cùng vấn đề đều thất bại thì dừng hỏi lại thay vì lách giới hạn bằng cách giữ nguyên attempt.
+
+### 6.2. Phạm vi áp dụng và giải quyết xung đột
+
+Worker giữ quyền chuyển trạng thái, cấp quyền công cụ, tạo phiên reviewer, quản lý branch và đếm retry. Skill là hướng dẫn thực hiện trong stage, không được tự thay những cơ chế đó.
+
+Mỗi bundle có ghi chú tích hợp minh bạch. Không sửa trực tiếp file trong plugin cache:
+
+- **Phạm vi test:** yêu cầu trực tiếp của người dùng được ưu tiên hơn lời yêu cầu chạy toàn bộ suite trong skill TDD. Áp dụng red/green và verification cho Test Plan của feature; phần legacy bỏ qua vẫn xuất hiện trong báo cáo.
+- **Approval:** yêu cầu hỏi/duyệt từ skill được chuyển thành `waiting_input` hoặc `waiting_approval` trên dashboard. Không tạo cổng duyệt thứ hai cho cùng PlanVersion đã được duyệt; thay phạm vi vẫn phải duyệt lại.
+- **Điều phối:** worker tạo reviewer độc lập, dùng model đã chọn. Không để skill tự spawn reviewer trùng, tự chọn model mạnh hơn, merge hoặc xóa worktree.
+- **Sửa theo review:** phản biện được lưu kèm bằng chứng; finding bắt buộc đang tranh luận chưa được coi là đã giải quyết. Reviewer đánh giá lại; nếu vẫn bất đồng thì chuyển sang hỏi người dùng trong giới hạn vòng lặp.
+- **Giữ code:** chỉ sửa trong worktree của task. Không làm theo chỉ dẫn xóa/rewrite code sẵn có chỉ vì nó chưa được viết test-first; áp dụng TDD cho phần thay đổi đang thực hiện.
+- **Đầu ra:** skill có thể sinh báo cáo Markdown, nhưng adapter phải chuẩn hóa và kiểm tra schema trước khi worker dùng output. Lời tự nhận “done” không trực tiếp đổi status thành completed.
+
+Không nạp tất cả Superpowers vào mỗi stage. `using-superpowers`, `executing-plans`, `subagent-driven-development`, `using-git-worktrees` và `finishing-a-development-branch` không phải bundle mặc định của runtime này vì chúng có thêm quy trình điều phối đã do worker sở hữu. Đây là quyết định về harness đang thiết kế, không thay đổi những skill mà agent phát triển harness phải tuân theo trong phiên hiện tại.
+
+Trong nội dung truyền cho agent: tuân thủ ràng buộc platform trước; áp dụng yêu cầu người dùng/plan đã duyệt; kết hợp baseline và rule repo theo phạm vi; rồi áp dụng skill. Rule repo cụ thể hóa conventions nhưng không được tự đổi approval, quyền công cụ hoặc giới hạn của worker. Xung đột thực sự chưa có quyết định từ người dùng thì ghi rõ nguồn và hỏi, không im lặng bỏ rule nào.
+
+### 6.3. Cách nạp và truy vết
+
+- MVP dùng mapping stage cố định trong cấu hình được quản lý của harness. Chưa xây marketplace hoặc UI chỉnh sửa skill tùy ý.
+- Registry ánh xạ ID skill sang nguồn, phiên bản plugin, đường dẫn thực và các tài liệu phụ cần thiết. Bản nguồn đã khảo sát: Superpowers `6.4.1`, Matt Pocock `1.2.3`.
+- Resolve nội dung thực trên máy khi bắt đầu chạy; không hard-code đường dẫn cache cá nhân vào sản phẩm. Skill bắt buộc bị thiếu → blocked với lý do `skill_unavailable`.
+- Lưu snapshot/hash nội dung rule, skill, tài liệu phụ đã nạp và ghi chú tích hợp trong StageAttempt. Chỉ nạp rule có trigger phù hợp; không gắn tất cả tài liệu vào mọi prompt.
+- Khi plugin thay đổi giữa task, dùng bundle snapshot đã chốt. Người dùng chủ động áp dụng bản mới thì tạo attempt mới có provenance mới; không trộn hai bản trong một lượt.
+- Khi resume/đổi model, truyền lại đúng rule, skill bundle và context nghiệp vụ của stage; model mới không được mất các ràng buộc này.
+- Nhánh review dùng template đã nạp như tài liệu phụ của skill, không báo template đó là một skill độc lập.
+
 ## 7. Branch, worktree và revision
 
 - Một task tương ứng một feature hoặc bug nhỏ. Task có nhiều feature độc lập phải được chia trước khi duyệt plan.
@@ -193,7 +249,7 @@ Các thực thể chính:
 | Repository / RepoProfile | Path, base/remote, commit, công nghệ, command candidates và căn cứ |
 | Task | Requirement, stage/status/reason, branch/worktree, dependency, repair count, delivery mode |
 | PlanVersion / Approval | Phạm vi, tiêu chí, test plan, cấu hình và phiên bản được duyệt |
-| StageAttempt | Phiên Codex, snapshot cấu hình, input/output, thời điểm, revision, usage |
+| StageAttempt | Phiên Codex, snapshot cấu hình/model/rule/skill và ghi chú tích hợp, input/output, thời điểm, revision, usage |
 | CheckResult / ReviewFinding | Bằng chứng test, finding và vòng sửa xử lý |
 | Event / ControlCommand | Timeline có thứ tự; lệnh pause/resume/cancel có ID chống lặp |
 | SideEffect / Artifact | Intent/result của tác động ngoài DB; đường dẫn và fingerprint báo cáo |
@@ -206,7 +262,7 @@ Web và worker chỉ lắng nghe loopback. Mutation endpoint kiểm tra origin/s
 
 Các lát cắt triển khai dự kiến, mỗi lát có kết quả quan sát được:
 
-1. **Kết nối và discovery:** kiểm chứng Codex auth/model/read-only run; nhập repo; hiển thị profile, prerequisites và model catalog.
+1. **Kết nối và discovery:** kiểm chứng Codex auth/model/read-only run; resolve skill/rule; nhập repo; hiển thị profile, prerequisites và model catalog.
 2. **Requirement và approval:** tạo task, hỏi đáp, lưu plan version và ngăn code trước approval.
 3. **Thực thi feature:** branch/worktree, một lượt implement, chạy test theo plan và xem bằng chứng trên dashboard.
 4. **Vòng review/sửa:** reviewer độc lập, finding có cấu trúc, repair limit và evidence bị vô hiệu khi code đổi.
@@ -217,6 +273,7 @@ Các lát cắt triển khai dự kiến, mỗi lát có kết quả quan sát �
 Kiểm thử chính harness gồm:
 
 - Unit: transition guards, approval theo version, giới hạn repair, cấu hình model và invalidation evidence.
+- Skill/rule integration: thiếu skill bắt buộc phải blocked; plugin update không đổi bundle giữa lượt; đổi model/resume giữ rule; rule Lighthouse chỉ nạp cho task phù hợp; yêu cầu chạy full suite trong skill không ghi đè chính sách feature-only; expected TDD red không tiêu repair round; skill không tự tạo thêm reviewer/worktree.
 - Integration: SQLite transaction/lease, Codex adapter với event giả lập, Git worktree thật trong repo tạm, process exit/timeout, reconciliation GitHub qua adapter giả lập.
 - E2E dashboard: tạo task → duyệt → code → verify fail → repair → review → deliver; pause/resume; thay model; thiếu runtime; quota; legacy test fail ngoài phạm vi không chặn feature; required test bị skip phải chặn.
 - Live smoke có kiểm soát: một repo frontend và một repo ngôn ngữ khác, dùng runtime có trên máy và tài khoản Codex thật. Kết quả chỉ xác nhận các môi trường được thử, không tuyên bố mọi stack đều đã kiểm chứng.
