@@ -1,7 +1,7 @@
 # Agent Harness — thiết kế MVP local
 
 Ngày: 2026-09-23
-Trạng thái: thiết kế đã thống nhất qua phỏng vấn; bản spec này chờ người dùng review.
+Trạng thái: người dùng đã duyệt thiết kế và yêu cầu bắt đầu ngày 2026-09-23, gồm bổ sung skill/rule và model mạnh cho plan, model tầm trung cho implement.
 
 ## 1. Mục tiêu và phạm vi
 
@@ -16,7 +16,7 @@ Các quyết định sản phẩm đã chốt:
 - Dùng Codex làm coding agent, ưu tiên đăng nhập ChatGPT với quyền truy cập sẵn có.
 - Người dùng duyệt requirement, plan, tiêu chí nghiệm thu và phạm vi test trước khi code.
 - Mỗi feature/task có branch và worktree riêng; reviewer có phiên Codex riêng.
-- Người dùng chọn model và reasoning effort theo stage; hệ thống không tự đổi model.
+- Người dùng chọn model và reasoning effort theo stage. Mặc định plan dùng model mạnh, implement dùng model tầm trung; worker chuyển theo cấu hình đã chọn, không tự đổi ngoài cấu hình đó.
 - Stage AI dùng skill bundle rõ ràng và baseline hành vi từ `AGENTS.md`; runtime lưu nguồn/phiên bản đã nạp.
 - Viết test cho tính năng mới và bug đang sửa; có thể bỏ qua test cũ ngoài phạm vi feature.
 - Tối đa ba vòng sửa tự động sau lần triển khai đầu; hết giới hạn thì cần người dùng quyết định.
@@ -81,6 +81,8 @@ Plan có phiên bản, bao gồm:
 5. Test plan: từng kiểm tra, loại unit/integration/E2E, command, prerequisites, tiêu chí nghiệm thu được kiểm chứng.
 6. Model/effort dự kiến cho từng stage AI và giới hạn vòng sửa.
 
+Để model tầm trung có thể implement mà không phải thiết kế lại, plan phải chỉ rõ thứ tự bước và dependency, file/module cần thay đổi, interface và dữ liệu vào/ra khi có, hành vi lỗi liên quan, test cần viết, command kiểm tra và kết quả mong đợi. Bước không áp dụng một mục phải nêu lý do thay vì tạo thêm abstraction. Những quyết định sản phẩm còn mơ hồ phải được làm rõ trước approval.
+
 Approval gắn với phiên bản plan và phạm vi công việc. Thay requirement, tiêu chí nghiệm thu, dependency hoặc mở rộng phạm vi làm mất hiệu lực approval cũ; trình phần thay đổi rồi chờ duyệt lại. Chi tiết triển khai trong phạm vi đã duyệt do agent tự quyết.
 
 ## 5. Pipeline và trạng thái
@@ -115,12 +117,24 @@ Mỗi task có nhiều Stage Attempt. Một attempt lưu đầu vào, model/effo
 
 Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có cấu hình model/effort riêng. Viết test nằm trong implement/repair. Verify chạy command; prepare/deliver dùng công cụ, không cần một model riêng để xác định kết quả.
 
-- Thứ tự ưu tiên: cấu hình stage của task → cấu hình stage mặc định của hệ thống → model/effort mặc định hiện có từ Codex.
+Chính sách phân bổ model đã được người dùng yêu cầu:
+
+| Stage | Mặc định | Điều kiện |
+| --- | --- | --- |
+| plan, gồm lập lại plan | Model mạnh cho phân tích và lập kế hoạch | Dùng model đã cấu hình cho vai trò planner; đầu ra phải đạt yêu cầu rõ ràng tại mục 4 |
+| implement | Model tầm trung | Chỉ bắt đầu sau khi plan đủ rõ, được duyệt và môi trường sẵn sàng |
+| Các stage AI khác | Cấu hình riêng đã chọn | Không suy rộng quyết định này thành tự đổi model cho review/repair/discover/analyze |
+
+“Model mạnh” và “model tầm trung” là hai vai trò cấu hình, không phải tên model hoặc thứ hạng tự suy ra từ catalog. Khi thiết lập, ánh xạ chúng sang model ID khả dụng và reasoning effort hợp lệ; lưu rõ lựa chọn. Hai vai trò này phải được cấu hình trước khi chạy, không âm thầm dùng một model mặc định cho cả hai. Người dùng vẫn có thể ghi đè từng stage của task.
+
+- Thứ tự ưu tiên: cấu hình stage của task → cấu hình stage mặc định của hệ thống. Chỉ các stage chưa có yêu cầu vai trò cụ thể mới được kế thừa model/effort mặc định hiện có từ Codex.
 - Khi tạo task, sao chép cấu hình mặc định vào task; chụp cấu hình thực dùng thành snapshot khi bắt đầu attempt. Thay setting chung không âm thầm đổi task đã tạo.
 - Danh sách model và effort lấy từ runtime/tài khoản; kiểm tra cặp lựa chọn hợp lệ trước khi chạy.
 - Model không khả dụng: báo và chờ người dùng chọn lại. Không tự fallback.
+- Khi chuyển plan → implement, worker dùng model implement đã lưu mà không hỏi lại. Đây là chuyển model theo stage đã được cho phép, không phải tự động nâng/hạ model ngoài cấu hình.
 - Thay model có hiệu lực ở lượt sau. Muốn đổi ngay phải ngắt lượt đang chạy, chờ nó dừng, đối chiếu file/process rồi tiếp tục.
 - Model mới nhận requirement/plan đã duyệt, diff hiện tại, finding và kết quả kiểm tra liên quan. Không phụ thuộc vào trí nhớ ngầm giữa hai phiên.
+- Nếu implement phát hiện plan thiếu quyết định hoặc sai giả định quan trọng, ghi rõ vấn đề và quay lại plan với model planner đã chọn; không tự mở rộng phạm vi. Plan thay đổi phải qua approval trước khi tiếp tục, giữ nguyên branch/worktree và repair count.
 - Reviewer dùng phiên riêng với quyền chỉ đọc code; output có cấu trúc gồm finding, severity, file/căn cứ, tiêu chí bị vi phạm và verdict.
 - Log hiển thị model/effort thực dùng, thời gian, usage khi runtime cung cấp. Không tự quy đổi usage thành USD của subscription.
 
@@ -273,6 +287,7 @@ Các lát cắt triển khai dự kiến, mỗi lát có kết quả quan sát �
 Kiểm thử chính harness gồm:
 
 - Unit: transition guards, approval theo version, giới hạn repair, cấu hình model và invalidation evidence.
+- Model routing: plan dùng planner model, implement dùng implementer model sau approval; task override được ưu tiên; thiếu role mapping/model không khả dụng phải chờ cấu hình; lập lại plan dùng planner model và duyệt lại; cấu hình chung thay đổi không ảnh hưởng task đã tạo.
 - Skill/rule integration: thiếu skill bắt buộc phải blocked; plugin update không đổi bundle giữa lượt; đổi model/resume giữ rule; rule Lighthouse chỉ nạp cho task phù hợp; yêu cầu chạy full suite trong skill không ghi đè chính sách feature-only; expected TDD red không tiêu repair round; skill không tự tạo thêm reviewer/worktree.
 - Integration: SQLite transaction/lease, Codex adapter với event giả lập, Git worktree thật trong repo tạm, process exit/timeout, reconciliation GitHub qua adapter giả lập.
 - E2E dashboard: tạo task → duyệt → code → verify fail → repair → review → deliver; pause/resume; thay model; thiếu runtime; quota; legacy test fail ngoài phạm vi không chặn feature; required test bị skip phải chặn.
