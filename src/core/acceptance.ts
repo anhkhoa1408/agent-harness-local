@@ -1,4 +1,5 @@
-import {PlanSchema,type Plan} from './contracts';
+import {PlanSchema,type Plan,type Task,type Review} from './contracts';
+import type {CheckResult} from '../execution/checks';
 export function validatePlan(plan:Plan):string[]{
  const parsed=PlanSchema.safeParse(plan);if(!parsed.success)return parsed.error.issues.map(i=>`${i.path.join('.')}: ${i.message}`);
  const errors:string[]=[];
@@ -11,3 +12,14 @@ export function validatePlan(plan:Plan):string[]{
  function visit(id:string){if(active.has(id)){errors.push('dependency_cycle');return;}if(visited.has(id))return;const step=plan.steps.find(s=>s.id===id);if(!step){errors.push(`unknown_dependency:${id}`);return;}active.add(id);step.dependsOn.forEach(visit);active.delete(id);visited.add(id);}
  plan.steps.forEach(s=>visit(s.id));return [...new Set(errors)];
 }
+export function acceptanceErrors(task:Task,plan:Plan,checks:CheckResult[],review:Review,fingerprint:string):string[]{
+ const errors=validatePlan(plan);
+ if(task.id!==plan.taskId||task.planVersion!==plan.version||task.approvedPlanVersion!==plan.version||task.sourceCommit!==plan.sourceCommit)errors.push('plan_not_approved');
+ if(review.taskId!==task.id||review.planVersion!==plan.version||review.fingerprint!==fingerprint)errors.push('stale_review');
+ if(review.verdict!=='pass')errors.push('review_not_passed');
+ if(review.findings.some(f=>f.severity!=='minor'&&f.status!=='resolved'))errors.push('unresolved_findings');
+ for(const spec of plan.checks.filter(c=>c.required)){const matching=checks.filter(c=>c.id===spec.id);if(matching.length!==1||!matching.every(c=>c.taskId===task.id&&c.planVersion===plan.version&&c.fingerprint===fingerprint&&c.status==='passed'&&c.evidencePath))errors.push(`required_check:${spec.id}`);}
+ for(const criterion of plan.criteria){const matches=review.criteria.filter(c=>c.id===criterion.id);if(matches.length!==1||!matches.every(c=>c.passed&&c.evidence.trim()))errors.push(`criterion:${criterion.id}`);}
+ return errors;
+}
+export function canDeliver(task:Task,plan:Plan,checks:CheckResult[],review:Review,fingerprint:string):boolean{return acceptanceErrors(task,plan,checks,review,fingerprint).length===0;}
