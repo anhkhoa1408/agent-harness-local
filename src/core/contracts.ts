@@ -29,3 +29,9 @@ export const ControlCommandSchema=z.object({
 });
 export type ControlCommand=z.infer<typeof ControlCommandSchema>;
 export type Event={seq:number;taskId:string;type:string;data:unknown;at:number};
+export const RepositorySchema=z.object({id:z.string(),root:z.string(),baseBranch:z.string(),remote:z.string().nullable(),head:z.string(),dirty:z.boolean()});
+export type Repository=z.infer<typeof RepositorySchema>;
+export const CommandSpecSchema=z.object({id:z.string().min(1),executable:z.string().min(1),args:z.array(z.string()),cwd:z.string().min(1),envNames:z.array(z.string()),timeoutMs:z.number().int().min(100).max(3600000),reportPath:z.string().nullable()});
+export type CommandSpec=z.infer<typeof CommandSpecSchema>;
+export const RepoProfileSchema=z.object({repositoryId:z.string(),sourceCommit:z.string(),languages:z.array(z.string()),areas:z.array(z.object({path:z.string(),purpose:z.string()})),commands:z.array(CommandSpecSchema),prerequisites:z.array(z.string()),evidence:z.array(z.object({path:z.string(),reason:z.string()})),unknowns:z.array(z.string())});
+export type RepoProfile=z.infer<typeof RepoProfileSchema>;
