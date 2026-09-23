@@ -41,3 +41,5 @@ export const PlanSchema=z.object({taskId:z.string(),version:z.number().int().pos
 export type Plan=z.infer<typeof PlanSchema>;
 export const AnalysisSchema=z.object({requirement:z.string().min(1),questions:z.array(z.object({id:z.string(),question:z.string(),recommendation:z.string()}))});
 export type Analysis=z.infer<typeof AnalysisSchema>;
+export const ReviewSchema=z.object({taskId:z.string(),fingerprint:z.string(),planVersion:z.number().int().positive(),findings:z.array(z.object({id:z.string(),severity:z.enum(['critical','important','minor']),criterionId:z.string().nullable(),path:z.string(),line:z.number().int().nonnegative(),description:z.string(),evidence:z.string(),status:z.enum(['open','resolved','disputed'])})),criteria:z.array(z.object({id:z.string(),passed:z.boolean(),evidence:z.string()})),verdict:z.enum(['pass','changes_requested','needs_input'])});
+export type Review=z.infer<typeof ReviewSchema>;
