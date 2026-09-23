@@ -1,5 +1,6 @@
 import {stages} from '../core/contracts';import type {Handlers} from './engine';
 import {z} from 'zod';import {join} from 'node:path';
+import {createDelivery} from '../delivery/github';
 import {aiStages,AnalysisSchema,PlanSchema,RepositorySchema,ReviewSchema,type Task,type AiStage,type Plan} from '../core/contracts';
 import type {Store} from '../storage/store';import type {AgentClient} from '../codex/client';import {resolveModel} from '../core/model-policy';
 import {resolveBundle,snapshotBundle,type Bundle} from '../context/skills';import {composeInstructions} from '../context/prompts';import {discoverRepository,gitText} from '../repositories/inspect';import {prepareWorktree} from '../repositories/worktree';import {fingerprintWorktree} from '../repositories/fingerprint';import {runChecks,type CheckResult} from '../execution/checks';import {canImplement,nextAfterReview} from '../core/transitions';import {acceptanceErrors} from '../core/acceptance';import {savePlan} from '../server/services';
@@ -38,6 +39,7 @@ export function createHandlers(store:Store,client:AgentClient,data:string):Handl
   implement:mutate,repair:mutate,
   verify:async(task,signal)=>{const plan=planOf(task);if(!canImplement(task,plan))throw new Error('plan_not_approved');const checks=await runChecks(task,plan,signal,artifacts(task));store.putRecord('checks',task.id,checks);
    const failures=plan.checks.filter(s=>s.required&&!checks.some(c=>c.id===s.id&&c.status==='passed'));if(failures.length){if(checks.some(c=>c.status==='blocked'))return {stage:'verify',status:'blocked',reason:checks.find(c=>c.status==='blocked')?.reason??'test_blocked',output:checks};if(task.repairCount>=3)return {stage:'verify',status:'blocked',reason:'repair_limit',output:checks};return next('repair',checks);}return next('review',checks);},
+  deliver:async(task,signal)=>{const delivery=await createDelivery(store,data)(task,signal);store.putRecord('delivery',task.id,delivery);return {stage:'deliver',status:'completed',reason:null,output:delivery};},
   review:async(task,signal)=>{const plan=planOf(task),before=await fingerprint(task,plan),checks=(store.getRecord('checks',task.id)??[]) as CheckResult[];
    const review=await ai(task,'review',ReviewSchema,{task,plan,checks,fingerprint:before,diff:await gitText(task.worktree!,['diff',task.sourceCommit,'--']),instruction:'Independently review the final worktree and tests. Every acceptance criterion needs evidence. Return the exact fingerprint and plan version.'},signal);
    const after=await fingerprint(task,plan);if(before!==after)throw new Error('review_snapshot_changed');store.putRecord('review',task.id,review);const errors=acceptanceErrors(task,plan,checks,review,after);store.putRecord('acceptance',task.id,{passed:errors.length===0,errors,fingerprint:after});
