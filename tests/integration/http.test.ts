@@ -6,11 +6,10 @@ import { taskFixture } from "../support/task-fixture";
 test("local bootstrap, CSRF, hostile origins, stale commands and artifact traversal", async () => {
   const store = openStore(":memory:");
   try {
-    const handle = createHttpHandler(
-      store,
-      "/tmp/harness-http",
-      async () => [],
-    );
+    const handle = createHttpHandler(store, "/tmp/harness-http", async () => [
+      { id: "gpt-6-astra", efforts: ["high"], isDefault: false },
+      { id: "gpt-6-luna", efforts: ["medium"], isDefault: true },
+    ]);
     const base = "http://127.0.0.1:3100";
     const headers = {
       host: "127.0.0.1:3100",
@@ -65,6 +64,40 @@ test("local bootstrap, CSRF, hostile origins, stale commands and artifact traver
       (await handle(request("settings", "PUT", {}, { "x-harness-csrf": "" })))
         .status,
     ).toBe(403);
+    const initial = await (await handle(request("settings"))).json();
+    expect(initial.models.plan).toEqual({
+      model: "gpt-6-astra",
+      effort: "high",
+    });
+    expect(initial.models.review).toEqual({
+      model: "gpt-6-luna",
+      effort: "medium",
+    });
+    const saved = await handle(
+      request("settings", "PUT", {
+        ...initial,
+        models: {
+          ...initial.models,
+          plan: { model: "gpt-6-astra", effort: "low" },
+          review: { model: "gpt-6-luna", effort: "high" },
+        },
+      }),
+    );
+    expect(saved.status).toBe(200);
+    expect((await saved.json()).models).toEqual(initial.models);
+    const unavailable = await handle(
+      request("settings", "PUT", {
+        ...initial,
+        models: {
+          ...initial.models,
+          plan: { model: "gpt-6-luna", effort: "medium" },
+        },
+      }),
+    );
+    expect(unavailable.status).toBe(400);
+    expect(await unavailable.json()).toEqual({
+      error: "effort_unavailable: high",
+    });
     const task = store.createTask(taskFixture());
     expect(
       (

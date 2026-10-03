@@ -24,7 +24,11 @@ export function TaskForm() {
       setRepos(r);
       setTasks(t);
       setHealth(h.worker);
-      setConfigured(!!s.models);
+      setConfigured(
+        !!s.models &&
+          !!s.skillRoots?.superpowers &&
+          !!s.skillRoots?.["mattpocock-skills"],
+      );
       setRepoId((old) => old || r[0]?.id || "");
     } catch (e) {
       setError(String(e));
@@ -116,7 +120,7 @@ export function TaskForm() {
       )}
       {!configured && (
         <p className="notice">
-          Chọn model cho từng stage trước khi bắt đầu.{" "}
+          Kiểm tra Model & skills trước khi bắt đầu.{" "}
           <Link href="/settings">Mở Model & skills →</Link>
         </p>
       )}

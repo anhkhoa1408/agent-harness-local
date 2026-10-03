@@ -3,7 +3,11 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Store } from "../storage/store";
 import type { ModelInfo } from "../core/model-policy";
-import { resolveModel } from "../core/model-policy";
+import {
+  resolveModel,
+  defaultModels,
+  applyEffortPolicy,
+} from "../core/model-policy";
 import {
   ModelMapSchema,
   NewTaskSchema,
@@ -15,10 +19,15 @@ import { authorize, readSession } from "./local-session";
 import { createServices } from "./services";
 import { contained } from "../context/rules";
 import { gitText } from "../repositories/inspect";
-export const SettingsSchema = z.object({
-  models: ModelMapSchema,
-  skillRoots: z.record(z.string(), z.string()),
-});
+export const SettingsSchema = z
+  .object({
+    models: ModelMapSchema.default(defaultModels),
+    skillRoots: z.record(z.string(), z.string()).default({}),
+  })
+  .transform((settings) => ({
+    ...settings,
+    models: applyEffortPolicy(settings.models),
+  }));
 const json = (body: unknown, status = 200) =>
   Response.json(body, {
     status,
@@ -74,10 +83,7 @@ export function createHttpHandler(
       if (parts[0] === "settings") {
         if (method === "GET")
           return json(
-            store.getRecord("settings", "current") ?? {
-              models: null,
-              skillRoots: {},
-            },
+            SettingsSchema.parse(store.getRecord("settings", "current") ?? {}),
           );
         if (method === "PUT") {
           const settings = SettingsSchema.parse(await body()),
@@ -109,7 +115,7 @@ export function createHttpHandler(
           if (method === "GET") return json(store.listTasks());
           if (method === "POST") {
             const settings = SettingsSchema.parse(
-                store.getRecord("settings", "current"),
+                store.getRecord("settings", "current") ?? {},
               ),
               raw = await body(),
               repo = RepositorySchema.parse(
@@ -124,7 +130,9 @@ export function createHttpHandler(
               ...raw,
               sourceCommit,
               targetBranch: raw.targetBranch ?? repo.baseBranch,
-              models: raw.models ?? settings.models,
+              models: applyEffortPolicy(
+                ModelMapSchema.parse(raw.models ?? settings.models),
+              ),
             });
             await gitText(repo.root, [
               "check-ref-format",

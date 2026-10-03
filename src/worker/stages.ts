@@ -15,7 +15,7 @@ import {
 } from "../core/contracts";
 import type { Store } from "../storage/store";
 import type { AgentClient } from "../codex/client";
-import { resolveModel } from "../core/model-policy";
+import { resolveModel, applyEffortPolicy } from "../core/model-policy";
 import { resolveBundle, snapshotBundle, type Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";
 import {
@@ -109,6 +109,7 @@ export function createHandlers(
       return withSourceSnapshot(repository(task), (cwd) =>
         ai({ ...task, worktree: cwd }, stage, schema, context, signal),
       );
+    task = { ...task, models: applyEffortPolicy(task.models) };
     const bundle = store.getRecord("bundle", `${task.id}:${stage}`) as Bundle,
       model = resolveModel(stage, task.models, {}, await client.models());
     let poll: NodeJS.Timeout | undefined;
@@ -362,9 +363,15 @@ export function createHandlers(
         if (!original) throw new Error("context_missing");
         const files = [
           ...original.files.filter(
-            (f) => !f.id.startsWith("repo:") && !f.id.startsWith("rule:"),
+            (f) =>
+              !f.id.startsWith("repo:") &&
+              !f.id.startsWith("rule:") &&
+              f.id !== "agent:ecc/e2e-runner",
           ),
           ...scoped,
+          ...(plan.checks.some((c) => c.kind === "e2e")
+            ? (original.optionalFiles ?? [])
+            : []),
         ];
         const bundle = {
           ...original,
@@ -373,7 +380,12 @@ export function createHandlers(
             JSON.stringify({
               stage,
               adaptations: original.adaptations,
-              files: files.map((f) => [f.id, f.sha256]).sort(),
+              optionalFiles: (original.optionalFiles ?? []).map((f) => [
+                f.id,
+                f.sha256,
+                f.path,
+              ]),
+              files: files.map((f) => [f.id, f.sha256, f.path]).sort(),
             }),
           ),
         };

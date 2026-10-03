@@ -1,0 +1,3 @@
+# ecc/e2e-runner
+
+Apply only when the approved plan contains E2E checks. Design tests around the feature's user-visible flow, including relevant error states. Use the repository's existing browser tooling and stable semantic selectors; rely on observable readiness instead of arbitrary sleeps. The approved command must own server startup, readiness, port allocation and cleanup. Capture reproducible failure evidence such as logs, screenshot or trace when supported. Do not quarantine, skip or weaken a required feature test to make verification pass. Do not introduce Playwright if the plan has not approved that dependency.

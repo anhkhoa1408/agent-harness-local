@@ -1,50 +1,56 @@
 import { test, expect } from "vitest";
-import { resolveModel } from "../../src/core/model-policy";
+import {
+  resolveModel,
+  defaultModels,
+  applyEffortPolicy,
+} from "../../src/core/model-policy";
+import { aiStages } from "../../src/core/contracts";
 const catalog = [
   { id: "strong", efforts: ["high"], isDefault: false },
-  { id: "medium", efforts: ["medium"], isDefault: true },
+  { id: "economy", efforts: ["medium"], isDefault: true },
 ];
-const config = {
-  plan: { model: "strong", effort: "high" },
-  implement: { model: "medium", effort: "medium" },
-};
-test("stage routing uses planner and implementer settings without silently falling back", () => {
-  expect(resolveModel("plan", {}, config, catalog)).toEqual({
+test("code policy uses high planning and medium elsewhere, retaining model choices", () => {
+  const defaults = defaultModels();
+  expect(defaults.plan).toEqual({ model: "gpt-6-astra", effort: "high" });
+  for (const stage of aiStages.filter((s) => s !== "plan"))
+    expect(defaults[stage]).toEqual({ model: "gpt-6-luna", effort: "medium" });
+  const choices = { ...defaults, plan: { model: "strong", effort: "low" } };
+  expect(applyEffortPolicy(choices).plan).toEqual({
     model: "strong",
     effort: "high",
   });
-  expect(resolveModel("implement", {}, config, catalog)).toEqual({
-    model: "medium",
-    effort: "medium",
+  expect(choices.plan.effort).toBe("low");
+  expect(resolveModel("plan", choices, {}, catalog)).toEqual({
+    model: "strong",
+    effort: "high",
   });
-  expect(() => resolveModel("plan", {}, {}, catalog)).toThrow(
-    "model_unconfigured",
-  );
+  expect(
+    resolveModel(
+      "repair",
+      { repair: { model: "economy", effort: "high" } },
+      {},
+      catalog,
+    ),
+  ).toEqual({ model: "economy", effort: "medium" });
+});
+test("model overrides never fall back and unsupported fixed effort blocks", () => {
   expect(() =>
     resolveModel(
       "plan",
       { plan: { model: "missing", effort: "high" } },
-      config,
+      {},
       catalog,
     ),
   ).toThrow("model_unavailable");
   expect(() =>
     resolveModel(
-      "implement",
-      { implement: { model: "medium", effort: "high" } },
-      config,
+      "plan",
+      { plan: { model: "economy", effort: "medium" } },
+      {},
       catalog,
     ),
   ).toThrow("effort_unavailable");
-});
-test("task override wins and resolution returns an independent value", () => {
-  const resolved = resolveModel(
-    "plan",
-    { plan: { model: "medium", effort: "medium" } },
-    config,
-    catalog,
-  );
-  expect(resolved.model).toBe("medium");
-  resolved.model = "mutated";
-  expect(config.plan.model).toBe("strong");
+  const copy = defaultModels();
+  copy.plan.model = "changed";
+  expect(defaultModels().plan.model).toBe("gpt-6-astra");
 });

@@ -11,7 +11,10 @@ export function taskFixture(patch: Partial<Task> = {}): Task {
     models: Object.fromEntries(
       aiStages.map((s) => [
         s,
-        { model: s === "plan" ? "strong" : "medium", effort: "high" },
+        {
+          model: s === "plan" ? "strong" : "medium",
+          effort: s === "plan" ? "high" : "medium",
+        },
       ]),
     ) as Task["models"],
     stage: "plan",

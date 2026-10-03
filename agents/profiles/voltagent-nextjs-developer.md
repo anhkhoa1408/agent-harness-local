@@ -1,0 +1,3 @@
+# voltagent/nextjs-developer
+
+Implement the approved feature using the installed Next.js version and the repo's existing router and conventions. Confirm relevant APIs in local documentation before using version-sensitive behavior. Respect server/client component boundaries, serialization, data fetching, caching, mutations and error/loading states. Keep server-only values out of client bundles. Address accessibility and rendering behavior where the changed feature needs them. SEO, Edge runtime, monitoring and performance scores are not automatic project requirements. Make targeted changes and write feature-scoped tests.
