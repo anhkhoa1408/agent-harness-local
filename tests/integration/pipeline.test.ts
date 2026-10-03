@@ -55,7 +55,7 @@ test("strong planning, approved isolated implementation, real failure/repair and
     const fake: AgentClient = {
       models: async () => [
         { id: "strong", efforts: ["high"], isDefault: false },
-        { id: "medium", efforts: ["high"], isDefault: false },
+        { id: "medium", efforts: ["medium"], isDefault: false },
       ],
       answer: async () => {},
       interrupt: async () => {},
@@ -133,6 +133,12 @@ test("strong planning, approved isolated implementation, real failure/repair and
     };
     await wait(() => store.getTask(task.id).status === "waiting_approval");
     expect(calls.some((c) => c.write)).toBe(false);
+    const frozen = store.getRecord("bundle", `${task.id}:implement`) as any;
+    const optional = frozen.optionalFiles[0];
+    // An approved E2E check enables the already-frozen profile, without reloading upstream.
+    const savedPlan = store.getRecord("plan", `${task.id}:1`) as any;
+    savedPlan.checks[0].kind = "e2e";
+    store.putRecord("plan", `${task.id}:1`, savedPlan);
     const waiting = store.getTask(task.id);
     store.enqueue({
       id: "approve",
@@ -148,7 +154,28 @@ test("strong planning, approved isolated implementation, real failure/repair and
     expect(
       calls.find((c) => c.instructions.includes("stage: plan"))?.model.model,
     ).toBe("strong");
-    expect(calls.find((c) => c.write)?.model.model).toBe("medium");
+    expect(calls.find((c) => c.write)?.model).toEqual({
+      model: "medium",
+      effort: "medium",
+    });
+    for (const call of calls) {
+      const isPlan = call.instructions.includes("stage: plan");
+      expect(call.model.effort).toBe(isPlan ? "high" : "medium");
+    }
+    const implementation = calls.find((c) =>
+      c.instructions.includes("stage: implement"),
+    )!;
+    expect(implementation.instructions).toContain("SOURCE agent:ecc/tdd-guide");
+    expect(implementation.instructions).toContain(optional.content);
+    expect(
+      calls.find((c) => c.instructions.includes("stage: repair"))!.instructions,
+    ).toContain("SOURCE agent:voltagent/debugger");
+    expect(
+      calls.find((c) => c.instructions.includes("stage: review"))!.instructions,
+    ).toContain("SOURCE agent:ecc/code-reviewer");
+    const worktree = store.getTask(task.id).worktree;
+    for (const call of calls.filter((c) => c.write))
+      expect(call.cwd).toBe(worktree);
     expect(
       calls.find((c) => c.instructions.includes("stage: review")),
     ).toMatchObject({ write: false });

@@ -15,7 +15,7 @@ npm run dev
 
 Mở `http://127.0.0.1:3000`. Lần mở đầu tạo session HttpOnly cùng origin. Chỉ bind loopback; không triển khai lên public server. Đóng browser không dừng worker; Ctrl+C trong terminal dừng cả web/worker.
 
-1. Trong **Model & skills**, chọn model + effort cho tất cả AI stages từ catalog của Codex đang đăng nhập. Chọn model mạnh cho **plan** (bao gồm replan), model trung bình cho **implement**. Không tự fallback hoặc chuyển sang API tính phí.
+1. Trong **Model & skills**, mặc định **plan/replan = gpt-6-astra / high**, các stage AI khác **gpt-6-luna / medium**. Có thể đổi model từ catalog; effort cố định trong `src/core/model-policy.ts`, không có selector. Model/effort không khả dụng sẽ bị chặn, không tự fallback hoặc chuyển sang API tính phí.
 2. Điền thư mục skill roots: thư mục chứa `writing-plans/`, `test-driven-development/`, `systematic-debugging/`… của Superpowers và `grilling/` của Matt Pocock. Đường dẫn tùy phiên bản plugin cài trên máy. `baseline` tùy chọn, mặc định dùng AGENTS.md của harness, mục 1–6.
 3. Đăng ký đường dẫn repo Git có commit và nhánh nguồn. Repo đích có thể là JavaScript, Python hoặc ngôn ngữ khác; harness không mặc định chạy npm trong repo đích.
 4. Tạo task, trả lời câu hỏi, đọc plan và duyệt command/test scope trước khi code.
@@ -74,3 +74,23 @@ node --import tsx scripts/codex-smoke.ts --read-only --model MODEL_ID --effort E
 ```
 
 Xem thiết kế và implementation plan trong `docs/superpowers/`.
+
+## Agent profiles theo stage
+
+Mapping: `src/context/agents.ts`; cấu hình model/effort: `src/core/model-policy.ts`.
+
+| Stage | Profile |
+| --- | --- |
+| discover | Harness repo-explorer |
+| analyze | VoltAgent business-analyst |
+| plan | ECC planner |
+| implement | VoltAgent specialist theo repo + ECC tdd-guide |
+| review | ECC code-reviewer, read-only |
+| repair | VoltAgent debugger + ECC build-error-resolver + tdd-guide |
+| prepare / verify / deliver | Worker / test runner |
+
+Specialists hiện có: Next.js, frontend React/Vue/Angular, Python, Spring Boot. Repo hỗn hợp hoặc stack khác dùng implementer chung, không ép repo sang Next.js. Implement/repair nhận thêm ECC e2e-runner khi plan đã duyệt có E2E checks. Mỗi stage là phiên riêng do worker điều phối; profiles không tự spawn sub-agent.
+
+Nguồn GitHub, commit và SHA256 ở `agents/sources.json`; bản gốc và MIT licenses ở `agents/upstream/`; bản rút gọn dùng thực tế ở `agents/profiles/`. Không chạy installer upstream. Profile và nguồn được chụp vào context artifact; profile đã frozen của task cũ giữ nguyên. Các lượt mới dùng effort trong code và lưu effort thực vào attempt log; model snapshot của task vẫn giữ nguyên cho đến khi áp dụng Settings ở stage boundary.
+
+Mỗi feature có branch/worktree riêng trong `.harness/worktrees/<task-id>`, tạo sau approval và giữ nguyên qua repair/replan/resume. Repo gốc không bị thay đổi.

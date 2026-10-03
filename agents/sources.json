@@ -1,0 +1,68 @@
+{
+  "ecc/planner": {
+    "file": "agents/upstream/ecc/planner.md",
+    "url": "https://github.com/affaan-m/ECC/blob/ef648e01899ba3e8dc6371642deaaf64b4477775/agents/planner.md",
+    "revision": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+    "sha256": "63aba865206bac9cb5887542fb01b97656e7701faff98e091aa77057ba9860bc"
+  },
+  "ecc/tdd-guide": {
+    "file": "agents/upstream/ecc/tdd-guide.md",
+    "url": "https://github.com/affaan-m/ECC/blob/ef648e01899ba3e8dc6371642deaaf64b4477775/agents/tdd-guide.md",
+    "revision": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+    "sha256": "979afbb40c42bfdd02fc308c130d7e257f5d6dd5f6531ef2562644862f6b7771"
+  },
+  "ecc/code-reviewer": {
+    "file": "agents/upstream/ecc/code-reviewer.md",
+    "url": "https://github.com/affaan-m/ECC/blob/ef648e01899ba3e8dc6371642deaaf64b4477775/agents/code-reviewer.md",
+    "revision": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+    "sha256": "9dd23be23d65f18126e10f7680fc1eb2576ec54a427d076ff2f870bd0bafd5d2"
+  },
+  "ecc/e2e-runner": {
+    "file": "agents/upstream/ecc/e2e-runner.md",
+    "url": "https://github.com/affaan-m/ECC/blob/ef648e01899ba3e8dc6371642deaaf64b4477775/agents/e2e-runner.md",
+    "revision": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+    "sha256": "94811f4bbc491c351cdf220ab103d6bd251fb1d88d9d46ba4c8162637a236a5b"
+  },
+  "ecc/build-error-resolver": {
+    "file": "agents/upstream/ecc/build-error-resolver.md",
+    "url": "https://github.com/affaan-m/ECC/blob/ef648e01899ba3e8dc6371642deaaf64b4477775/agents/build-error-resolver.md",
+    "revision": "ef648e01899ba3e8dc6371642deaaf64b4477775",
+    "sha256": "acc9e14df59dd28d00f966b3a6cf0d9aeeda7e8a9ab7f1bc442466c0219c35ec"
+  },
+  "voltagent/business-analyst": {
+    "file": "agents/upstream/voltagent/business-analyst.md",
+    "url": "https://github.com/VoltAgent/awesome-claude-code-subagents/blob/82b73821baa7a911d5b14cfb6da238b7f0db6b42/categories/08-business-product/business-analyst.md",
+    "revision": "82b73821baa7a911d5b14cfb6da238b7f0db6b42",
+    "sha256": "d7aa88028703b5029118537a56f5f529535558d1d594603289dfb618bd63ed3f"
+  },
+  "voltagent/nextjs-developer": {
+    "file": "agents/upstream/voltagent/nextjs-developer.md",
+    "url": "https://github.com/VoltAgent/awesome-claude-code-subagents/blob/82b73821baa7a911d5b14cfb6da238b7f0db6b42/categories/02-language-specialists/nextjs-developer.md",
+    "revision": "82b73821baa7a911d5b14cfb6da238b7f0db6b42",
+    "sha256": "435a9c43ef696ed9f268e7ba0a7a20a422697e8227c95af9b4acce37a8c6e540"
+  },
+  "voltagent/frontend-developer": {
+    "file": "agents/upstream/voltagent/frontend-developer.md",
+    "url": "https://github.com/VoltAgent/awesome-claude-code-subagents/blob/82b73821baa7a911d5b14cfb6da238b7f0db6b42/categories/01-core-development/frontend-developer.md",
+    "revision": "82b73821baa7a911d5b14cfb6da238b7f0db6b42",
+    "sha256": "f0d9e9c05f3ed75afa6d72dce6803d59eb0410c8af01e74ef1c9931dc21ec122"
+  },
+  "voltagent/python-pro": {
+    "file": "agents/upstream/voltagent/python-pro.md",
+    "url": "https://github.com/VoltAgent/awesome-claude-code-subagents/blob/82b73821baa7a911d5b14cfb6da238b7f0db6b42/categories/02-language-specialists/python-pro.md",
+    "revision": "82b73821baa7a911d5b14cfb6da238b7f0db6b42",
+    "sha256": "b87dba6a73d6f61d0aea24fc73f757c9e75f53cea1df117f0c8aa0c7432a1e16"
+  },
+  "voltagent/spring-boot-engineer": {
+    "file": "agents/upstream/voltagent/spring-boot-engineer.md",
+    "url": "https://github.com/VoltAgent/awesome-claude-code-subagents/blob/82b73821baa7a911d5b14cfb6da238b7f0db6b42/categories/02-language-specialists/spring-boot-engineer.md",
+    "revision": "82b73821baa7a911d5b14cfb6da238b7f0db6b42",
+    "sha256": "b09a4d457549ba7156682d3246364981eb4d8ce2dad4dc26464d55a40cf61fb0"
+  },
+  "voltagent/debugger": {
+    "file": "agents/upstream/voltagent/debugger.md",
+    "url": "https://github.com/VoltAgent/awesome-claude-code-subagents/blob/82b73821baa7a911d5b14cfb6da238b7f0db6b42/categories/04-quality-security/debugger.md",
+    "revision": "82b73821baa7a911d5b14cfb6da238b7f0db6b42",
+    "sha256": "7e39938967cb1313f803a603e215ad0d8c778e0913328ccee220bb8470d617f3"
+  }
+}

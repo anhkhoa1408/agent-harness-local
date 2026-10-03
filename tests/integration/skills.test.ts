@@ -44,7 +44,19 @@ test("snapshots remain unchanged after installed skill edits and include scoped 
     expect(bundle.files.some((x) => x.content === "Nested conventions.")).toBe(
       true,
     );
+    expect(bundle.files.some((f) => f.id === "agent:ecc/tdd-guide")).toBe(true);
+    expect(bundle.files.some((f) => f.id === "agent:ecc/e2e-runner")).toBe(
+      false,
+    );
+    expect(bundle.optionalFiles?.map((f) => f.id)).toEqual([
+      "agent:ecc/e2e-runner",
+    ]);
     const artifact = await snapshotBundle(bundle, join(root, "artifacts"));
+    const before = JSON.parse(await readFile(artifact, "utf8"));
+    bundle.optionalFiles![0].content = "Changed live memory";
+    expect(JSON.parse(await readFile(artifact, "utf8")).optionalFiles).toEqual(
+      before.optionalFiles,
+    );
     await writeFile(
       join(skills, "test-driven-development/SKILL.md"),
       "Different policy.",

@@ -1,3 +1,4 @@
+import { applyEffortPolicy } from "../core/model-policy";
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/store";
 import {
@@ -195,7 +196,8 @@ export async function runWorker(
           throw new Error("stage_boundary_required");
         const p = c.payload as { models?: unknown; deliveryMode?: unknown };
         const patch: Partial<Task> = {};
-        if (p.models) patch.models = ModelMapSchema.parse(p.models);
+        if (p.models)
+          patch.models = applyEffortPolicy(ModelMapSchema.parse(p.models));
         if (p.deliveryMode === "local" || p.deliveryMode === "github")
           patch.deliveryMode = p.deliveryMode;
         store.updateTask(
@@ -255,7 +257,10 @@ export async function runWorker(
             leaseEpoch: lease.epoch,
             status: "running",
             output: null,
-            model: next.models[next.stage as keyof Task["models"]] ?? null,
+            model:
+              applyEffortPolicy(next.models)[
+                next.stage as keyof Task["models"]
+              ] ?? null,
             bundleHash: null,
             threadId: null,
             turnId: null,

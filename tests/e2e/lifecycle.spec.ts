@@ -129,3 +129,28 @@ test("new plan requires fresh approval; quota never silently switches model", as
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Hủy task" }).click();
 });
+
+test("settings expose fixed effort and mapped agents, preserving models on save", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
+  await page.getByRole("link", { name: "⚙ Model & skills" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Agent theo stage", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Effort high", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("Effort medium", { exact: true })).toHaveCount(5);
+  await expect(page.getByRole("combobox", { name: /Effort/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "Model plan", exact: true }),
+  ).toHaveValue("fixture-strong");
+  await expect(
+    page.getByRole("combobox", { name: "Model review", exact: true }),
+  ).toHaveValue("fixture-medium");
+  await page.getByRole("button", { name: "Lưu cấu hình" }).click();
+  await expect(page.getByRole("status")).toContainText("Đã lưu cấu hình");
+  const settings = await (await page.request.get("/api/settings")).json();
+  expect(settings.models.plan.effort).toBe("high");
+  expect(settings.models.review.effort).toBe("medium");
+});

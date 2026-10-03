@@ -1,7 +1,7 @@
 # Agent Harness — thiết kế MVP local
 
 Ngày: 2026-09-23
-Trạng thái: người dùng đã duyệt thiết kế và yêu cầu bắt đầu ngày 2026-09-23, gồm bổ sung skill/rule và model mạnh cho plan, model tầm trung cho implement.
+Trạng thái: thiết kế đã duyệt ngày 2026-09-23; bổ sung theo yêu cầu người dùng ngày 2026-10-03: agent GitHub theo stage, effort cố định trong code (plan high, còn lại medium), model tiết kiệm ngoài planning và worktree riêng mỗi feature.
 
 ## 1. Mục tiêu và phạm vi
 
@@ -16,7 +16,7 @@ Các quyết định sản phẩm đã chốt:
 - Dùng Codex làm coding agent, ưu tiên đăng nhập ChatGPT với quyền truy cập sẵn có.
 - Người dùng duyệt requirement, plan, tiêu chí nghiệm thu và phạm vi test trước khi code.
 - Mỗi feature/task có branch và worktree riêng; reviewer có phiên Codex riêng.
-- Người dùng chọn model và reasoning effort theo stage. Mặc định plan dùng model mạnh, implement dùng model tầm trung; worker chuyển theo cấu hình đã chọn, không tự đổi ngoài cấu hình đó.
+- Người dùng có thể chọn model theo stage; effort cố định trong code: plan/replan high, các stage AI khác medium. Mặc định plan dùng gpt-6-astra, còn lại gpt-6-luna. Không fallback khi model/effort không khả dụng.
 - Stage AI dùng skill bundle rõ ràng và baseline hành vi từ `AGENTS.md`; runtime lưu nguồn/phiên bản đã nạp.
 - Viết test cho tính năng mới và bug đang sửa; có thể bỏ qua test cũ ngoài phạm vi feature.
 - Tối đa ba vòng sửa tự động sau lần triển khai đầu; hết giới hạn thì cần người dùng quyết định.
@@ -117,17 +117,17 @@ Mỗi task có nhiều Stage Attempt. Một attempt lưu đầu vào, model/effo
 
 Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có cấu hình model/effort riêng. Viết test nằm trong implement/repair. Verify chạy command; prepare/deliver dùng công cụ, không cần một model riêng để xác định kết quả.
 
-Chính sách phân bổ model đã được người dùng yêu cầu:
+Chính sách theo yêu cầu ngày 2026-10-03, thay thế lựa chọn effort trên UI:
 
-| Stage | Mặc định | Điều kiện |
+| Stage | Model mặc định | Effort |
 | --- | --- | --- |
-| plan, gồm lập lại plan | Model mạnh cho phân tích và lập kế hoạch | Dùng model đã cấu hình cho vai trò planner; đầu ra phải đạt yêu cầu rõ ràng tại mục 4 |
-| implement | Model tầm trung | Chỉ bắt đầu sau khi plan đủ rõ, được duyệt và môi trường sẵn sàng |
-| Các stage AI khác | Cấu hình riêng đã chọn | Không suy rộng quyết định này thành tự đổi model cho review/repair/discover/analyze |
+| plan, gồm replan | gpt-6-astra | high |
+| discover, analyze, implement, review, repair | gpt-6-luna | medium |
+| prepare, verify, deliver | Worker/runner, không gọi model | Không áp dụng |
 
-“Model mạnh” và “model tầm trung” là hai vai trò cấu hình, không phải tên model hoặc thứ hạng tự suy ra từ catalog. Khi thiết lập, ánh xạ chúng sang model ID khả dụng và reasoning effort hợp lệ; lưu rõ lựa chọn. Hai vai trò này phải được cấu hình trước khi chạy, không âm thầm dùng một model mặc định cho cả hai. Người dùng vẫn có thể ghi đè từng stage của task.
+Policy nằm trong `src/core/model-policy.ts`; thay effort bằng cách sửa code. UI vẫn cho đổi model nhưng hiển thị effort cố định. API chuẩn hóa effort khi lưu settings, tạo task và áp dụng model vào task; runtime và attempt log dùng effort của policy. Lựa chọn model cũ của task được giữ; lịch sử attempt và context snapshot đã ghi không bị sửa. Cặp model/effort không khả dụng phải blocked, không tự fallback. Model tiết kiệm là lựa chọn cấu hình, không cam kết mức quota hoặc số tiền cụ thể.
 
-- Thứ tự ưu tiên: cấu hình stage của task → cấu hình stage mặc định của hệ thống. Chỉ các stage chưa có yêu cầu vai trò cụ thể mới được kế thừa model/effort mặc định hiện có từ Codex.
+- Thứ tự model: snapshot task → cấu hình hệ thống → mặc định trong code.
 - Khi tạo task, sao chép cấu hình mặc định vào task; chụp cấu hình thực dùng thành snapshot khi bắt đầu attempt. Thay setting chung không âm thầm đổi task đã tạo.
 - Danh sách model và effort lấy từ runtime/tài khoản; kiểm tra cặp lựa chọn hợp lệ trước khi chạy.
 - Model không khả dụng: báo và chờ người dùng chọn lại. Không tự fallback.
@@ -148,7 +148,7 @@ Harness đọc thêm `AGENTS.md` của repo đích và các hướng dẫn trong
 
 Rule `rules/lighthouse-performance.md` chỉ được nạp khi task liên quan Liquid/Shopify theme/Core Web Vitals của theme. Workspace hiện chưa có nội dung file này. Đây là dependency điều kiện: task không liên quan tiếp tục bình thường; khi áp dụng mà rule không có thì hỏi người dùng cung cấp rule, không giả lập nội dung.
 
-Mapping dưới đây là thiết kế cho runtime sắp xây, chưa phải registry đã hoạt động. Các skill Superpowers/Matt Pocock được đọc từ bản đã cài để xác định hành vi; một skill có trong phiên Codex hiện tại không có nghĩa worker tương lai tự động truy cập được.
+Registry skill đã triển khai trong `src/context/skills.ts`; agent profile được map trong `src/context/agents.ts`. Worker nạp các skill từ roots cấu hình và profile đóng gói cùng ứng dụng, lưu snapshot nội dung và nguồn theo task. Cài skill trong phiên Codex không tự cấu hình roots cho worker.
 
 | Stage | Skill/bộ hướng dẫn mặc định | Trách nhiệm và kết quả |
 | --- | --- | --- |
@@ -306,3 +306,18 @@ Theo dõi thời gian người dùng can thiệp, số lần hỏi lại, số v
 - [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk): lựa chọn thay thế cho automation đơn giản; không triển khai đồng thời cả hai adapter trong MVP.
 - [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting): cơ sở chạy web server local.
 - [SQLite appropriate uses](https://www.sqlite.org/whentouse.html): cơ sở chọn lưu trữ ứng dụng local.
+
+### Bổ sung agent mapping — 2026-10-03
+
+- discover: Repo explorer riêng của harness, read-only.
+- analyze: VoltAgent business-analyst + grilling.
+- plan: ECC planner + writing-plans.
+- implement: một specialist VoltAgent nếu evidence từ committed manifests/source cho thấy Next.js, frontend React/Vue/Angular, Python hoặc Spring Boot; repo hỗn hợp/chưa nhận diện dùng implementer chung. Kèm ECC tdd-guide.
+- review: ECC code-reviewer + skill review hiện có; conversation độc lập, read-only.
+- repair: VoltAgent debugger + ECC build-error-resolver + tdd-guide, kèm systematic-debugging.
+- implement/repair nạp thêm ECC e2e-runner khi plan đã duyệt có E2E checks. Profile được freeze sẵn vào optional context ngay lúc task bắt đầu; prepare chỉ kích hoạt bản frozen, không đọc lại upstream.
+- prepare/verify/deliver thuộc worker, không spawn agent bổ sung.
+
+Đây là profile hướng dẫn cho từng phiên stage, không tự tạo đội agent lồng nhau. Bản nguồn GitHub pin commit cùng license nằm trong `agents/upstream`; runtime chỉ nạp bản rút gọn trong `agents/profiles`. Model/tool metadata, coverage toàn repo, context-manager và hành vi deploy tự động của upstream không được kế thừa. Output schema, quyền thực thi, stage transitions và approval của harness giữ quyền quyết định. Profile cũ đã frozen không tự cập nhật khi đổi ứng dụng; task mới nhận mapping mới.
+
+Mỗi feature/task luôn có branch và worktree riêng, tạo sau khi duyệt plan. Implement/verify/review/repair/deliver dùng lại worktree đó; pause/resume và replan không tạo worktree mới. Trước approval, các bước chỉ đọc committed source snapshot. Không tự merge hoặc xóa worktree.

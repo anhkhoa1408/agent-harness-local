@@ -129,3 +129,34 @@ test("argv spaces survive and abort terminates process group; legacy test never 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("each feature owns a different worktree while retries preserve its edits", async () => {
+  const fixture = await createTempRepo({ "app.js": "original" });
+  const dir = await mkdtemp(join(tmpdir(), "feature-worktrees-"));
+  try {
+    const repo = await inspectRepository(fixture.root, "main", null);
+    const a = taskFixture({
+      id: "feature-a",
+      branch: "codex/feature-a",
+      sourceCommit: repo.head,
+    });
+    const b = taskFixture({
+      id: "feature-b",
+      branch: "codex/feature-b",
+      sourceCommit: repo.head,
+    });
+    const first = await prepareWorktree(repo, a, dir);
+    const second = await prepareWorktree(repo, b, dir);
+    expect(first).not.toBe(second);
+    await writeFile(join(first, "app.js"), "feature A");
+    expect(await prepareWorktree(repo, a, dir)).toBe(first);
+    expect(await readFile(join(first, "app.js"), "utf8")).toBe("feature A");
+    expect(await readFile(join(second, "app.js"), "utf8")).toBe("original");
+    expect(await readFile(join(fixture.root, "app.js"), "utf8")).toBe(
+      "original",
+    );
+  } finally {
+    await fixture.dispose();
+    await rm(dir, { recursive: true, force: true });
+  }
+});

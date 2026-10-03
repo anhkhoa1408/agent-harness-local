@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
-import { aiStages, type ModelMap, type ModelChoice } from "../core/contracts";
-import type { ModelInfo } from "../core/model-policy";
+import { aiStages, type ModelMap } from "../core/contracts";
+import { stageEffort, type ModelInfo } from "../core/model-policy";
 import { api, stageLabel } from "./api";
 export function ModelSettings() {
   const [catalog, setCatalog] = useState<ModelInfo[]>([]),
@@ -18,13 +18,10 @@ export function ModelSettings() {
       })
       .catch((e) => setMessage(String(e)));
   }, []);
-  const select = (
-    stage: (typeof aiStages)[number],
-    patch: Partial<ModelChoice>,
-  ) =>
+  const select = (stage: (typeof aiStages)[number], model: string) =>
     setModels((old) => ({
       ...old,
-      [stage]: { model: "", effort: "", ...old[stage], ...patch },
+      [stage]: { model, effort: stageEffort(stage) },
     }));
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -48,8 +45,8 @@ export function ModelSettings() {
       <p className="eyebrow">STAGE ROUTING</p>
       <h1>Đúng model, đúng công việc.</h1>
       <p className="muted">
-        Dùng model mạnh để lập plan; model trung bình để implement theo plan đã
-        duyệt.
+        Plan dùng model mạnh với effort high. Các stage AI còn lại dùng model
+        tiết kiệm với effort medium.
       </p>
       {message && (
         <p role="status" className="notice">
@@ -71,9 +68,7 @@ export function ModelSettings() {
                   <p>
                     {stage === "plan"
                       ? "Model mạnh · plan và replan"
-                      : stage === "implement"
-                        ? "Model trung bình · thực thi"
-                        : "Chọn theo nhu cầu"}
+                      : "Model tiết kiệm · medium"}
                   </p>
                 </div>
                 <label className="sr-label">
@@ -81,9 +76,7 @@ export function ModelSettings() {
                   <select
                     required
                     value={models[stage]?.model ?? ""}
-                    onChange={(e) =>
-                      select(stage, { model: e.target.value, effort: "" })
-                    }
+                    onChange={(e) => select(stage, e.target.value)}
                   >
                     <option value="">Chọn model</option>
                     {catalog.map((m) => (
@@ -91,24 +84,30 @@ export function ModelSettings() {
                     ))}
                   </select>
                 </label>
-                <label className="sr-label">
-                  Effort {stage}
-                  <select
-                    required
-                    value={models[stage]?.effort ?? ""}
-                    onChange={(e) => select(stage, { effort: e.target.value })}
-                  >
-                    <option value="">Effort</option>
-                    {catalog
-                      .find((m) => m.id === models[stage]?.model)
-                      ?.efforts.map((e) => (
-                        <option key={e}>{e}</option>
-                      ))}
-                  </select>
-                </label>
+                <span className="badge">Effort {stageEffort(stage)}</span>
               </div>
             ))}
           </div>
+        </section>
+        <section className="panel">
+          <h2>Agent theo stage</h2>
+          <p className="hint">
+            Agent profile được đóng gói sẵn; mỗi task lưu snapshot riêng.
+          </p>
+          <ul>
+            <li>Discover: Repo explorer của harness</li>
+            <li>Analyze: VoltAgent business-analyst</li>
+            <li>Plan: ECC planner</li>
+            <li>
+              Implement: specialist theo repo + ECC tdd-guide; e2e-runner khi
+              plan yêu cầu E2E
+            </li>
+            <li>Review: ECC code-reviewer · chỉ đọc</li>
+            <li>
+              Repair: VoltAgent debugger + ECC build-error-resolver + tdd-guide
+            </li>
+            <li>Prepare, verify, deliver: worker và test runner</li>
+          </ul>
         </section>
         <section className="panel">
           <h2>Skill roots</h2>

@@ -1,0 +1,3 @@
+# ecc/tdd-guide
+
+For each new behavior or bug fix, identify observable acceptance criteria, write a focused failing test, observe the intended failure, then implement the smallest change that passes it. Use the repository's installed test framework. Unit tests cover local behavior; integration tests cover real boundaries. Avoid assertions that merely mirror implementation or over-mock the behavior being tested. Keep legacy tests outside approved scope marked skipped. Coverage percentages in upstream examples are not requirements. Return evidence of commands actually executed; worker verification is authoritative.
