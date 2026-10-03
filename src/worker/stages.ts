@@ -27,7 +27,11 @@ import { repoRules, contentHash } from "../context/rules";
 import { prepareWorktree } from "../repositories/worktree";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { runChecks, type CheckResult } from "../execution/checks";
-import { canImplement, nextAfterReview } from "../core/transitions";
+import {
+  canImplement,
+  nextAfterReview,
+  stageAfterPreparation,
+} from "../core/transitions";
 import { acceptanceErrors } from "../core/acceptance";
 import { savePlan } from "../server/services";
 export function unavailableHandlers(): Handlers {
@@ -231,6 +235,7 @@ export function createHandlers(
         current.revision,
         {
           approvedPlanVersion: null,
+          resumeStage: task.stage,
           stage: "plan",
           status: "queued",
           reason: result.reason,
@@ -388,7 +393,7 @@ export function createHandlers(
         { worktree: path },
         { type: "worktree.prepared", data: { path, branch: task.branch } },
       );
-      return next("implement", { path });
+      return next(stageAfterPreparation(task), { path });
     },
     implement: mutate,
     repair: mutate,

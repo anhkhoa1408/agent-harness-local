@@ -1,6 +1,23 @@
 import { test, expect } from "vitest";
 import { evaluateCheck, parseEvidence } from "../../src/execution/checks";
 import { planFixture } from "../support/task-fixture";
+test("nested skipped or empty TAP suites do not count as executed feature tests", async () => {
+  for (const content of [
+    "TAP version 13\n# Subtest: suite\n    ok 1 - skipped # SKIP\n    1..1\nok 1 - suite\n1..1\n",
+    "TAP version 13\n# Subtest: empty\n    1..0\nok 1 - empty\n1..1\n",
+  ]) {
+    const counts = await parseEvidence("tap", content);
+    expect(counts.executed).toBe(0);
+    expect(
+      evaluateCheck(planFixture().checks[0], {
+        ...counts,
+        exitCode: 0,
+        timedOut: false,
+        successMatched: false,
+      }),
+    ).toBe("blocked");
+  }
+});
 test("zero, skipped and uncounted feature tests block a green exit", () => {
   const spec = planFixture().checks[0],
     run = {

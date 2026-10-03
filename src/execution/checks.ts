@@ -41,11 +41,22 @@ export async function parseEvidence(
   if (format === "tap")
     return new Promise((resolve) => {
       const parser = new Parser();
+      let executed = 0,
+        skipped = 0,
+        failed = 0;
+      parser.on("result", (result) => {
+        if (result.closingTestPoint) return;
+        if (result.skip || result.todo) skipped++;
+        else {
+          executed++;
+          if (!result.ok) failed++;
+        }
+      });
       parser.on("complete", (r) =>
         resolve({
-          executed: r.count,
-          failed: r.ok ? r.fail : Math.max(1, r.fail),
-          skipped: r.skip + r.todo,
+          executed,
+          failed: r.ok ? failed : Math.max(1, failed),
+          skipped: Math.max(skipped, r.skip + r.todo),
         }),
       );
       parser.end(text);

@@ -7,6 +7,7 @@ export type RpcMessage = {
   result?: any;
   error?: { code: number; message: string };
 };
+export class RpcRemoteError extends Error {}
 export class JsonRpc {
   private sequence = 0;
   private closed = false;
@@ -39,7 +40,7 @@ export class JsonRpc {
         if (!entry) return;
         clearTimeout(entry.timer);
         this.pending.delete(m.id as number);
-        if (m.error) entry.reject(new Error(m.error.message));
+        if (m.error) entry.reject(new RpcRemoteError(m.error.message));
         else entry.resolve(m.result);
       } catch {
         this.fail(new Error("runtime_invalid_message"));

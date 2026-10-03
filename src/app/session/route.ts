@@ -1,6 +1,6 @@
 import { bootstrapSession } from "../../server/local-session";
-import { store } from "../../server/runtime";
+import { getStore } from "../../server/runtime";
 export const runtime = "nodejs";
 export function GET(request: Request) {
-  return bootstrapSession(request, store);
+  return bootstrapSession(request, getStore());
 }

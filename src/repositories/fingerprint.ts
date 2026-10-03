@@ -7,6 +7,12 @@ export async function fingerprintWorktree(
   excluded: string[] = [],
   sourceCommit?: string,
 ): Promise<string> {
+  const base = sourceCommit ?? (await gitText(path, ["rev-parse", "HEAD"]));
+  const original = (
+    await gitText(path, ["ls-tree", "-r", "--name-only", "-z", base])
+  )
+    .split("\0")
+    .filter(Boolean);
   const tracked = (await gitText(path, ["ls-files", "-z"]))
       .split("\0")
       .filter(Boolean),
@@ -17,8 +23,10 @@ export async function fingerprintWorktree(
       .filter(Boolean)
       .filter((p) => !excluded.includes(p));
   const hash = createHash("sha256");
-  hash.update(sourceCommit ?? (await gitText(path, ["rev-parse", "HEAD"])));
-  for (const file of [...new Set([...tracked, ...untracked])].sort()) {
+  hash.update(base);
+  for (const file of [
+    ...new Set([...original, ...tracked, ...untracked]),
+  ].sort()) {
     hash.update(JSON.stringify(file));
     try {
       const info = await lstat(join(path, file));
