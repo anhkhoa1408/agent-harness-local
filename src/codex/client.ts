@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { ModelChoice } from "../core/contracts";
 import type { ModelInfo } from "../core/model-policy";
-import { JsonRpc } from "./rpc";
+import { JsonRpc, RpcRemoteError } from "./rpc";
 export type AgentInput = {
   cwd: string;
   model: ModelChoice;
@@ -175,7 +175,13 @@ export class CodexClient implements AgentClient {
           onEvent({ type: "started", data: { threadId, turnId } });
           if (signal.aborted) abort();
         })
-        .catch(fail);
+        .catch((error) =>
+          fail(
+            error instanceof RpcRemoteError
+              ? error
+              : new Error("runtime_state_unknown"),
+          ),
+        );
     });
   }
   async answer(id: string | number, result: unknown) {

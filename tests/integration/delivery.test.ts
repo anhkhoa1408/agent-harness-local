@@ -61,6 +61,7 @@ test("lost PR response reconciles existing PR; external remote changes block", a
 async function fixture(
   remoteMode: boolean,
   work: (context: any) => Promise<void>,
+  operation: "modify" | "delete" | "rename" = "modify",
 ) {
   const f = await createTempRepo({ "app.js": "original" }),
     dir = await mkdtemp(join(tmpdir(), "delivery")),
@@ -84,9 +85,18 @@ async function fixture(
       }),
       path = await prepareWorktree(repo, task, join(dir, "worktrees"));
     task.worktree = path;
-    await writeFile(join(path, "app.js"), "feature");
+    if (operation === "modify")
+      await writeFile(join(path, "app.js"), "feature");
+    else {
+      await rm(join(path, "app.js"));
+      if (operation === "rename")
+        await writeFile(join(path, "renamed.js"), "original");
+    }
     const fingerprint = await fingerprintWorktree(path, [], task.sourceCommit),
-      plan = planFixture({ sourceCommit: task.sourceCommit });
+      plan = planFixture({
+        sourceCommit: task.sourceCommit,
+        steps: [{ ...planFixture().steps[0], files: ["app.js", "renamed.js"] }],
+      });
     store.putRecord("repository", repo.id, repo);
     store.putRecord("plan", "task:1", plan);
     store.putRecord("checks", "task", [
@@ -124,3 +134,18 @@ async function fixture(
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+test.each(["delete", "rename"] as const)(
+  "delivery preserves reviewed evidence for %s",
+  async (operation) => {
+    await fixture(
+      false,
+      async ({ deliver, task }) => {
+        const first = await deliver(task, new AbortController().signal);
+        const second = await deliver(task, new AbortController().signal);
+        expect(first.commit).toBe(second.commit);
+      },
+      operation,
+    );
+  },
+);

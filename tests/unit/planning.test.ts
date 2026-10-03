@@ -1,7 +1,21 @@
 import { test, expect } from "vitest";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { approvePlan, canImplement } from "../../src/core/transitions";
+import {
+  approvePlan,
+  canImplement,
+  stageAfterPreparation,
+} from "../../src/core/transitions";
 import { validatePlan } from "../../src/core/acceptance";
+test("replanning after a repair keeps the repair stage and budget", () => {
+  const task = approvePlan(
+    taskFixture({ repairCount: 3, resumeStage: "repair" }),
+    planFixture(),
+    1,
+  );
+  expect(stageAfterPreparation(task)).toBe("repair");
+  expect(task.repairCount).toBe(3);
+  expect(stageAfterPreparation(taskFixture({ repairCount: 1 }))).toBe("repair");
+});
 test("editing a plan invalidates prior approval", () => {
   const plan = planFixture();
   const task = approvePlan(taskFixture(), plan, 1);

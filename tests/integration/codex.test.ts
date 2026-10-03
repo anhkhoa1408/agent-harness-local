@@ -1,4 +1,4 @@
-import { test, expect } from "vitest";
+import { test, expect, vi } from "vitest";
 import { PassThrough } from "node:stream";
 import { JsonRpc } from "../../src/codex/rpc";
 import { CodexClient } from "../../src/codex/client";
@@ -16,6 +16,42 @@ function fixture() {
   );
   return { rpc: new JsonRpc(output, input), sent, output, input };
 }
+test("lost turn-start response retains unknown writer exclusion", async () => {
+  vi.useFakeTimers();
+  const f = fixture(),
+    client = new CodexClient(f.rpc);
+  try {
+    f.input.on("data", (chunk) => {
+      const m = JSON.parse(String(chunk));
+      if (m.method === "thread/start")
+        f.output.write(
+          JSON.stringify({ id: m.id, result: { thread: { id: "t" } } }) + "\n",
+        );
+    });
+    const result = client
+      .run(
+        {
+          cwd: "/fixture",
+          model: { model: "medium", effort: "medium" },
+          instructions: "",
+          prompt: "write",
+          outputSchema: { type: "object" },
+          write: true,
+        },
+        () => {},
+        new AbortController().signal,
+      )
+      .then(
+        () => "unexpected_success",
+        (e) => e.message,
+      );
+    await vi.advanceTimersByTimeAsync(30001);
+    expect(await result).toBe("runtime_state_unknown");
+  } finally {
+    await client.close();
+    vi.useRealTimers();
+  }
+});
 test("correlates out-of-order fragmented replies and separates server approvals", async () => {
   const f = fixture();
   const requests: any[] = [];

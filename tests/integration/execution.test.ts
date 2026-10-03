@@ -14,6 +14,23 @@ import { taskFixture, planFixture } from "../support/task-fixture";
 import { inspectRepository } from "../../src/repositories/inspect";
 import { prepareWorktree } from "../../src/repositories/worktree";
 import { fingerprintWorktree } from "../../src/repositories/fingerprint";
+import { gitText } from "../../src/repositories/inspect";
+test("fingerprint survives staging and committing a deletion or rename", async () => {
+  const f = await createTempRepo({ "old.js": "original", "gone.js": "delete" });
+  try {
+    const base = await gitText(f.root, ["rev-parse", "HEAD"]);
+    await rm(join(f.root, "gone.js"));
+    await rm(join(f.root, "old.js"));
+    await writeFile(join(f.root, "new.js"), "original");
+    const before = await fingerprintWorktree(f.root, [], base);
+    await gitText(f.root, ["add", "-A"]);
+    expect(await fingerprintWorktree(f.root, [], base)).toBe(before);
+    await gitText(f.root, ["commit", "-m", "rename and delete"]);
+    expect(await fingerprintWorktree(f.root, [], base)).toBe(before);
+  } finally {
+    await f.dispose();
+  }
+});
 import { runProcess } from "../../src/execution/process";
 import { runChecks } from "../../src/execution/checks";
 test("isolates dirty source, retries same worktree, fingerprints untracked and ignored tracked files", async () => {
@@ -89,7 +106,10 @@ test("argv spaces survive and abort terminates process group; legacy test never 
     setTimeout(() => stop.abort(), 80);
     expect((await pending).exitCode).toBeNull();
     const checks = await runChecks(
-      taskFixture({ worktree: f.root }),
+      taskFixture({
+        worktree: f.root,
+        sourceCommit: await gitText(f.root, ["rev-parse", "HEAD"]),
+      }),
       planFixture({
         checks: [
           {

@@ -1,5 +1,10 @@
 import type { Task, Plan, Review } from "./contracts";
 import { validatePlan } from "./acceptance";
+export function stageAfterPreparation(task: Task): "implement" | "repair" {
+  return task.resumeStage === "repair" || task.repairCount > 0
+    ? "repair"
+    : "implement";
+}
 export function canImplement(task: Task, plan: Plan): boolean {
   return (
     task.id === plan.taskId &&
