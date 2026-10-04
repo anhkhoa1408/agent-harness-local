@@ -2,7 +2,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { aiStages, type ModelMap } from "../core/contracts";
 import { stageEffort, type ModelInfo } from "../core/model-policy";
-import { api, stageLabel } from "./api";
+import { api } from "./api";
+import { StageModelRow } from "./settings/stage-model-row";
 export function ModelSettings() {
   const [catalog, setCatalog] = useState<ModelInfo[]>([]),
     [models, setModels] = useState<Partial<ModelMap>>({}),
@@ -38,11 +39,6 @@ export function ModelSettings() {
   return (
     <>
       <p className="eyebrow">STAGE ROUTING</p>
-      <h1>Đúng model, đúng công việc.</h1>
-      <p className="muted">
-        Plan dùng model mạnh với effort high. Các stage AI còn lại dùng model
-        tiết kiệm với effort medium.
-      </p>
       {message && (
         <p role="status" className="notice">
           {message}
@@ -57,35 +53,17 @@ export function ModelSettings() {
           </p>
           <div className="model-grid">
             {aiStages.map((stage) => (
-              <div className="model-row" key={stage}>
-                <div>
-                  <strong>{stageLabel[stage]}</strong>
-                  <p>
-                    {stage === "plan"
-                      ? "Model mạnh · plan và replan"
-                      : "Model tiết kiệm · medium"}
-                  </p>
-                </div>
-                <label className="sr-label">
-                  Model {stage}
-                  <select
-                    required
-                    value={models[stage]?.model ?? ""}
-                    onChange={(e) => select(stage, e.target.value)}
-                  >
-                    <option value="">Chọn model</option>
-                    {catalog.map((m) => (
-                      <option key={m.id}>{m.id}</option>
-                    ))}
-                  </select>
-                </label>
-                <span className="badge">Effort {stageEffort(stage)}</span>
-              </div>
+              <StageModelRow
+                key={stage}
+                stage={stage}
+                model={models[stage]?.model ?? ""}
+                catalog={catalog}
+                onSelect={select}
+              />
             ))}
           </div>
         </section>
         <section className="panel">
-          <h2>Agent theo stage</h2>
           <p className="hint">
             Agent profile được đóng gói sẵn; mỗi task lưu snapshot riêng.
           </p>
@@ -104,10 +82,6 @@ export function ModelSettings() {
             <li>Prepare, verify, deliver: worker và test runner</li>
           </ul>
         </section>
-        <p className="hint">
-          Agent và skills đi kèm repository, không cần cấu hình đường dẫn trên
-          máy.
-        </p>
         <button className="primary" disabled={busy}>
           Lưu cấu hình
         </button>
