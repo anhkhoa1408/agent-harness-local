@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { createTempRepo } from "../support/temp-repo";
 test("unavailable model is rejected; stale skill roots cannot override bundled context", async ({
   page,
 }) => {
@@ -69,6 +70,25 @@ test("approval unlocks isolated implementation, repair, review and local report"
   await expect(page.getByText("Repair 1/3", { exact: false })).toBeVisible();
   await page.getByRole("tab", { name: "Tests", exact: true }).click();
   await expect(page.getByText("passed", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Diff", exact: true }).click();
+  await expect(page.locator("pre")).toContainText("module.exports=2");
+  await page.getByRole("tab", { name: "Review", exact: true }).click();
+  await expect(page.locator("pre").first()).toContainText('"verdict": "pass"');
+  await page.getByRole("tab", { name: "Context", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Model hiện tại" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /^Context / }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Timeline", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Plan", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Test plan", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Duyệt plan" })).toHaveCount(0);
 });
 test("questions block planning until answered and Python commands need no npm", async ({
   page,
@@ -147,7 +167,7 @@ test("settings expose fixed effort and mapped agents, preserving models on save"
   await page.getByRole("link", { name: "⚙ Model & skills" }).click();
   await expect(
     page.getByRole("heading", { name: "Agent theo stage", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Skill roots", exact: true }),
   ).toHaveCount(0);
@@ -215,4 +235,61 @@ test("pipeline circles track pause, completion and skipped repair on dashboard a
     "data-state",
     "skipped",
   );
+});
+
+test("repository registration reports errors and selects the registered repository", async ({
+  page,
+}) => {
+  const repo = await createTempRepo({ "README.md": "UI registration fixture" });
+  try {
+    await page.goto("/");
+    await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
+    await page.getByText("+ Đăng ký repository", { exact: true }).click();
+    await page
+      .getByLabel("Đường dẫn repo", { exact: true })
+      .fill("/missing-harness-refactor-repo");
+    await page
+      .getByRole("button", { name: "Đăng ký repo", exact: true })
+      .click();
+    await expect(page.locator("p[role=alert]")).toContainText("request_failed");
+    await page.getByLabel("Đường dẫn repo", { exact: true }).fill(repo.root);
+    await page
+      .getByRole("button", { name: "Đăng ký repo", exact: true })
+      .click();
+    await expect(page.locator("p[role=alert]")).toHaveCount(0);
+    const repositories = await (
+      await page.request.get("/api/repositories")
+    ).json();
+    const registered = repositories.find(
+      (r: { root: string }) => r.root === repo.root,
+    );
+    expect(registered).toBeDefined();
+    await expect(
+      page.getByRole("combobox", { name: "Repository", exact: true }),
+    ).toHaveValue(registered.id);
+    await expect(page.getByRole("button", { name: "Tạo task" })).toBeEnabled();
+  } finally {
+    await repo.dispose();
+  }
+});
+
+test("model settings report save errors without losing stage selections", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
+  await page.getByRole("link", { name: "⚙ Model & skills" }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Model plan", exact: true }),
+  ).toHaveValue("fixture-strong");
+  await page
+    .getByRole("combobox", { name: "Model plan", exact: true })
+    .selectOption("fixture-medium");
+  await page.getByRole("button", { name: "Lưu cấu hình" }).click();
+  await expect(page.getByRole("status")).toContainText("effort_unavailable");
+  await expect(
+    page.getByRole("combobox", { name: "Model plan", exact: true }),
+  ).toHaveValue("fixture-medium");
+  const settings = await (await page.request.get("/api/settings")).json();
+  expect(settings.models.plan.model).toBe("fixture-strong");
 });
