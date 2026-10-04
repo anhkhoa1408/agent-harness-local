@@ -57,11 +57,14 @@ async function stackDocuments(root: string) {
   await walk(root);
   return docs;
 }
-export async function loadProfile(id: ProfileId): Promise<ContextFile> {
+export async function loadProfile(
+  id: ProfileId,
+  packageRoot = process.cwd(),
+): Promise<ContextFile> {
   const source = sources[id];
   const file = await contextFile(
     `agent:${id}`,
-    resolve("agents/profiles", id.replace("/", "-") + ".md"),
+    resolve(packageRoot, "agents/profiles", id.replace("/", "-") + ".md"),
   );
   return {
     ...file,
@@ -71,6 +74,7 @@ export async function loadProfile(id: ProfileId): Promise<ContextFile> {
 export async function agentProfiles(
   stage: Stage,
   root: string,
+  packageRoot = process.cwd(),
 ): Promise<ContextFile[]> {
   let ids: ProfileId[] = [];
   if (stage === "analyze") ids = ["voltagent/business-analyst"];
@@ -82,7 +86,9 @@ export async function agentProfiles(
   if (stage === "review") ids = ["ecc/code-reviewer"];
   if (stage === "repair")
     ids = ["voltagent/debugger", "ecc/build-error-resolver", "ecc/tdd-guide"];
-  const files = await Promise.all(ids.map(loadProfile));
+  const files = await Promise.all(
+    ids.map((id) => loadProfile(id, packageRoot)),
+  );
   if (stage === "discover" || (stage === "implement" && ids.length === 1)) {
     const content =
       stage === "discover"

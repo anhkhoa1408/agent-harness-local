@@ -6,19 +6,21 @@ import {
   readFile,
   rm,
   symlink,
+  cp,
 } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resolveBundle, snapshotBundle } from "../../src/context/skills";
-test("snapshots remain unchanged after installed skill edits and include scoped nested rules", async () => {
+test("snapshots remain unchanged after bundled skill edits and include scoped nested rules", async () => {
   const root = await mkdtemp(join(tmpdir(), "harness-skills-"));
   try {
-    const skills = join(root, "skills"),
+    await cp("agents", join(root, "agents"), { recursive: true });
+    const skills = join(root, "skills/superpowers"),
       repo = join(root, "repo");
     await mkdir(join(skills, "test-driven-development"), { recursive: true });
     await mkdir(join(repo, "src"), { recursive: true });
     await writeFile(
-      join(root, "baseline.md"),
+      join(root, "AGENTS.md"),
       "## 1. Rules\nKeep scope.\n## 7. Workspace only\nPrivate spec pointer.",
     );
     await writeFile(
@@ -33,10 +35,10 @@ test("snapshots remain unchanged after installed skill edits and include scoped 
     await writeFile(join(repo, "src/AGENTS.md"), "Nested conventions.");
     const bundle = await resolveBundle(
       "implement",
-      { superpowers: skills, baseline: join(root, "baseline.md") },
       repo,
       ["src/page.ts"],
       false,
+      root,
     );
     expect(bundle.files.map((x) => x.content).join("\n")).not.toContain(
       "Private spec pointer",
@@ -63,15 +65,8 @@ test("snapshots remain unchanged after installed skill edits and include scoped 
     );
     expect(JSON.parse(await readFile(artifact, "utf8")).hash).toBe(bundle.hash);
     expect(
-      (
-        await resolveBundle(
-          "implement",
-          { superpowers: skills, baseline: join(root, "baseline.md") },
-          repo,
-          ["src/page.ts"],
-          false,
-        )
-      ).hash,
+      (await resolveBundle("implement", repo, ["src/page.ts"], false, root))
+        .hash,
     ).not.toBe(bundle.hash);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -80,43 +75,20 @@ test("snapshots remain unchanged after installed skill edits and include scoped 
 test("missing required skill and conditional Lighthouse rule block instead of disappearing", async () => {
   const root = await mkdtemp(join(tmpdir(), "harness-rules-"));
   try {
-    await writeFile(join(root, "baseline.md"), "Base.");
+    await cp("agents", join(root, "agents"), { recursive: true });
+    await writeFile(join(root, "AGENTS.md"), "Base.");
     await expect(
-      resolveBundle(
-        "discover",
-        { baseline: join(root, "baseline.md") },
-        root,
-        [],
-        false,
-      ),
+      resolveBundle("discover", root, [], false, root),
     ).resolves.toHaveProperty("stage", "discover");
     await expect(
-      resolveBundle(
-        "discover",
-        { baseline: join(root, "baseline.md") },
-        root,
-        [],
-        true,
-      ),
+      resolveBundle("discover", root, [], true, root),
     ).rejects.toThrow("rule_unavailable");
     await expect(
-      resolveBundle(
-        "implement",
-        { baseline: join(root, "baseline.md") },
-        root,
-        [],
-        false,
-      ),
+      resolveBundle("implement", root, [], false, root),
     ).rejects.toThrow("skill_unavailable");
     await symlink("/etc", join(root, "outside"));
     await expect(
-      resolveBundle(
-        "discover",
-        { baseline: join(root, "baseline.md") },
-        root,
-        ["outside/passwd"],
-        false,
-      ),
+      resolveBundle("discover", root, ["outside/passwd"], false, root),
     ).rejects.toThrow("path_outside_root");
   } finally {
     await rm(root, { recursive: true, force: true });

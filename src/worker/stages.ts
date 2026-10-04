@@ -66,9 +66,6 @@ export function createHandlers(
       task.sourceCommit,
     );
   async function freeze(task: Task) {
-    const settings = store.getRecord("settings", "current") as {
-      skillRoots?: Record<string, string>;
-    } | null;
     if (
       aiStages.every((stage) =>
         store.getRecord("bundle", `${task.id}:${stage}`),
@@ -81,7 +78,6 @@ export function createHandlers(
         if (store.getRecord("bundle", key)) continue;
         const bundle = await resolveBundle(
           stage,
-          settings?.skillRoots ?? {},
           sourceRoot,
           [],
           /\b(liquid|shopify)\b/i.test(task.requirement),

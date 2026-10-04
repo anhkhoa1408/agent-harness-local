@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture, planFixture } from "../support/task-fixture";
@@ -21,32 +21,8 @@ test("strong planning, approved isolated implementation, real failure/repair and
   const stop = new AbortController(),
     calls: AgentInput[] = [];
   try {
-    const files = [
-      "superpowers/writing-plans/SKILL.md",
-      "superpowers/test-driven-development/SKILL.md",
-      "superpowers/test-driven-development/writing-good-tests.md",
-      "superpowers/requesting-code-review/SKILL.md",
-      "superpowers/requesting-code-review/code-reviewer.md",
-      "superpowers/receiving-code-review/SKILL.md",
-      "superpowers/systematic-debugging/SKILL.md",
-      "superpowers/systematic-debugging/root-cause-tracing.md",
-      "superpowers/verification-before-completion/SKILL.md",
-      "mattpocock-skills/grilling/SKILL.md",
-    ];
-    for (const file of files) {
-      await mkdir(dirname(join(dir, file)), { recursive: true });
-      await writeFile(join(dir, file), "Fixture skill");
-    }
-    await writeFile(join(dir, "baseline"), "Baseline");
     const repo = await inspectRepository(f.root, "main", null);
     store.putRecord("repository", repo.id, repo);
-    store.putRecord("settings", "current", {
-      skillRoots: {
-        superpowers: join(dir, "superpowers"),
-        "mattpocock-skills": join(dir, "mattpocock-skills"),
-        baseline: join(dir, "baseline"),
-      },
-    });
     const task = store.createTask({
       ...taskFixture(),
       repositoryId: repo.id,

@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { stages, type Event, type ControlCommand } from "../core/contracts";
-import { api, stageLabel, statusLabel } from "./api";
+import { type Event, type ControlCommand } from "../core/contracts";
+import { Pipeline } from "./pipeline";
+import { api, statusLabel } from "./api";
 export function TaskDetail({ id }: { id: string }) {
   const [detail, setDetail] = useState<any>(null),
     [events, setEvents] = useState<Event[]>([]),
@@ -82,23 +83,11 @@ export function TaskDetail({ id }: { id: string }) {
             : statusLabel[task.status]}
         </span>
       </div>
-      <ol className="pipeline">
-        {stages.map((s, index) => (
-          <li
-            key={s}
-            className={
-              s === task.stage
-                ? "current"
-                : stages.indexOf(task.stage) > index
-                  ? "done"
-                  : ""
-            }
-          >
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            {stageLabel[s]}
-          </li>
-        ))}
-      </ol>
+      <Pipeline nodes={detail.pipeline} />
+      <p className="pipeline-legend">
+        ✓ Xanh: đã xong · Cam: đang xử lý hoặc chờ · Đen: chưa chạy / không cần
+        chạy
+      </p>
       <div className="actions">
         {task.status === "running" && (
           <button disabled={busy} onClick={() => command("pause")}>
@@ -134,7 +123,7 @@ export function TaskDetail({ id }: { id: string }) {
             {task.reason === "runtime_state_unknown"
               ? "Runtime cũ chưa được xác nhận đã dừng. Cần đối chiếu process trước khi resume."
               : task.reason.includes("skill_")
-                ? "Kiểm tra đường dẫn skill trong Settings rồi tiếp tục."
+                ? "Bộ skill đi kèm ứng dụng đang thiếu. Khôi phục thư mục skills từ repository rồi tiếp tục."
                 : task.reason.includes("model_")
                   ? "Cập nhật model cho task ở bên dưới rồi tiếp tục."
                   : "Xem evidence và cấu hình; giải quyết nguyên nhân trước khi tiếp tục."}

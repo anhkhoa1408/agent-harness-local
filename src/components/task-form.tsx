@@ -2,12 +2,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Repository, Task } from "../core/contracts";
+import type { Repository } from "../core/contracts";
+import { Pipeline } from "./pipeline";
+import type { TaskWithProgress } from "../core/pipeline-progress";
 import { api, statusLabel, stageLabel } from "./api";
 export function TaskForm() {
   const router = useRouter(),
     [repos, setRepos] = useState<Repository[]>([]),
-    [tasks, setTasks] = useState<Task[]>([]),
+    [tasks, setTasks] = useState<TaskWithProgress[]>([]),
     [health, setHealth] = useState("offline"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -17,18 +19,14 @@ export function TaskForm() {
     try {
       const [r, t, h, s] = await Promise.all([
         api<Repository[]>("repositories"),
-        api<Task[]>("tasks"),
+        api<TaskWithProgress[]>("tasks"),
         api("health"),
         api("settings"),
       ]);
       setRepos(r);
       setTasks(t);
       setHealth(h.worker);
-      setConfigured(
-        !!s.models &&
-          !!s.skillRoots?.superpowers &&
-          !!s.skillRoots?.["mattpocock-skills"],
-      );
+      setConfigured(!!s.models);
       setRepoId((old) => old || r[0]?.id || "");
     } catch (e) {
       setError(String(e));
@@ -45,7 +43,7 @@ export function TaskForm() {
     setError("");
     const f = new FormData(event.currentTarget);
     try {
-      const task = await api<Task>("tasks", "POST", {
+      const task = await api<TaskWithProgress>("tasks", "POST", {
         repositoryId: repoId,
         title: f.get("title"),
         requirement: f.get("requirement"),
@@ -191,7 +189,7 @@ export function TaskForm() {
             {tasks.length ? (
               tasks.map((t) => (
                 <Link className="task-card" href={`/tasks/${t.id}`} key={t.id}>
-                  <div>
+                  <div className="task-card-body">
                     <span
                       className={`badge ${t.status === "completed" ? "good" : ""}`}
                     >
@@ -201,6 +199,7 @@ export function TaskForm() {
                     <p>
                       {stageLabel[t.stage]} · {t.branch}
                     </p>
+                    <Pipeline nodes={t.pipeline} compact />
                   </div>
                   <span className="arrow">↗</span>
                 </Link>

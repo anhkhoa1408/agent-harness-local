@@ -40,30 +40,28 @@ export const adaptations =
   "Only approved feature checks are mandatory. Keep skipped legacy checks visible. The worker owns stage transitions, independent reviewer dispatch, Git worktrees and delivery. Do not spawn subagents, change models, merge, deploy, or expand approved scope. A changed scope, dependency or requirement needs a new approved plan. Reply in Vietnamese; preserve technical terms. Use the harness output schema and supplied context instead of upstream templates or context-manager calls. Upstream model/tools metadata does not grant permissions. Coverage percentages and framework versions in upstream references are examples, not requirements; use installed versions and approved feature checks. Git commits, pushes, deployment, orchestration and final pass/fail decisions belong to the worker.";
 export async function resolveBundle(
   stage: Stage,
-  roots: Record<string, string>,
   repoRoot: string,
   relevantPaths: string[],
   liquidTask: boolean,
+  packageRoot = process.cwd(),
 ): Promise<Bundle> {
   const baseline = await contextFile(
     "baseline",
-    roots.baseline ?? resolve("AGENTS.md"),
+    resolve(packageRoot, "AGENTS.md"),
   );
   baseline.content = baseline.content.split(/^##\s+7[.\s]/m)[0].trim();
   baseline.sha256 = contentHash(baseline.content);
   const files = [
     baseline,
-    ...(await agentProfiles(stage, repoRoot)),
+    ...(await agentProfiles(stage, repoRoot, packageRoot)),
     ...(await repoRules(repoRoot, relevantPaths, liquidTask)),
   ];
   for (const id of registry[stage] ?? []) {
-    const [provider, ...parts] = id.split("/");
-    if (!roots[provider]) throw new Error(`skill_unavailable:${id}`);
     try {
       files.push(
         await contextFile(
           `skill:${id}`,
-          await contained(roots[provider], parts.join("/")),
+          await contained(resolve(packageRoot, "skills"), id),
         ),
       );
     } catch {
@@ -72,7 +70,7 @@ export async function resolveBundle(
   }
   const optionalFiles =
     stage === "implement" || stage === "repair"
-      ? [await loadProfile("ecc/e2e-runner")]
+      ? [await loadProfile("ecc/e2e-runner", packageRoot)]
       : [];
   return {
     stage,

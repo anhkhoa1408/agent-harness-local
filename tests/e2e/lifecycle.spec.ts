@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-test("unavailable model is rejected; missing skill blocks until settings are repaired", async ({
+test("unavailable model is rejected; stale skill roots cannot override bundled context", async ({
   page,
 }) => {
   await page.goto("/");
@@ -28,16 +28,23 @@ test("unavailable model is rejected; missing skill blocks until settings are rep
       skillRoots: { ...settings.skillRoots, superpowers: "/missing-skills" },
     },
   });
-  await create(page, "missing-skill");
-  await expect(page.getByText("Bị chặn", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("skill_unavailable:superpowers/writing-plans/SKILL.md", {
-      exact: true,
-    }),
-  ).toBeVisible();
-  await page.request.put("/api/settings", { headers, data: settings });
-  await page.getByRole("button", { name: "Tiếp tục" }).click();
+  const portable = await (await page.request.get("/api/settings")).json();
+  expect(portable).not.toHaveProperty("skillRoots");
+  await create(page, "bundled-skills");
   await expect(page.getByRole("button", { name: "Duyệt plan" })).toBeVisible();
+  const pipeline = page.getByRole("list", { name: "Tiến độ pipeline" });
+  await expect(pipeline.locator('[data-stage="discover"]')).toHaveAttribute(
+    "data-state",
+    "done",
+  );
+  await expect(pipeline.locator('[data-stage="plan"]')).toHaveAttribute(
+    "data-state",
+    "current",
+  );
+  await expect(pipeline.locator('[data-stage="implement"]')).toHaveAttribute(
+    "data-state",
+    "pending",
+  );
   await page.getByRole("button", { name: "Hủy task" }).click();
 });
 async function create(page: Page, requirement: string) {
@@ -82,7 +89,9 @@ test("required skipped feature test blocks delivery", async ({ page }) => {
   await create(page, "skip");
   await expect(page.getByText("Chờ duyệt plan", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Duyệt plan" }).click();
-  await expect(page.getByText("Bị chặn", { exact: true })).toBeVisible({
+  await expect(
+    page.getByRole("listitem", { name: "Kiểm thử: Bị chặn", exact: true }),
+  ).toBeVisible({
     timeout: 15000,
   });
   await expect(
@@ -139,6 +148,10 @@ test("settings expose fixed effort and mapped agents, preserving models on save"
   await expect(
     page.getByRole("heading", { name: "Agent theo stage", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Skill roots", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByText("Effort high", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Effort medium", { exact: true })).toHaveCount(5);
   await expect(page.getByRole("combobox", { name: /Effort/ })).toHaveCount(0);
@@ -153,4 +166,53 @@ test("settings expose fixed effort and mapped agents, preserving models on save"
   const settings = await (await page.request.get("/api/settings")).json();
   expect(settings.models.plan.effort).toBe("high");
   expect(settings.models.review.effort).toBe("medium");
+});
+
+test("pipeline circles track pause, completion and skipped repair on dashboard and detail", async ({
+  page,
+}) => {
+  await create(page, "slow pipeline");
+  const pipeline = page.getByRole("list", { name: "Tiến độ pipeline" });
+  await expect(page.getByRole("button", { name: "Duyệt plan" })).toBeVisible();
+  await expect(pipeline.locator('[data-stage="plan"]')).toContainText(
+    "Chờ duyệt",
+  );
+  await page.getByRole("button", { name: "Duyệt plan" }).click();
+  await expect(pipeline.locator('[data-stage="plan"]')).toHaveAttribute(
+    "data-state",
+    "done",
+  );
+  await expect(pipeline.locator('[data-stage="implement"]')).toHaveAttribute(
+    "data-state",
+    "current",
+  );
+  await page.getByRole("button", { name: "Tạm dừng" }).click();
+  await expect(pipeline).toContainText("Tạm dừng");
+  await page.getByRole("button", { name: "Tiếp tục" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Đã bàn giao local" }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(pipeline.locator('[data-stage="deliver"]')).toHaveAttribute(
+    "data-state",
+    "done",
+  );
+  await expect(pipeline.locator('[data-stage="repair"]')).toHaveAttribute(
+    "data-state",
+    "skipped",
+  );
+  await page.getByRole("link", { name: "← Workspace" }).click();
+  const card = page.getByRole("link").filter({
+    has: page.getByRole("heading", {
+      name: "Feature slow pipeline",
+      exact: true,
+    }),
+  });
+  await expect(card.locator('[data-stage="deliver"]')).toHaveAttribute(
+    "data-state",
+    "done",
+  );
+  await expect(card.locator('[data-stage="repair"]')).toHaveAttribute(
+    "data-state",
+    "skipped",
+  );
 });

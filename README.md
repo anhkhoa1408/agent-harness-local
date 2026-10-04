@@ -16,7 +16,7 @@ npm run dev
 Mở `http://127.0.0.1:3000`. Lần mở đầu tạo session HttpOnly cùng origin. Chỉ bind loopback; không triển khai lên public server. Đóng browser không dừng worker; Ctrl+C trong terminal dừng cả web/worker.
 
 1. Trong **Model & skills**, mặc định **plan/replan = gpt-6-astra / high**, các stage AI khác **gpt-6-luna / medium**. Có thể đổi model từ catalog; effort cố định trong `src/core/model-policy.ts`, không có selector. Model/effort không khả dụng sẽ bị chặn, không tự fallback hoặc chuyển sang API tính phí.
-2. Điền thư mục skill roots: thư mục chứa `writing-plans/`, `test-driven-development/`, `systematic-debugging/`… của Superpowers và `grilling/` của Matt Pocock. Đường dẫn tùy phiên bản plugin cài trên máy. `baseline` tùy chọn, mặc định dùng AGENTS.md của harness, mục 1–6.
+2. Agents và skills đã nằm trong repo (`agents/`, `skills/`); không cần cài plugin hoặc cấu hình Skill roots. Rule nền dùng AGENTS.md của harness, mục 1–6.
 3. Đăng ký đường dẫn repo Git có commit và nhánh nguồn. Repo đích có thể là JavaScript, Python hoặc ngôn ngữ khác; harness không mặc định chạy npm trong repo đích.
 4. Tạo task, trả lời câu hỏi, đọc plan và duyệt command/test scope trước khi code.
 5. Xem tests, review, timeline và báo cáo. Có thể đổi model của task tại stage boundary bằng cách lưu Settings rồi áp dụng vào task.
@@ -94,3 +94,11 @@ Specialists hiện có: Next.js, frontend React/Vue/Angular, Python, Spring Boot
 Nguồn GitHub, commit và SHA256 ở `agents/sources.json`; bản gốc và MIT licenses ở `agents/upstream/`; bản rút gọn dùng thực tế ở `agents/profiles/`. Không chạy installer upstream. Profile và nguồn được chụp vào context artifact; profile đã frozen của task cũ giữ nguyên. Các lượt mới dùng effort trong code và lưu effort thực vào attempt log; model snapshot của task vẫn giữ nguyên cho đến khi áp dụng Settings ở stage boundary.
 
 Mỗi feature có branch/worktree riêng trong `.harness/worktrees/<task-id>`, tạo sau approval và giữ nguyên qua repair/replan/resume. Repo gốc không bị thay đổi.
+
+## Pipeline và chuyển thiết bị
+
+Mỗi task có pipeline dạng các node tròn ở danh sách và trang chi tiết: xanh có dấu tick = đã xong, cam = stage hiện tại, đen = chưa tới/cần chạy lại. Nhãn riêng thể hiện chờ duyệt, tạm dừng, lỗi, hủy hoặc bỏ qua; đây là chỉ báo, không phải checkbox điều khiển. Tiến độ lấy từ attempts, không suy đoán các bước trước đều đã pass. Repair/replan làm mất hiệu lực các kết quả downstream cần chạy lại.
+
+Clone repo sang máy khác, cài dependencies và đăng nhập Codex là có đủ agent profiles/skills. Cần đăng ký lại đường dẫn repo đích trên máy mới; dữ liệu `.harness/`, credentials và worktrees local không được commit. Task cũ giữ context snapshot đã đóng băng.
+
+Skills được vendored theo phiên bản distribution và SHA256 trong `skills/sources.json`, kèm MIT licenses; xem `skills/README.md` để cập nhật. Đây là hướng dẫn cho phiên agent do worker tạo, không phải các process subagent tự chạy.
