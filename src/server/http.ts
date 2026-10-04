@@ -1,3 +1,7 @@
+import {
+  pipelineProgress,
+  type ProgressAttempt,
+} from "../core/pipeline-progress";
 import { z } from "zod";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,7 +26,6 @@ import { gitText } from "../repositories/inspect";
 export const SettingsSchema = z
   .object({
     models: ModelMapSchema.default(defaultModels),
-    skillRoots: z.record(z.string(), z.string()).default({}),
   })
   .transform((settings) => ({
     ...settings,
@@ -112,7 +115,17 @@ export function createHttpHandler(
       }
       if (parts[0] === "tasks") {
         if (!parts[1]) {
-          if (method === "GET") return json(store.listTasks());
+          if (method === "GET") {
+            const attempts = store.listRecords("attempt") as ProgressAttempt[];
+            return json(
+              store
+                .listTasks()
+                .map((task) => ({
+                  ...task,
+                  pipeline: pipelineProgress(task, attempts),
+                })),
+            );
+          }
           if (method === "POST") {
             const settings = SettingsSchema.parse(
                 store.getRecord("settings", "current") ?? {},
@@ -182,6 +195,10 @@ export function createHttpHandler(
             }
           return json({
             task,
+            pipeline: pipelineProgress(
+              task,
+              store.listRecords("attempt") as ProgressAttempt[],
+            ),
             plan: store.getRecord("plan", `${task.id}:${task.planVersion}`),
             analysis: store.getRecord("analysis", task.id),
             checks: store.getRecord("checks", task.id),

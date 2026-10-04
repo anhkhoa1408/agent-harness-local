@@ -36,6 +36,8 @@ export type Attempt = {
   leaseEpoch: number;
   status: "running" | "completed" | "interrupted" | "failed";
   output: unknown;
+  nextStage?: Stage;
+  nextStatus?: Status;
   model: Task["models"][keyof Task["models"]] | null;
   bundleHash: string | null;
   threadId: string | null;
@@ -310,6 +312,8 @@ export async function runWorker(
                   ...attempt,
                   status: "completed",
                   output: result.output,
+                  nextStage: result.stage,
+                  nextStatus: entry.stop ?? result.status,
                 });
                 // Some handlers save a versioned plan and perform their own atomic transition.
                 if (current.status === "running")

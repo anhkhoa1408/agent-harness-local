@@ -6,7 +6,6 @@ import { api, stageLabel } from "./api";
 export function ModelSettings() {
   const [catalog, setCatalog] = useState<ModelInfo[]>([]),
     [models, setModels] = useState<Partial<ModelMap>>({}),
-    [roots, setRoots] = useState<Record<string, string>>({}),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -14,7 +13,6 @@ export function ModelSettings() {
       .then(([c, s]) => {
         setCatalog(c.models);
         setModels(s.models ?? {});
-        setRoots(s.skillRoots ?? {});
       })
       .catch((e) => setMessage(String(e)));
   }, []);
@@ -29,9 +27,6 @@ export function ModelSettings() {
     try {
       await api("settings", "PUT", {
         models,
-        skillRoots: Object.fromEntries(
-          Object.entries(roots).filter(([, v]) => v.trim()),
-        ),
       });
       setMessage("Đã lưu cấu hình. Task mới sẽ dùng lựa chọn này.");
     } catch (e) {
@@ -109,29 +104,10 @@ export function ModelSettings() {
             <li>Prepare, verify, deliver: worker và test runner</li>
           </ul>
         </section>
-        <section className="panel">
-          <h2>Skill roots</h2>
-          <p className="hint">
-            Đường dẫn tới thư mục chứa các skill. Context được snapshot theo
-            task; chỉnh file gốc không thay đổi task đang chạy.
-          </p>
-          {["superpowers", "mattpocock-skills", "baseline"].map((key) => (
-            <label key={key}>
-              {key}
-              {key === "baseline" ? " (AGENTS.md, tùy chọn)" : ""}
-              <input
-                value={roots[key] ?? ""}
-                onChange={(e) => setRoots({ ...roots, [key]: e.target.value })}
-                placeholder={
-                  key === "baseline"
-                    ? "Mặc định: AGENTS.md của harness"
-                    : "/path/to/plugin/skills"
-                }
-                required={key !== "baseline"}
-              />
-            </label>
-          ))}
-        </section>
+        <p className="hint">
+          Agent và skills đi kèm repository, không cần cấu hình đường dẫn trên
+          máy.
+        </p>
         <button className="primary" disabled={busy}>
           Lưu cấu hình
         </button>

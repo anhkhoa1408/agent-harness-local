@@ -64,7 +64,11 @@ test("local bootstrap, CSRF, hostile origins, stale commands and artifact traver
       (await handle(request("settings", "PUT", {}, { "x-harness-csrf": "" })))
         .status,
     ).toBe(403);
+    store.putRecord("settings", "current", {
+      skillRoots: { superpowers: "/old-machine/path" },
+    });
     const initial = await (await handle(request("settings"))).json();
+    expect(initial).not.toHaveProperty("skillRoots");
     expect(initial.models.plan).toEqual({
       model: "gpt-6-astra",
       effort: "high",
@@ -99,6 +103,26 @@ test("local bootstrap, CSRF, hostile origins, stale commands and artifact traver
       error: "effort_unavailable: high",
     });
     const task = store.createTask(taskFixture());
+    store.putRecord("attempt", "done-discover", {
+      taskId: task.id,
+      stage: "discover",
+      status: "completed",
+      output: null,
+      nextStage: "analyze",
+      nextStatus: "queued",
+    });
+    store.updateTask(
+      task.id,
+      task.revision,
+      { stage: "analyze", status: "running" },
+      { type: "stage.completed", data: {} },
+    );
+    const summary = await (await handle(request("tasks"))).json();
+    expect(
+      summary[0].pipeline.find((n: any) => n.stage === "discover").state,
+    ).toBe("done");
+    const detail = await (await handle(request(`tasks/${task.id}`))).json();
+    expect(detail.pipeline).toEqual(summary[0].pipeline);
     expect(
       (
         await handle(
