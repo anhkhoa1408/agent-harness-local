@@ -1,0 +1,20 @@
+name: agent-harness-local
+services:
+  harness:
+    build: .
+    init: true
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:1455:1456"
+    volumes:
+      - harness-data:/data
+      - codex-login:/codex
+      - type: bind
+        source: ${HARNESS_REPOS_DIR:-${HOME}/Documents/Personal}
+        target: /repos
+        bind:
+          create_host_path: false
+    stop_grace_period: 30s
+volumes:
+  harness-data:
+  codex-login:

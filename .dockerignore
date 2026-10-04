@@ -1,0 +1,12 @@
+.git
+node_modules
+.next
+.harness
+.superpowers
+.env*
+!.env.example
+.DS_Store
+**/.DS_Store
+test-results
+playwright-report
+*.tsbuildinfo

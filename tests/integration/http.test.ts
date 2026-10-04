@@ -153,3 +153,99 @@ test("local bootstrap, CSRF, hostile origins, stale commands and artifact traver
     store.close();
   }
 });
+
+test("OAuth endpoints require local session and CSRF before starting or cancelling login", async () => {
+  const store = openStore(":memory:");
+  let starts = 0,
+    cancels = 0;
+  const login = {
+    status: async () => ({
+      status: "signed_out" as const,
+      authorizationUrl: null,
+      error: null,
+    }),
+    start: async () => {
+      starts++;
+      return {
+        status: "starting" as const,
+        authorizationUrl: null,
+        error: null,
+      };
+    },
+    cancel: async () => {
+      cancels++;
+      return {
+        status: "signed_out" as const,
+        authorizationUrl: null,
+        error: null,
+      };
+    },
+  };
+  try {
+    const handle = createHttpHandler(
+      store,
+      "/tmp/harness-http",
+      async () => [],
+      login,
+    );
+    const base = "http://127.0.0.1:3100",
+      host = "127.0.0.1:3100";
+    const boot = bootstrapSession(
+      new Request(base + "/session", {
+        headers: {
+          host,
+          "sec-fetch-mode": "navigate",
+          "sec-fetch-site": "none",
+        },
+      }),
+      store,
+    );
+    const cookie = boot.headers.get("set-cookie")!.split(";")[0];
+    const session = await handle(
+      new Request(base + "/api/session", { headers: { host, cookie } }),
+    );
+    const { csrf } = await session.json();
+    const request = (path: string, method = "GET", extra = {}) =>
+      new Request(base + "/api/" + path, {
+        method,
+        headers: {
+          host,
+          cookie,
+          origin: base,
+          "x-harness-csrf": csrf,
+          ...extra,
+        },
+      });
+    expect(
+      (await handle(request("codex-auth", "POST", { "x-harness-csrf": "" })))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await handle(
+          request("codex-auth", "POST", { origin: "https://evil.test" }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(starts).toBe(0);
+    expect((await (await handle(request("codex-auth"))).json()).status).toBe(
+      "signed_out",
+    );
+    expect((await handle(request("codex-auth", "POST"))).status).toBe(200);
+    expect(starts).toBe(1);
+    expect(
+      (
+        await handle(
+          request("codex-auth/cancel", "POST", { "x-harness-csrf": "" }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(cancels).toBe(0);
+    expect((await handle(request("codex-auth/cancel", "POST"))).status).toBe(
+      200,
+    );
+    expect(cancels).toBe(1);
+  } finally {
+    store.close();
+  }
+});
