@@ -16,6 +16,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <p className="nav-label">WORKSPACE</p>
           <nav>
             <Link href="/">◫ &nbsp; Tổng quan</Link>
+            <Link href="/login">↗ &nbsp; Đăng nhập Codex</Link>
             <Link href="/settings">⚙ &nbsp; Model & skills</Link>
           </nav>
         </aside>

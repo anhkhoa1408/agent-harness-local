@@ -42,3 +42,12 @@ Không có minor finding bị hoãn từ review. Không dispatch re-review sau f
 - Không chứng nhận mọi OS, toolchain hoặc Git submodule; môi trường chạy kiểm chứng là macOS với Node 24.
 
 Hướng dẫn chạy, dữ liệu, pause/resume và các giới hạn vận hành nằm trong [README](../README.md).
+
+## Docker và OAuth browser — 2026-10-04
+
+- 61 unit/integration tests: pass; gồm trạng thái OAuth, retry, timeout, cancel, race khi polling, session/CSRF và launcher ba tiến trình.
+- 12 Playwright E2E: pass; hai test mới dùng OAuth provider fixture để kiểm tra popup, trạng thái thành công, reload, hủy và retry.
+- TypeScript và production build trong Docker Linux ARM64: pass.
+- Smoke container thật: dashboard và worker sẵn sàng; Codex CLI tạo URL OAuth có PKCE; callback local qua proxy từ chối state sai (HTTP 400); hủy đăng nhập: pass.
+- Volume dữ liệu giữ nguyên sau khi tạo lại container: pass.
+- Chưa hoàn tất đăng nhập tài khoản OpenAI thật và chưa chạy pipeline inference trong Docker. Phiên lưu qua lần khởi tạo service được kiểm tra bằng fixture; khả năng lưu token thật cần người dùng hoàn tất đăng nhập.

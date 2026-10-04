@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 const port = process.env.PORT ?? "3000";
+const host = process.env.HARNESS_HOST ?? "127.0.0.1";
 if (process.env.HARNESS_TEST_MODE === "1") {
   await new Promise((resolve, reject) => {
     const seed = spawn(
@@ -19,7 +20,7 @@ const children = [
       "node_modules/next/dist/bin/next",
       process.env.HARNESS_PRODUCTION === "1" ? "start" : "dev",
       "--hostname",
-      "127.0.0.1",
+      host,
       "--port",
       port,
     ],
@@ -29,6 +30,16 @@ const children = [
     stdio: "inherit",
   }),
 ];
+// The CLI owns OAuth/PKCE and listens on loopback; forward the Docker callback port.
+if (process.env.HARNESS_OAUTH_PROXY === "1") {
+  children.push(
+    spawn(
+      "socat",
+      ["TCP-LISTEN:1456,bind=0.0.0.0,reuseaddr,fork", "TCP:127.0.0.1:1455"],
+      { stdio: "inherit" },
+    ),
+  );
+}
 let stopping = false;
 function stop(code = 0) {
   if (stopping) return;

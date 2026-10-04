@@ -3,6 +3,7 @@ import {
   type ProgressAttempt,
 } from "../core/pipeline-progress";
 import { z } from "zod";
+import { getCodexLogin, type LoginService } from "./codex-login";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Store } from "../storage/store";
@@ -43,6 +44,7 @@ export function createHttpHandler(
   store: Store,
   data: string,
   models: () => Promise<ModelInfo[]>,
+  login: LoginService = getCodexLogin(),
 ) {
   return async (request: Request): Promise<Response> => {
     if (!authorize(request, store))
@@ -61,6 +63,12 @@ export function createHttpHandler(
       return JSON.parse(text);
     };
     try {
+      if (parts[0] === "codex-auth") {
+        if (!parts[1] && method === "GET") return json(await login.status());
+        if (!parts[1] && method === "POST") return json(await login.start());
+        if (parts[1] === "cancel" && method === "POST")
+          return json(await login.cancel());
+      }
       if (parts[0] === "session" && method === "GET")
         return json({ csrf: readSession(request, store)!.csrf });
       if (parts[0] === "health" && method === "GET") {
