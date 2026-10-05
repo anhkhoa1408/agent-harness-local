@@ -3,6 +3,8 @@ services:
   harness:
     build: .
     init: true
+    security_opt:
+      - seccomp=./config/docker-seccomp.json
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:1455:1456"

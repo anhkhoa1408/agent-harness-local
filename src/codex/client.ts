@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import type { ModelChoice, AiStage } from "../core/contracts";
+import type { ModelChoice, Stage } from "../core/contracts";
 import type { ModelInfo } from "../core/model-policy";
 import { JsonRpc, RpcRemoteError } from "./rpc";
 import { runSubagentStage } from "./subagents";
@@ -12,7 +12,7 @@ export type AgentInput = {
   write: boolean;
   executionMode?: "manual" | "auto";
   threadId?: string;
-  delegation?: { stage: AiStage; attemptId: string; packetPath: string };
+  delegation?: { stage: Stage; attemptId: string; packetPath: string };
 };
 export type AgentEvent = {
   type:

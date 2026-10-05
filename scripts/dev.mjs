@@ -33,11 +33,9 @@ const children = [
 // The CLI owns OAuth/PKCE and listens on loopback; forward the Docker callback port.
 if (process.env.HARNESS_OAUTH_PROXY === "1") {
   children.push(
-    spawn(
-      "socat",
-      ["TCP-LISTEN:1456,bind=0.0.0.0,reuseaddr,fork", "TCP:127.0.0.1:1455"],
-      { stdio: "inherit" },
-    ),
+    spawn(process.execPath, ["--import", "tsx", "scripts/oauth-proxy.ts"], {
+      stdio: "inherit",
+    }),
   );
 }
 let stopping = false;

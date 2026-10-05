@@ -6,6 +6,7 @@ import type { Task, Plan, CheckSpec } from "../core/contracts";
 import { runProcess } from "./process";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { contained } from "../context/rules";
+import { evidenceExclusions, clearScreenshots } from "./ui-verification";
 export type CheckResult = {
   id: string;
   taskId: string;
@@ -16,6 +17,8 @@ export type CheckResult = {
   exitCode: number | null;
   evidencePath: string;
   reason: string | null;
+  imageEvidence?: { path: string; sha256: string }[];
+  stderrPath?: string;
 };
 type Counts = { executed: number | null; failed: number; skipped: number };
 export function evaluateCheck(
@@ -104,7 +107,7 @@ export async function runChecks(
 ): Promise<CheckResult[]> {
   if (!task.worktree) throw new Error("worktree_missing");
   const root = task.worktree,
-    excluded = plan.checks.flatMap((c) => (c.reportPath ? [c.reportPath] : []));
+    excluded = evidenceExclusions(plan);
   const fingerprint = await fingerprintWorktree(
       root,
       excluded,
@@ -116,6 +119,7 @@ export async function runChecks(
     let evidencePath = "",
       exitCode: number | null = null;
     try {
+      await clearScreenshots(root, plan, spec.id);
       let report: string | null = null;
       if (spec.reportPath) {
         report = await contained(root, spec.reportPath);
@@ -142,6 +146,7 @@ export async function runChecks(
         executed: counts.executed,
         exitCode,
         evidencePath: report ?? evidencePath,
+        stderrPath: run.stderrPath,
         reason: status === "passed" ? null : "check_evidence_unsatisfied",
       });
     } catch (error) {

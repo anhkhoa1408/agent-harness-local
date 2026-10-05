@@ -1,4 +1,4 @@
-import { CodexLoginPage } from "../../components/codex-login";
+import { LoginPage } from "@/components/pages/login-page";
 export default function Login() {
-  return <CodexLoginPage />;
+  return <LoginPage />;
 }

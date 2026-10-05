@@ -1,4 +1,4 @@
-import { TaskForm } from "../components/task-form";
+import { WorkspacePage } from "@/components/pages/workspace-page";
 export default function Home() {
-  return <TaskForm />;
+  return <WorkspacePage />;
 }

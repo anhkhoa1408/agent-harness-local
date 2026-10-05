@@ -14,6 +14,7 @@ import {
   applyEffortPolicy,
 } from "../core/model-policy";
 import {
+  ExecutionModeSchema,
   ModelMapSchema,
   NewTaskSchema,
   ControlCommandSchema,
@@ -21,12 +22,14 @@ import {
   aiStages,
 } from "../core/contracts";
 import { authorize, readSession } from "./local-session";
-import { createServices } from "./services";
+import { createServices, planComments } from "./services";
 import { contained } from "../context/rules";
 import { gitText } from "../repositories/inspect";
+import { pickFolder } from "./folder-picker";
 export const SettingsSchema = z
   .object({
     models: ModelMapSchema.default(defaultModels),
+    executionMode: ExecutionModeSchema.default("manual"),
   })
   .transform((settings) => ({
     ...settings,
@@ -45,6 +48,7 @@ export function createHttpHandler(
   data: string,
   models: () => Promise<ModelInfo[]>,
   login: LoginService = getCodexLogin(),
+  folderPicker: () => Promise<string | null> = pickFolder,
 ) {
   return async (request: Request): Promise<Response> => {
     if (!authorize(request, store))
@@ -105,7 +109,23 @@ export function createHttpHandler(
           return json(settings);
         }
       }
-      if (parts[0] === "repositories") {
+      if (
+        parts[0] === "repositories" &&
+        parts[1] === "pick-folder" &&
+        parts.length === 2 &&
+        method === "POST"
+      ) {
+        try {
+          return json({ path: await folderPicker() });
+        } catch (error) {
+          const code = error instanceof Error ? error.message : "";
+          if (code === "folder_picker_busy") return json({ error: code }, 409);
+          if (code === "folder_picker_unsupported")
+            return json({ error: code }, 501);
+          return json({ error: "folder_picker_failed" }, 503);
+        }
+      }
+      if (parts[0] === "repositories" && !parts[1]) {
         if (method === "GET") return json(store.listRecords("repository"));
         if (method === "POST") {
           const input = z
@@ -150,6 +170,7 @@ export function createHttpHandler(
             const task = NewTaskSchema.parse({
               ...raw,
               sourceCommit,
+              executionMode: raw.executionMode ?? settings.executionMode,
               targetBranch: raw.targetBranch ?? repo.baseBranch,
               models: applyEffortPolicy(
                 ModelMapSchema.parse(raw.models ?? settings.models),
@@ -208,6 +229,7 @@ export function createHttpHandler(
               store.listRecords("attempt") as ProgressAttempt[],
             ),
             plan: store.getRecord("plan", `${task.id}:${task.planVersion}`),
+            comments: planComments(store, task.id),
             analysis: store.getRecord("analysis", task.id),
             checks: store.getRecord("checks", task.id),
             review: store.getRecord("review", task.id),
@@ -228,14 +250,16 @@ export function createHttpHandler(
       if (parts[0] === "artifacts" && method === "GET") {
         const record = store.getRecord("artifact", parts[1]) as {
           path: string;
+          type?: string;
         } | null;
         if (!record) return json({ error: "artifact_not_found" }, 404);
         const path = await contained(join(data, "artifacts"), record.path);
         if ((await stat(path)).size > 8 * 1024 * 1024)
           return json({ error: "artifact_too_large" }, 400);
-        return new Response(await readFile(path, "utf8"), {
+        const screenshot = record.type === "screenshot";
+        return new Response(screenshot ? await readFile(path) : await readFile(path, "utf8"), {
           headers: {
-            "content-type": "text/plain; charset=utf-8",
+            "content-type": screenshot ? "image/png" : "text/plain; charset=utf-8",
             "content-security-policy": "default-src 'none'; sandbox",
             "x-content-type-options": "nosniff",
             "cache-control": "no-store",

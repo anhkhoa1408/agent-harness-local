@@ -138,6 +138,38 @@ export const CheckSpecSchema = CommandSpecSchema.extend({
   successPattern: z.string().nullable(),
 });
 export type CheckSpec = z.infer<typeof CheckSpecSchema>;
+export const UiVerificationSchema = z.object({
+  screenshots: z
+    .array(
+      z.object({
+        id: z
+          .string()
+          .regex(/^[a-zA-Z0-9_-]+$/)
+          .max(80),
+        checkId: z.string().min(1),
+        path: z.string().min(1),
+        criterionIds: z.array(z.string().min(1)).min(1),
+        viewport: z.object({
+          width: z.number().int().min(1).max(3840),
+          height: z.number().int().min(1).max(3840),
+        }),
+        referencePath: z.string().min(1).nullable(),
+      }),
+    )
+    .min(1)
+    .max(6),
+});
+export const VisualReviewSchema = z.object({
+  screenshots: z
+    .array(
+      z.object({
+        id: z.string(),
+        passed: z.boolean(),
+        evidence: z.string().trim().min(1).max(2000),
+      }),
+    )
+    .max(6),
+});
 export const PlanSchema = z.object({
   taskId: z.string(),
   version: z.number().int().positive(),
@@ -163,6 +195,7 @@ export const PlanSchema = z.object({
     }),
   ),
   checks: z.array(CheckSpecSchema),
+  uiVerification: UiVerificationSchema.nullable().optional(),
   dependencies: z.array(z.string()),
   environment: z.array(z.string()),
   unresolved: z.array(z.string()),

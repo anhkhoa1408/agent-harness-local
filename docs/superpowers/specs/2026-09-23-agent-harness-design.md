@@ -23,7 +23,7 @@ Các quyết định sản phẩm đã chốt:
 - Viết test cho tính năng mới và bug đang sửa; có thể bỏ qua test cũ ngoài phạm vi feature.
 - Tối đa ba vòng sửa tự động sau lần triển khai đầu; hết giới hạn thì cần người dùng quyết định.
 - Tạo GitHub PR khi đạt điều kiện; bàn giao local nếu remote không được hỗ trợ hoặc không có remote.
-- Không tự merge, deploy hoặc xóa worktree trong MVP.
+- Không tự merge task vào base, deploy hoặc xóa worktree. Theo cập nhật 2026-10-05, prepare được phép đồng bộ base remote vào worktree riêng.
 
 Các lựa chọn kỹ thuật cụ thể dưới đây là đề xuất triển khai cho những quyết định trên và thuộc phạm vi review bản spec này.
 
@@ -43,7 +43,7 @@ flowchart LR
   UI --> F
 ```
 
-- **Web:** Next.js + TypeScript. Nhập task, duyệt plan, xem timeline/diff/test/review và điều khiển pause/resume/cancel. API lưu yêu cầu điều khiển; không giữ agent chạy trong vòng đời HTTP request.
+- **Web:** Next.js + TypeScript. Nhập task, duyệt plan, xem timeline/test/review và điều khiển pause/resume/cancel. API lưu yêu cầu điều khiển; không giữ agent chạy trong vòng đời HTTP request.
 - **Worker:** tiến trình Node.js + TypeScript độc lập với web. Đọc yêu cầu từ database, chiếm quyền chạy một task, thực thi pipeline, ghi sự kiện và kết quả.
 - **Persistence:** SQLite lưu dữ liệu có cấu trúc; filesystem lưu báo cáo, log lớn và ảnh/trace E2E. Đây là lựa chọn thiết kế phù hợp phạm vi một người dùng local, không yêu cầu dịch vụ database riêng.
 - **Codex adapter:** giao tiếp app-server, cung cấp lấy danh sách model, bắt đầu/tiếp tục/ngắt lượt, nhận sự kiện và chuyển yêu cầu quyền hạn sang dashboard. Không trộn protocol Codex vào logic chuyển trạng thái.
@@ -102,9 +102,9 @@ Mỗi trạng thái chờ có reason và hành động cần thiết; ví dụ `
 | discover | Repo Profile và kiểm tra khả năng thực thi → analyze |
 | analyze | Requirement đủ rõ; thiếu thông tin → waiting_input; đủ → plan |
 | plan | Plan có phiên bản → waiting_approval; được duyệt → prepare |
-| prepare | Tạo mới hoặc xác minh worktree/branch đã có, môi trường đủ và dependencies được duyệt → implement lần đầu hoặc repair nếu đang sửa |
+| prepare | Tạo/xác minh worktree, fetch base từ remote và merge trong worktree riêng; conflict dùng AI giới hạn theo file. Base đổi → discover/plan và duyệt lại; baseline giữ nguyên → implement hoặc repair |
 | implement | Code và test cho tính năng mới/bug → verify |
-| verify | Kiểm tra bắt buộc pass → review; lỗi do thay đổi → repair; lỗi môi trường → blocked |
+| verify | Runner chạy checks; UI task có screenshot được chọn thì thêm một lượt AI đọc ảnh. Tất cả bắt buộc pass → review; lỗi hành vi/giao diện → repair; thiếu evidence/môi trường → blocked |
 | review | Không còn finding bắt buộc sửa, đủ bằng chứng → deliver; có finding → repair |
 | repair | Sửa theo lỗi test/review, tăng repair round → verify; thay phạm vi → plan |
 | deliver | Kiểm tra evidence còn hiệu lực, commit/push/tạo PR hoặc xuất bàn giao local → completed |
@@ -117,7 +117,7 @@ Mỗi task có nhiều Stage Attempt. Một attempt lưu đầu vào, model/effo
 
 ## 6. Model và context
 
-Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có cấu hình model/effort riêng. Viết test nằm trong implement/repair. Verify chạy command; prepare/deliver dùng công cụ, không cần một model riêng để xác định kết quả.
+Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có cấu hình model/effort riêng. Viết test nằm trong implement/repair. Verify chạy command; chỉ gọi model review cho ảnh UI được chọn. Prepare dùng công cụ Git, chỉ gọi model repair khi có conflict. Deliver không gọi model; không thêm lựa chọn model riêng cho hai lượt tùy điều kiện này.
 
 Chính sách theo yêu cầu ngày 2026-10-03, thay thế lựa chọn effort trên UI:
 
@@ -125,7 +125,9 @@ Chính sách theo yêu cầu ngày 2026-10-03, thay thế lựa chọn effort tr
 | --- | --- | --- |
 | plan, gồm replan | gpt-6-astra | high |
 | discover, analyze, implement, review, repair | gpt-6-luna | medium |
-| prepare, verify, deliver | Worker/runner, không gọi model | Không áp dụng |
+| prepare | Worker; conflict dùng model repair đã chọn | medium khi có conflict |
+| verify | Runner; ảnh UI dùng model review đã chọn | medium khi có screenshot |
+| deliver | Worker, không gọi model | Không áp dụng |
 
 Policy nằm trong `src/core/model-policy.ts`; thay effort bằng cách sửa code. UI vẫn cho đổi model nhưng hiển thị effort cố định. API chuẩn hóa effort khi lưu settings, tạo task và áp dụng model vào task; runtime và attempt log dùng effort của policy. Lựa chọn model cũ của task được giữ; lịch sử attempt và context snapshot đã ghi không bị sửa. Cặp model/effort không khả dụng phải blocked, không tự fallback. Model tiết kiệm là lựa chọn cấu hình, không cam kết mức quota hoặc số tiền cụ thể.
 
@@ -201,7 +203,7 @@ Trong nội dung truyền cho agent: tuân thủ ràng buộc platform trước;
 
 - Một task tương ứng một feature hoặc bug nhỏ. Task có nhiều feature độc lập phải được chia trước khi duyệt plan.
 - Mặc định tạo branch `codex/<task-id>-<slug>` từ commit đã chốt của base branch. Tên va chạm phải được xử lý mà không chiếm branch của task khác.
-- Cho phép branch nguồn là feature khác; lưu dependency và chọn branch đích PR phù hợp. Không tự rebase/merge khi branch nguồn thay đổi.
+- Cho phép branch nguồn là feature khác; lưu dependency và chọn branch đích PR phù hợp. Không tự rebase. Theo cập nhật 2026-10-05, prepare được phép merge base remote đã fetch vào worktree của task; không merge ngược task vào base.
 - Mỗi task có worktree riêng. Không checkout branch khác trong working directory đang dùng của người dùng; không tự mang thay đổi chưa commit từ đó sang task.
 - Discovery và plan phải gắn với revision nguồn. Nếu source thay đổi trước prepare, đọc lại phần bị ảnh hưởng và xin duyệt lại khi plan phải thay đổi.
 - Resume và mọi vòng sửa giữ nguyên branch/worktree. Reviewer đọc cùng snapshot nhưng không ghi vào đó.
@@ -270,7 +272,7 @@ Các thực thể chính:
 | Event / ControlCommand | Timeline có thứ tự; lệnh pause/resume/cancel có ID chống lặp |
 | SideEffect / Artifact | Intent/result của tác động ngoài DB; đường dẫn và fingerprint báo cáo |
 
-Các màn hình: danh sách repo/task; tạo task; hỏi đáp và duyệt plan; chi tiết task với timeline, diff, tests, review; cấu hình model theo stage; kết quả bàn giao. Task detail thể hiện rõ đang chạy/chờ gì, người dùng cần làm gì và trạng thái worker.
+Các màn hình: danh sách repo/task; tạo task; hỏi đáp và duyệt plan; chi tiết task với timeline, tests, review; cấu hình model theo stage; kết quả bàn giao. Task detail thể hiện rõ đang chạy/chờ gì, người dùng cần làm gì và trạng thái worker. Theo yêu cầu ngày 2026-10-04, bỏ tab Diff; người dùng review diff trên GitHub. Pipeline vẫn giữ dữ liệu diff để review và kiểm tra phạm vi thay đổi.
 
 Web và worker chỉ lắng nghe loopback. Mutation endpoint kiểm tra origin/session local; không mở quyền thực thi local ra mạng. Credential không gửi đến browser hoặc lưu trong database/log. Repository-controlled content không được thay policy, approval hoặc giới hạn của harness.
 
@@ -318,11 +320,11 @@ Theo dõi thời gian người dùng can thiệp, số lần hỏi lại, số v
 - review: ECC code-reviewer + skill review hiện có; conversation độc lập, read-only.
 - repair: VoltAgent debugger + ECC build-error-resolver + tdd-guide, kèm systematic-debugging.
 - implement/repair nạp thêm ECC e2e-runner khi plan đã duyệt có E2E checks. Profile được freeze sẵn vào optional context ngay lúc task bắt đầu; prepare chỉ kích hoạt bản frozen, không đọc lại upstream.
-- prepare/verify/deliver thuộc worker, không spawn agent bổ sung.
+- prepare/verify/deliver thuộc worker. Prepare chỉ dispatch một child resolve conflict nếu cần; verify chỉ dispatch một child đọc ảnh đã chọn nếu plan có UI verification. Không dispatch AI để chạy lại command. Deliver không dispatch AI.
 
 Đây là profile hướng dẫn cho từng phiên stage, không tự tạo đội agent lồng nhau. Bản nguồn GitHub pin commit cùng license nằm trong `agents/upstream`; runtime chỉ nạp bản rút gọn trong `agents/profiles`. Model/tool metadata, coverage toàn repo, context-manager và hành vi deploy tự động của upstream không được kế thừa. Output schema, quyền thực thi, stage transitions và approval của harness giữ quyền quyết định. Profile cũ đã frozen không tự cập nhật khi đổi ứng dụng; task mới nhận mapping mới.
 
-Mỗi feature/task luôn có branch và worktree riêng, tạo sau khi duyệt plan. Implement/verify/review/repair/deliver dùng lại worktree đó; pause/resume và replan không tạo worktree mới. Trước approval, các bước chỉ đọc committed source snapshot. Không tự merge hoặc xóa worktree.
+Mỗi feature/task luôn có branch và worktree riêng, tạo sau khi duyệt plan. Implement/verify/review/repair/deliver dùng lại worktree đó; pause/resume và replan không tạo worktree mới. Trước approval, các bước chỉ đọc committed source snapshot. Không tự merge task vào base hoặc xóa worktree; prepare được phép đồng bộ base vào worktree riêng theo cập nhật 2026-10-05.
 
 ### Cập nhật UI pipeline — 2026-10-04
 
@@ -335,3 +337,32 @@ Agent profiles và skills được version-control cùng repo, kèm nguồn, phi
 Theo yêu cầu người dùng: Docker Compose chạy dashboard và Node.js worker bằng một lệnh; đăng nhập Codex qua trang trong dashboard, dùng browser OAuth của Codex CLI. CLI sở hữu state/PKCE, callback và token exchange; ứng dụng chỉ khởi chạy, hiển thị authorization URL và kiểm tra trạng thái. Không xây OAuth provider hoặc dùng client ID tự tạo.
 
 Trong container, dashboard bind `0.0.0.0` để Docker forward port; cổng host vẫn chỉ bind `127.0.0.1`. Callback CLI tại loopback 1455 được proxy qua cổng container 1456, publish host `127.0.0.1:1455`. Dữ liệu và phiên Codex nằm trong volumes riêng; repository từ Personal được mount tại `/repos`. Không mount phiên Codex trên host.
+
+## Bổ sung góp ý Plan và Auto mode — 2026-10-04
+
+Theo yêu cầu người dùng: Plan hỗ trợ comment chung hoặc theo step/criterion/check, gắn với version. Người dùng gửi comments rồi yêu cầu sửa; planner nhận Plan trước và feedback, tạo version mới để duyệt. Version cũ và comments giữ nguyên. Khi version hiện tại có comments, phải tạo version mới trước approval. Replan giữ worktree và repair budget.
+
+Settings có chế độ mặc định cho task mới; task có thể đổi chế độ tại stage boundary. Manual giữ `on-request`; Auto dùng `never` với sandbox hiện tại (`read-only` trước implementation và cho reviewer, `workspace-write` cho implement/repair). Auto không tự mở rộng quyền filesystem/network; request quyền bất ngờ bị decline và ghi event. Approval Plan thuộc worker vẫn bắt buộc, độc lập với policy công cụ. Giới hạn repair, test/review gates và quy tắc replan giữ nguyên.
+
+
+## Bổ sung Prepare và UI Verify tiết kiệm token — 2026-10-05
+
+Theo yêu cầu đã chốt: mở rộng hai stage hiện có, không thêm stage hoặc cấu hình model mới.
+
+### Prepare
+
+- Remote mặc định do repository đăng ký quyết định (thường là `origin`); fetch đúng `baseBranch`, pin commit vừa lấy rồi merge vào worktree riêng. Repo không có remote tiếp tục dùng committed source local.
+- Không pull/checkout/reset repo gốc; không mang thay đổi chưa commit của người dùng sang task. Worktree task có edits chưa commit và cần cập nhật base thì blocked, giữ nguyên edits.
+- Clean merge/fast-forward do worker thực hiện, không dùng token AI. Khi conflict, dispatch một lượt với model repair, chỉ các file conflict và rule liên quan; agent chỉ chỉnh nội dung. Worker kiểm tra phạm vi, index/HEAD và conflict markers, rồi stage/commit. Không tự chọn ours/theirs toàn bộ. Cần quyết định nghiệp vụ hoặc lỗi merge/fetch thì dừng với lý do cụ thể.
+- Ghi intent/result đồng bộ ngoài worktree. Retry dùng lại target đã pin và resolution đã xác minh; không gọi AI hoặc commit lặp khi merge đã hoàn tất.
+- Baseline đổi → cập nhật `sourceCommit` thành committed snapshot sau merge, giữ worktree, số repair và lịch sử plan; xóa evidence downstream, vô hiệu approval, chạy lại discovery/analysis/plan và duyệt version mới trước implement. Không tự áp dụng plan cũ lên source mới.
+
+### UI Verify
+
+- Planner thêm `uiVerification` cho thay đổi UI nhìn thấy được; task chỉ đổi logic dùng runner như cũ. Plan cũ chưa có trường này tiếp tục runner-only.
+- Plan chọn 1–6 ảnh PNG, mỗi ảnh có `id`, `checkId` của required E2E, đường dẫn từ worktree root, `criterionIds`, `viewport` và `referencePath` local nullable. Tiêu chí mô tả rõ layout/nội dung cần đối chiếu. Không có reference thì chỉ đánh giá theo tiêu chí đã duyệt; không tuyên bố khớp thiết kế không tồn tại.
+- E2E command sở hữu server readiness/cleanup, assertion hành vi và capture ảnh viewport-only, `deviceScaleFactor=1`. Runner xóa ảnh cũ trước check, không ghi đè tracked source, kiểm tra kích thước PNG và lưu bản copy/hash trong artifacts. Generated screenshot không thuộc feature diff và không bị commit.
+- Required checks fail → repair hoặc blocked theo policy hiện có, không gọi AI xem ảnh. Checks pass và có selection → một lượt model review, read-only, chỉ tiêu chí được ánh xạ và ảnh đã chọn. Không truyền toàn bộ DOM/diff/plan hoặc để agent tự duyệt website.
+- Mỗi ảnh cần một verdict với evidence cụ thể; verdict thiếu/trùng, ảnh thiếu/sai viewport, nguồn đổi hoặc ảnh đổi đều không thể pass. Visual fail → repair, dùng chung giới hạn ba vòng. Lỗi runtime/evidence → blocked.
+- Lưu các kết quả `ui:<id>` cùng task/plan/fingerprint và hash ảnh. Review dùng kết quả đã lưu; delivery bắt buộc có verdict pass hiện hành và kiểm tra lại hash ảnh. Dashboard hiển thị selection trong plan và link mở ảnh trong Tests.
+- Repair nhận tối đa 6 check lỗi, tối đa 2.000 ký tự cuối của stdout/report và stderr cho mỗi check, kèm đường dẫn ảnh; đọc thêm evidence chỉ khi cần. Các check pass không gửi lại dưới dạng lỗi. Không gửi toàn bộ report vào prompt.

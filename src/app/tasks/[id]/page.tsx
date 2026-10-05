@@ -1,8 +1,8 @@
-import { TaskDetail } from "../../../components/task-detail";
+import { TaskDetailPage } from "@/components/pages/task-detail-page";
 export default async function TaskPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  return <TaskDetail id={(await params).id} />;
+  return <TaskDetailPage id={(await params).id} />;
 }

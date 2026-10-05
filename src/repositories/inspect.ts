@@ -10,13 +10,13 @@ import {
   type Repository,
   type ModelChoice,
 } from "../core/contracts";
-import type { AgentClient } from "../codex/client";
+import type { AgentClient, AgentEvent } from "../codex/client";
 import type { Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";
 const exec = promisify(execFile);
-export async function gitText(root: string, args: string[]): Promise<string> {
+export async function gitText(root: string, args: string[], signal?: AbortSignal): Promise<string> {
   return (
-    await exec("git", ["-C", root, ...args], { maxBuffer: 8 * 1024 * 1024 })
+    await exec("git", ["-C", root, ...args], { maxBuffer: 8 * 1024 * 1024, signal, timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
   ).stdout.trim();
 }
 export async function inspectRepository(
@@ -97,6 +97,8 @@ export async function discoverRepository(
   bundle: Bundle,
   model: ModelChoice,
   signal: AbortSignal,
+  executionMode?: "manual" | "auto",
+  onEvent: (event: AgentEvent) => void = () => {},
 ) {
   const docs = await sourceDocuments(repo),
     snapshot = await mkdtemp(join(tmpdir(), "harness-discovery-"));
@@ -114,8 +116,9 @@ export async function discoverRepository(
         prompt: `Inspect the committed source snapshot only. Do not run setup or commands. Return languages, areas, candidate argv commands, prerequisites, evidence paths and unknowns. Missing or truncated files are unknowns. repositoryId=${repo.id}; sourceCommit=${repo.head}`,
         outputSchema: z.toJSONSchema(RepoProfileSchema),
         write: false,
+        executionMode,
       },
-      () => {},
+      onEvent,
       signal,
     );
     const profile = RepoProfileSchema.parse(run.result);

@@ -20,6 +20,8 @@ export function validatePlan(plan: Plan): string[] {
     )
       errors.push(`missing_evidence:${criterion.id}`);
   for (const check of plan.checks) {
+    if (check.id.startsWith("ui:"))
+      errors.push(`reserved_check_id:${check.id}`);
     if (!["build", "typecheck"].includes(check.kind) && check.minimumTests < 1)
       errors.push(`minimum_tests:${check.id}`);
     if (
@@ -30,6 +32,43 @@ export function validatePlan(plan: Plan): string[] {
       errors.push(`missing_success_evidence:${check.id}`);
     if (check.reportFormat === "junit" && !check.reportPath)
       errors.push(`missing_report:${check.id}`);
+  }
+  const screenshots = plan.uiVerification?.screenshots ?? [];
+  if (
+    new Set(screenshots.map((s) => s.id)).size !== screenshots.length ||
+    new Set(screenshots.map((s) => s.path)).size !== screenshots.length
+  )
+    errors.push("ui_duplicate_selection");
+  const safePath = (path: string) =>
+    !path.startsWith("/") &&
+    !path.includes("\\") &&
+    !path.split("/").some((p) => p === ".." || p === "." || !p);
+  for (const shot of screenshots) {
+    if (
+      !plan.checks.some(
+        (c) => c.id === shot.checkId && c.required && c.kind === "e2e",
+      )
+    )
+      errors.push(`ui_e2e_required:${shot.id}`);
+    if (
+      shot.criterionIds.some(
+        (id) =>
+          !plan.criteria.some(
+            (c) => c.id === id && c.checkIds.includes(shot.checkId),
+          ),
+      )
+    )
+      errors.push(`ui_criterion:${shot.id}`);
+    if (
+      !safePath(shot.path) ||
+      !shot.path.endsWith(".png") ||
+      (shot.referencePath &&
+        (!safePath(shot.referencePath) ||
+          !shot.referencePath.endsWith(".png"))) ||
+      screenshots.some((s) => s.referencePath === shot.path) ||
+      plan.checks.some((c) => c.reportPath === shot.path)
+    )
+      errors.push(`ui_path:${shot.id}`);
   }
   const visited = new Set<string>(),
     active = new Set<string>();
@@ -102,6 +141,22 @@ export function acceptanceErrors(
       !matches.every((c) => c.passed && c.evidence.trim())
     )
       errors.push(`criterion:${criterion.id}`);
+  }
+  for (const shot of plan.uiVerification?.screenshots ?? []) {
+    const matching = checks.filter((c) => c.id === `ui:${shot.id}`);
+    if (
+      matching.length !== 1 ||
+      !matching.every(
+        (c) =>
+          c.taskId === task.id &&
+          c.planVersion === plan.version &&
+          c.fingerprint === fingerprint &&
+          c.status === "passed" &&
+          c.evidencePath &&
+          c.imageEvidence?.length,
+      )
+    )
+      errors.push(`required_ui:${shot.id}`);
   }
   return errors;
 }
