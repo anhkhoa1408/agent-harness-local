@@ -1,10 +1,11 @@
+import { validateStories } from "./stories";
 import { PlanSchema, type Plan, type Task, type Review } from "./contracts";
 import type { CheckResult } from "../execution/checks";
 export function validatePlan(plan: Plan): string[] {
   const parsed = PlanSchema.safeParse(plan);
   if (!parsed.success)
     return parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
-  const errors: string[] = [];
+  const errors: string[] = validateStories(plan);
   if (plan.unresolved.length) errors.push("unresolved_questions");
   if (!plan.criteria.length || !plan.steps.length || !plan.checks.length)
     errors.push("incomplete_plan");

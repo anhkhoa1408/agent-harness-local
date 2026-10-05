@@ -9,12 +9,14 @@ import { api } from "@/lib/api";
 export function RepositoryForm({
   onSubmit,
   busy,
+  draft,
+  onDraftChange,
 }: {
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   busy: boolean;
+  draft: { path: string; base: string; remote: string };
+  onDraftChange: (field: "path" | "base" | "remote", value: string) => void;
 }) {
-  const [path, setPath] = useState("");
-  const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState("");
   async function browse() {
@@ -25,7 +27,7 @@ export function RepositoryForm({
         "repositories/pick-folder",
         "POST",
       );
-      if (result.path !== null) setPath(result.path);
+      if (result.path !== null) onDraftChange("path", result.path);
     } catch (error) {
       const code = error instanceof Error ? error.message : "";
       setError(
@@ -55,18 +57,30 @@ export function RepositoryForm({
         <Input
           id="repo-path"
           name="path"
-          value={path}
-          onChange={(event) => setPath(event.target.value)}
+          value={draft.path}
+          onChange={(event) => onDraftChange("path", event.target.value)}
           disabled={picking}
           placeholder="/Users/you/projects/my-app"
           required
         />
       </FormField>
       <FormField id="repo-base" label="Nhánh nguồn">
-        <Input id="repo-base" name="base" defaultValue="main" required />
+        <Input
+          id="repo-base"
+          name="base"
+          value={draft.base}
+          onChange={(event) => onDraftChange("base", event.target.value)}
+          required
+        />
       </FormField>
       <FormField id="repo-remote" label="Remote (để trống nếu local)">
-        <Input id="repo-remote" name="remote" placeholder="origin" />
+        <Input
+          id="repo-remote"
+          name="remote"
+          placeholder="origin"
+          value={draft.remote}
+          onChange={(event) => onDraftChange("remote", event.target.value)}
+        />
       </FormField>
       <Button variant="secondary" type="submit" disabled={busy || picking}>
         Đăng ký repo

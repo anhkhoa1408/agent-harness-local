@@ -2,6 +2,23 @@ name: agent-harness-local
 services:
   harness:
     build: .
+    develop:
+      watch:
+        - action: rebuild
+          path: .
+          ignore:
+            - .git/
+            - node_modules/
+            - .next/
+            - .harness/
+            - .superpowers/
+            - .env*
+            - "!.env.example"
+            - .DS_Store
+            - "**/.DS_Store"
+            - test-results/
+            - playwright-report/
+            - "*.tsbuildinfo"
     init: true
     security_opt:
       - seccomp=./config/docker-seccomp.json

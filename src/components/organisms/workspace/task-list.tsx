@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
-import type { Repository } from "@/core/contracts";
+import { StatusSchema, type Repository } from "@/core/contracts";
 import { SelectField } from "@/components/molecules/select-field";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import type { TaskWithProgress } from "@/core/pipeline-progress";
 import { Pipeline } from "@/components/organisms/pipeline";
-import { stageLabel } from "@/lib/api";
+import { stageLabel, statusLabel } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/molecules/status-badge";
 import { EmptyState } from "@/components/molecules/empty-state";
@@ -18,10 +18,14 @@ export function TaskList({
   repos: Repository[];
 }) {
   const [filterRepoId, setFilterRepoId] = useState("all");
-  const visibleTasks =
-    filterRepoId === "all"
-      ? tasks
-      : tasks.filter((task) => task.repositoryId === filterRepoId);
+  const [filterStatus, setFilterStatus] = useState("running");
+  const [activityLimit, setActivityLimit] = useState("3");
+  const filteredTasks = tasks.filter(
+    (task) =>
+      (filterRepoId === "all" || task.repositoryId === filterRepoId) &&
+      (filterStatus === "all" || task.status === filterStatus),
+  );
+  const visibleTasks = filteredTasks.slice(0, Number(activityLimit));
   return (
     <section
       aria-labelledby="recent-activity-heading"
@@ -30,6 +34,33 @@ export function TaskList({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="recent-activity-heading">Hoạt động gần đây</h2>
         <div className="flex flex-wrap items-center gap-3">
+          <div className="w-36 max-w-full">
+            <SelectField
+              id="activity-limit"
+              label="Số hoạt động hiển thị"
+              value={activityLimit}
+              onValueChange={setActivityLimit}
+              options={[3, 9, 12].map((count) => ({
+                value: String(count),
+                label: `${count} hoạt động`,
+              }))}
+            />
+          </div>
+          <div className="w-48 max-w-full">
+            <SelectField
+              id="activity-status"
+              label="Lọc theo trạng thái"
+              value={filterStatus}
+              onValueChange={setFilterStatus}
+              options={[
+                { value: "all", label: "Tất cả trạng thái" },
+                ...StatusSchema.options.map((status) => ({
+                  value: status,
+                  label: statusLabel[status],
+                })),
+              ]}
+            />
+          </div>
           <div className="w-60 max-w-full">
             <SelectField
               id="activity-repository"
@@ -46,7 +77,7 @@ export function TaskList({
             />
           </div>
           <span className="text-xs text-muted-foreground">
-            {visibleTasks.length} task
+            {visibleTasks.length} / {filteredTasks.length} task
           </span>
         </div>
       </div>
@@ -80,14 +111,18 @@ export function TaskList({
       ) : (
         <EmptyState
           title={
-            filterRepoId === "all"
-              ? "Workspace đang sẵn sàng"
-              : "Repository chưa có task"
+            filterStatus !== "all"
+              ? "Không có hoạt động phù hợp"
+              : filterRepoId === "all"
+                ? "Workspace đang sẵn sàng"
+                : "Repository chưa có task"
           }
           description={
-            filterRepoId === "all"
-              ? "Thêm repo và tạo task đầu tiên. Mọi tiến trình sẽ xuất hiện ở đây."
-              : "Chọn repository khác hoặc tạo task cho repository này."
+            filterStatus !== "all"
+              ? "Chọn trạng thái hoặc repository khác để xem hoạt động."
+              : filterRepoId === "all"
+                ? "Thêm repo và tạo task đầu tiên. Mọi tiến trình sẽ xuất hiện ở đây."
+                : "Chọn repository khác hoặc tạo task cho repository này."
           }
         />
       )}

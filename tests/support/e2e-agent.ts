@@ -2,8 +2,10 @@ import { writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { AgentClient } from "../../src/codex/client";
+import { type Plan } from "../../src/core/contracts";
 import { planFixture } from "./task-fixture";
 export function createFixtureAgent(): AgentClient {
+  const interruptedStories=new Set<string>();
   return {
     models: async () => [
       { id: "fixture-strong", efforts: ["high"], isDefault: false },
@@ -81,10 +83,21 @@ export function createFixtureAgent(): AgentClient {
               },
             ],
           });
+          if (task.splitIntoStories) {
+            const plan=result as Plan;
+            plan.criteria.push({id:"AC-2",description:"Second works",checkIds:["second-unit"]});
+            plan.steps.push({...plan.steps[0],id:"two",files:["second.cjs"],dependsOn:["one"]});
+            plan.checks.push({...plan.checks[0],id:"second-unit",args:["-e","console.log('TAP version 13\\n1..1\\n'+(require('./second.cjs')===3?'ok':'not ok')+' 1 - second')"]});
+            plan.stories=[
+              {id:"A",title:"First behavior",outcome:"First works",points:2,dependsOn:[],criterionIds:["AC-1"],stepIds:["one"]},
+              {id:"B",title:"Second behavior",outcome:"Second works",points:3,dependsOn:["A"],criterionIds:["AC-2"],stepIds:["two"]},
+            ];
+          }
         } else if (stage === "implement" || stage === "repair") {
+          if(task.requirement.includes("story-interrupt")&&task.storyId==="B"&&!interruptedStories.has(task.id)) {interruptedStories.add(task.id);throw new Error("quota_exceeded");}
           if (task.requirement.includes("quota") && stage === "implement")
             throw new Error("quota_exceeded");
-          if (task.requirement.includes("replan") && task.planVersion === 1)
+          if (((task.requirement.includes("replan")&&!task.requirement.includes("story-replan")) || (task.requirement.includes("story-replan")&&task.storyId==="B")) && task.planVersion === 1)
             return {
               threadId,
               child,
@@ -112,6 +125,8 @@ export function createFixtureAgent(): AgentClient {
             task.requirement.includes("repair") && stage === "implement"
               ? 1
               : 2;
+          if (context.plan.steps.some((s: any)=>s.files.includes("second.cjs"))) await writeFile(join(input.cwd,"second.cjs"),"module.exports=3\n");
+          if (context.plan.steps.some((s: any)=>s.files.includes("app.cjs")||s.files.includes("app.py"))) {
           await writeFile(
             join(
               input.cwd,
@@ -121,6 +136,7 @@ export function createFixtureAgent(): AgentClient {
               ? `value=${value}\n`
               : `module.exports=${value}\n`,
           );
+          }
           result = {
             summary: "Fixture feature",
             needsReplan: false,
@@ -132,13 +148,7 @@ export function createFixtureAgent(): AgentClient {
             planVersion: task.planVersion,
             fingerprint: context.fingerprint,
             findings: [],
-            criteria: [
-              {
-                id: "AC-1",
-                passed: true,
-                evidence: "feature-unit passed with real runner",
-              },
-            ],
+            criteria: context.plan.criteria.map((c: any)=>({id:c.id,passed:true,evidence:"feature checks passed with real runner"})),
             verdict: "pass",
           };
       }

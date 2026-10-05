@@ -7,6 +7,7 @@ import {
   ReviewSchema,
   RepositorySchema,
   type Task,
+  type Plan,
 } from "../core/contracts";
 import type { Store } from "../storage/store";
 import { acceptanceErrors } from "../core/acceptance";
@@ -94,6 +95,11 @@ export function createDelivery(
   options: {
     github?: GitHubPort;
     repositoryName?: (url: string) => string;
+    plan?: Plan;
+    effectPrefix?: string;
+    reportName?: string;
+    commitMessage?: string;
+    reportAppendix?: string;
   } = {},
 ) {
   return async function deliver(
@@ -106,7 +112,7 @@ export function createDelivery(
       repo = RepositorySchema.parse(
         store.getRecord("repository", task.repositoryId),
       ),
-      plan = PlanSchema.parse(
+      plan = options.plan ?? PlanSchema.parse(
         store.getRecord("plan", `${task.id}:${task.planVersion}`),
       ),
       review = ReviewSchema.parse(store.getRecord("review", task.id)),
@@ -138,7 +144,8 @@ export function createDelivery(
       )
     )
       throw new Error("scope_changed_requires_plan");
-    const commitKey = `${task.id}:commit:${before}`,
+    const commitMessage = options.commitMessage ?? `feat: ${task.title}\n\nHarness-Task: ${task.id}`;
+    const commitKey = `${options.effectPrefix ?? task.id}:commit:${before}`,
       commitEffect = store.getRecord("effect", commitKey) as {
         state: string;
         commit?: string;
@@ -154,7 +161,7 @@ export function createDelivery(
       if (head !== parent) {
         if (
           (await gitText(path, ["show", "-s", "--format=%B", "HEAD"])) !==
-          `feat: ${task.title}\n\nHarness-Task: ${task.id}`
+          commitMessage
         )
           throw new Error("local_head_changed");
       } else if (
@@ -165,7 +172,7 @@ export function createDelivery(
         await gitText(path, [
           "commit",
           "-m",
-          `feat: ${task.title}\n\nHarness-Task: ${task.id}`,
+          commitMessage,
         ]);
         head = await gitText(path, ["rev-parse", "HEAD"]);
       }
@@ -179,14 +186,14 @@ export function createDelivery(
     }
     const folder = join(data, "artifacts", task.id);
     await mkdir(folder, { recursive: true });
-    const reportPath = join(folder, `delivery-v${plan.version}.md`);
+    const reportPath = join(folder, options.reportName ?? `delivery-v${plan.version}.md`);
     await writeFile(
       reportPath,
-      `${marker(task.branch)}\n\n${renderReport(plan, checks, review)}\n\nTarget: ${task.targetBranch}; branch: ${task.branch}; commit: ${head}.\n`,
+      `${marker(task.branch)}\n\n${renderReport(plan, checks, review)}${options.reportAppendix ?? ""}\n\nTarget: ${task.targetBranch}; branch: ${task.branch}; commit: ${head}.\n`,
       { mode: 0o600 },
     );
-    store.putRecord("artifact", `${task.id}-delivery`, {
-      id: `${task.id}-delivery`,
+    store.putRecord("artifact", `${options.effectPrefix ?? task.id}-delivery`, {
+      id: `${options.effectPrefix ?? task.id}-delivery`,
       taskId: task.id,
       path: reportPath,
       type: "report",

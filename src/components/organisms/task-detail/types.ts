@@ -5,6 +5,8 @@ import type {
   PlanComment,
   Review,
   Task,
+  StoryRun,
+  StoryExecution,
 } from "@/core/contracts";
 import type { StageNode } from "@/core/pipeline-progress";
 import type { CheckResult } from "@/execution/checks";
@@ -12,6 +14,7 @@ import type { Delivery } from "@/delivery/github";
 
 export type TaskDetailData = {
   task: Task;
+  stories?: {execution: StoryExecution | null; runs: StoryRun[]};
   pipeline: StageNode[];
   plan: Plan | null;
   comments: PlanComment[];

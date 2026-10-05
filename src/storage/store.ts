@@ -84,6 +84,8 @@ export function openStore(filename: string) {
         if (current.revision !== expectedRevision)
           throw new Error("revision_conflict");
         if (
+          patch.featureId !== undefined ||
+          patch.storyId !== undefined ||
           patch.id !== undefined ||
           patch.revision !== undefined ||
           patch.createdAt !== undefined
