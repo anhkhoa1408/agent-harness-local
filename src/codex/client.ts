@@ -1,7 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import type { ModelChoice } from "../core/contracts";
+import type { ModelChoice, AiStage } from "../core/contracts";
 import type { ModelInfo } from "../core/model-policy";
 import { JsonRpc, RpcRemoteError } from "./rpc";
+import { runSubagentStage } from "./subagents";
 export type AgentInput = {
   cwd: string;
   model: ModelChoice;
@@ -9,10 +10,20 @@ export type AgentInput = {
   prompt: string;
   outputSchema: Record<string, unknown>;
   write: boolean;
+  executionMode?: "manual" | "auto";
   threadId?: string;
+  delegation?: { stage: AiStage; attemptId: string; packetPath: string };
 };
 export type AgentEvent = {
-  type: "started" | "message" | "tool" | "approval" | "completed" | "error";
+  type:
+    | "parent"
+    | "child"
+    | "started"
+    | "message"
+    | "tool"
+    | "approval"
+    | "completed"
+    | "error";
   data: any;
 };
 export type AgentRun = {
@@ -20,6 +31,7 @@ export type AgentRun = {
   turnId: string;
   result: unknown;
   usage: unknown;
+  child?: { threadId: string; turnId: string; model: ModelChoice; usage: unknown };
 };
 export interface AgentClient {
   models(): Promise<ModelInfo[]>;
@@ -43,6 +55,7 @@ export class CodexClient implements AgentClient {
   async initialize() {
     await this.rpc.request("initialize", {
       clientInfo: { name: "agent-harness", version: "0.1.0" },
+      capabilities: { experimentalApi: true },
     });
     this.rpc.notify("initialized");
   }
@@ -75,6 +88,11 @@ export class CodexClient implements AgentClient {
     onEvent: (e: AgentEvent) => void,
     signal: AbortSignal,
   ): Promise<AgentRun> {
+    if (input.delegation)
+      return runSubagentStage(
+        this.rpc, input, onEvent, signal,
+        this.options.interruptTimeoutMs ?? 10000,
+      );
     if (signal.aborted) throw new Error("interrupted");
     const thread = await this.rpc.request(
       input.threadId ? "thread/resume" : "thread/start",
@@ -83,7 +101,7 @@ export class CodexClient implements AgentClient {
         cwd: input.cwd,
         model: input.model.model,
         sandbox: input.write ? "workspace-write" : "read-only",
-        approvalPolicy: "on-request",
+        approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
         developerInstructions: input.instructions,
       },
     );

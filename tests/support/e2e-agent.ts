@@ -8,14 +8,18 @@ export function createFixtureAgent(): AgentClient {
     models: async () => [
       { id: "fixture-strong", efforts: ["high"], isDefault: false },
       { id: "fixture-medium", efforts: ["medium"], isDefault: false },
+      { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
     ],
     answer: async () => {},
     interrupt: async () => {},
     close: async () => {},
     async run(input, onEvent, signal) {
       const stage = /stage: (\w+)/.exec(input.instructions)![1],
-        threadId = randomUUID();
+        threadId = input.threadId ?? randomUUID(),
+        child = { threadId: randomUUID(), turnId: "child-turn", model: input.model, usage: null };
       signal.throwIfAborted();
+      onEvent({ type: "parent", data: { threadId } });
+      onEvent({ type: "child", data: { ...child, parentThreadId: threadId } });
       onEvent({ type: "started", data: { threadId, turnId: "one" } });
       let result: unknown;
       if (stage === "discover") {
@@ -83,6 +87,7 @@ export function createFixtureAgent(): AgentClient {
           if (task.requirement.includes("replan") && task.planVersion === 1)
             return {
               threadId,
+              child,
               turnId: "one",
               result: {
                 summary: "Need revised plan",
@@ -137,7 +142,7 @@ export function createFixtureAgent(): AgentClient {
             verdict: "pass",
           };
       }
-      return { threadId, turnId: "one", result, usage: null };
+      return { threadId, turnId: "one", result, usage: null, child };
     },
   };
 }

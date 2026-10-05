@@ -2,6 +2,8 @@ import { stages } from "../core/contracts";
 import type { Handlers } from "./engine";
 import { z } from "zod";
 import { join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { createDelivery } from "../delivery/github";
 import {
   aiStages,
@@ -9,17 +11,19 @@ import {
   PlanSchema,
   RepositorySchema,
   ReviewSchema,
+  RepoProfileSchema,
   type Task,
   type AiStage,
   type Plan,
 } from "../core/contracts";
 import type { Store } from "../storage/store";
-import type { AgentClient } from "../codex/client";
+import type { AgentClient, AgentInput } from "../codex/client";
+import { parentModel } from "../codex/subagents";
 import { resolveModel, applyEffortPolicy } from "../core/model-policy";
 import { resolveBundle, snapshotBundle, type Bundle } from "../context/skills";
-import { composeInstructions } from "../context/prompts";
+import { composeInstructions, stageEnvelope } from "../context/prompts";
 import {
-  discoverRepository,
+  sourceDocuments,
   gitText,
   withSourceSnapshot,
 } from "../repositories/inspect";
@@ -33,7 +37,7 @@ import {
   stageAfterPreparation,
 } from "../core/transitions";
 import { acceptanceErrors } from "../core/acceptance";
-import { savePlan } from "../server/services";
+import { savePlan, planComments } from "../server/services";
 export function unavailableHandlers(): Handlers {
   return Object.fromEntries(
     stages.map((stage) => [
@@ -59,6 +63,13 @@ export function createHandlers(
   });
   const planOf = (task: Task) =>
     PlanSchema.parse(store.getRecord("plan", `${task.id}:${task.planVersion}`));
+  const stageTask = (task: Task) => ({
+    id: task.id,
+    title: task.title,
+    requirement: task.requirement,
+    sourceCommit: task.sourceCommit,
+    planVersion: task.planVersion,
+  });
   const fingerprint = (task: Task, plan: Plan) =>
     fingerprintWorktree(
       task.worktree!,
@@ -106,8 +117,51 @@ export function createHandlers(
         ai({ ...task, worktree: cwd }, stage, schema, context, signal),
       );
     task = { ...task, models: applyEffortPolicy(task.models) };
+    const catalog = await client.models();
+    if (!catalog.some(m => m.id === parentModel.model && m.efforts.includes(parentModel.effort)))
+      throw new Error("parent_model_unavailable");
     const bundle = store.getRecord("bundle", `${task.id}:${stage}`) as Bundle,
-      model = resolveModel(stage, task.models, {}, await client.models());
+      model = resolveModel(stage, task.models, {}, catalog);
+    const attempt = store.listRecords("attempt").find((a: any) =>
+      a.taskId === task.id && a.stage === stage && a.status === "running",
+    ) as { id: string } | undefined;
+    const attemptId = attempt?.id ?? randomUUID(),
+      packetDir = join(artifacts(task), "delegations");
+    await mkdir(packetDir, { recursive: true });
+    const parent = store.getRecord("parent", task.id) as { threadId: string } | undefined;
+    const input: AgentInput = {
+      cwd: task.worktree!,
+      model,
+      instructions: composeInstructions(bundle),
+      prompt: typeof context === "string" ? context : JSON.stringify(context),
+      outputSchema: z.toJSONSchema(schema),
+      executionMode: task.executionMode,
+      write: stage === "implement" || stage === "repair",
+      threadId: parent?.threadId,
+      delegation: { stage, attemptId, packetPath: join(packetDir, `${attemptId}.json`) },
+    };
+    await writeFile(input.delegation!.packetPath, JSON.stringify({
+      instructions: input.instructions, input: context,
+      outputSchema: stageEnvelope(input),
+    }), { flag: "wx", mode: 0o600 });
+    store.putRecord("artifact", attemptId, {
+      id: attemptId, taskId: task.id,
+      path: input.delegation!.packetPath, type: "context",
+    });
+    const runtime = (update: Record<string, unknown>) => {
+      const current = store.getRecord("runtime", task.id) as Record<string, unknown>;
+      const value = { ...current, ...update };
+      store.putRecord("runtime", task.id, value);
+      if (attempt) store.putRecord("attempt", attemptId, {
+        ...store.getRecord("attempt", attemptId) as object,
+        threadId: value.threadId, turnId: value.turnId, child: value.child,
+        bundleHash: bundle.hash, parentModel, usage: value.usage,
+      });
+    };
+    store.putRecord("runtime", task.id, {
+      stage, model, bundleHash: bundle.hash, attemptId,
+      state: "preparing", threadId: parent?.threadId ?? null,
+    });
     let poll: NodeJS.Timeout | undefined;
     const pending = new Set<string>();
     try {
@@ -126,16 +180,16 @@ export function createHandlers(
         }
       }, 100);
       const run = await client.run(
-        {
-          cwd: task.worktree ?? repository(task).root,
-          model,
-          instructions: composeInstructions(bundle),
-          prompt: JSON.stringify(context),
-          outputSchema: z.toJSONSchema(schema),
-          write: stage === "implement" || stage === "repair",
-        },
+        input,
         (event) => {
           if (event.type === "approval") {
+            if (task.executionMode === "auto") {
+              void client.answer(event.data.requestId, { decision: "decline" });
+              store.addEvent(task.id, "approval.auto_declined", {
+                method: event.data.method,
+              });
+              return;
+            }
             const key = `${task.id}:${String(event.data.requestId)}`;
             if (
               ![
@@ -160,14 +214,14 @@ export function createHandlers(
               id: key,
               method: event.data.method,
             });
+          } else if (event.type === "parent") {
+            store.putRecord("parent", task.id, { threadId: event.data.threadId, model: parentModel });
+            runtime({ threadId: event.data.threadId, parentModel });
+          } else if (event.type === "child") {
+            runtime({ child: event.data });
+            store.addEvent(task.id, "subagent.started", { stage, attemptId, ...event.data });
           } else if (event.type === "started") {
-            store.putRecord("runtime", task.id, {
-              stage,
-              model,
-              bundleHash: bundle.hash,
-              ...event.data,
-              state: "running",
-            });
+            runtime({ threadId: event.data.threadId, turnId: event.data.turnId, parentModel, state: "running" });
             store.addEvent(task.id, "agent.started", {
               stage,
               model,
@@ -177,16 +231,21 @@ export function createHandlers(
         },
         signal,
       );
-      store.putRecord("runtime", task.id, {
-        stage,
-        model,
-        bundleHash: bundle.hash,
+      if (!run.child) throw new Error("subagent_evidence_missing");
+      runtime({
         threadId: run.threadId,
         turnId: run.turnId,
+        child: run.child,
         state: "stopped",
         usage: run.usage,
       });
       return schema.parse(run.result);
+    } catch (error) {
+      runtime({
+        state: error instanceof Error && error.message.includes("runtime_state_unknown")
+          ? "unknown" : "stopped",
+      });
+      throw error;
     } finally {
       if (poll) clearInterval(poll);
       for (const key of pending) store.deleteRecord("approval", key);
@@ -212,14 +271,13 @@ export function createHandlers(
       task.stage as "implement" | "repair",
       mutationSchema,
       {
-        task,
+        task: stageTask(task),
         plan,
         profile: store.getRecord(
           "profile",
           `${task.repositoryId}:${task.sourceCommit}`,
         ),
-        checks: store.getRecord("checks", task.id),
-        review: store.getRecord("review", task.id),
+        ...(task.stage === "repair" ? { checks: store.getRecord("checks", task.id), review: store.getRecord("review", task.id) } : {}),
         instruction:
           "Implement only approved files and scope. Do not commit. Use feature TDD; expected red is allowed. If scope/dependencies change return needsReplan before changing them.",
       },
@@ -277,14 +335,10 @@ export function createHandlers(
   return {
     ...unavailableHandlers(),
     discover: async (task, signal) => {
-      await freeze(task);
-      const profile = await discoverRepository(
-        repository(task),
-        client,
-        store.getRecord("bundle", `${task.id}:discover`) as Bundle,
-        resolveModel("discover", task.models, {}, await client.models()),
-        signal,
-      );
+      const repo = repository(task), docs = await sourceDocuments(repo);
+      const profile = await ai(task, "discover", RepoProfileSchema,
+        `Inspect the committed source snapshot only. Do not run setup or commands. Return languages, areas, candidate argv commands, prerequisites, evidence paths and unknowns. Missing or truncated files are unknowns. repositoryId=${repo.id}; sourceCommit=${repo.head}`, signal);
+      if (profile.repositoryId !== repo.id || profile.sourceCommit !== repo.head || profile.evidence.some(e => !docs.some(d => d.path === e.path))) throw new Error("invalid_profile_evidence");
       store.putRecord(
         "profile",
         `${task.repositoryId}:${task.sourceCommit}`,
@@ -298,7 +352,7 @@ export function createHandlers(
         "analyze",
         AnalysisSchema,
         {
-          task,
+          task: stageTask(task),
           profile: store.getRecord(
             "profile",
             `${task.repositoryId}:${task.sourceCommit}`,
@@ -320,15 +374,19 @@ export function createHandlers(
         "plan",
         PlanSchema,
         {
-          task,
+          task: stageTask(task),
           version: (task.planVersion ?? 0) + 1,
+          previousPlan: task.planVersion ? planOf(task) : null,
+          feedback: planComments(store, task.id).filter(
+            (c) => c.version === task.planVersion,
+          ),
           analysis: store.getRecord("analysis", task.id),
           profile: store.getRecord(
             "profile",
             `${task.repositoryId}:${task.sourceCommit}`,
           ),
           instruction:
-            "Return an implementation plan with exact argv feature checks, explicit file paths, acceptance/check mappings, prerequisites, dependencies and unresolved decisions. Do not implement. Tests must produce TAP or JUnit (reportPath); exit-code checks need a literal successPattern. E2E command owns isolated server readiness and cleanup.",
+            "Address all feedback on the previous plan when present. Return an implementation plan with exact argv feature checks, explicit file paths, acceptance/check mappings, prerequisites, dependencies and unresolved decisions. Do not implement. Tests must produce TAP or JUnit (reportPath); exit-code checks need a literal successPattern. E2E command owns isolated server readiness and cleanup.",
         },
         signal,
       );
@@ -463,7 +521,7 @@ export function createHandlers(
         "review",
         ReviewSchema,
         {
-          task,
+          task: stageTask(task),
           plan,
           checks,
           fingerprint: before,

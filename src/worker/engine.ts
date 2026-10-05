@@ -16,6 +16,12 @@ import {
   type Status,
   type ControlCommand,
 } from "../core/contracts";
+import {
+  addPlanComment,
+  requestPlanRevision,
+  planComments,
+} from "../server/services";
+import { ExecutionModeSchema } from "../core/contracts";
 import { approvePlan } from "../core/transitions";
 import { bootIdentity } from "./recovery";
 export type StageResult = {
@@ -141,6 +147,10 @@ export async function runWorker(
             store.getRecord("plan", `${task.id}:${task.planVersion}`),
           ),
           version = (c.payload as { version: number })?.version;
+        if (
+          planComments(store, task.id).some((c) => c.version === plan.version)
+        )
+          throw new Error("plan_feedback_requires_revision");
         const approved = approvePlan(task, plan, version);
         store.updateTask(
           task.id,
@@ -153,6 +163,10 @@ export async function runWorker(
           },
           event("plan.approved", { version }),
         );
+      } else if (c.kind === "comment") {
+        addPlanComment(store, task.id, c.payload);
+      } else if (c.kind === "revise") {
+        requestPlanRevision(store, task.id, c.payload);
       } else if (c.kind === "answer") {
         if (task.status !== "waiting_input") throw new Error("invalid_status");
         const answer = (c.payload as { answer: string })?.answer;
@@ -196,8 +210,14 @@ export async function runWorker(
       } else if (c.kind === "configure") {
         if (task.status === "running")
           throw new Error("stage_boundary_required");
-        const p = c.payload as { models?: unknown; deliveryMode?: unknown };
+        const p = c.payload as {
+          models?: unknown;
+          deliveryMode?: unknown;
+          executionMode?: unknown;
+        };
         const patch: Partial<Task> = {};
+        if (p.executionMode !== undefined)
+          patch.executionMode = ExecutionModeSchema.parse(p.executionMode);
         if (p.models)
           patch.models = applyEffortPolicy(ModelMapSchema.parse(p.models));
         if (p.deliveryMode === "local" || p.deliveryMode === "github")
@@ -310,6 +330,7 @@ export async function runWorker(
               store.atomic(() => {
                 store.putRecord("attempt", attempt.id, {
                   ...attempt,
+                  ...(store.getRecord("attempt", attempt.id) as object),
                   status: "completed",
                   output: result.output,
                   nextStage: result.stage,
@@ -346,6 +367,7 @@ export async function runWorker(
                   });
                 store.putRecord("attempt", attempt.id, {
                   ...attempt,
+                  ...(store.getRecord("attempt", attempt.id) as object),
                   status: abort.signal.aborted ? "interrupted" : "failed",
                   output: { error: message },
                 });

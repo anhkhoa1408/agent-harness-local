@@ -12,6 +12,58 @@ Dashboard dùng Next.js; worker Node.js chạy độc lập và lưu trạng th�
 - Theo dõi tiến độ, diff, kết quả kiểm thử và review trên dashboard.
 - Tạm dừng, tiếp tục và bàn giao bằng báo cáo local hoặc GitHub pull request.
 
+## Mô hình agent cha và subagents
+
+Trong Harness này:
+
+- **Skill:** tài liệu hướng dẫn cách làm việc, được ghép vào context của stage.
+- **Agent profile:** hướng dẫn vai trò, cũng được ghép vào context. Nạp nhiều profile không có nghĩa là chạy nhiều agent.
+- **Agent cha:** mỗi task có một parent thread bền vững, dùng `gpt-6-luna/medium`, chỉ giao nhiệm vụ và chờ kết quả. Worker vẫn quyết định stage, approval, tests, repair budget và bàn giao.
+- **Subagent:** mỗi attempt AI tạo đúng một con native mới, `fork_turns="none"`, dùng model/effort của stage. Con nhận đường dẫn packet riêng chứa input, frozen bundle và output schema; không nhận lịch sử hội thoại của cha. System/runtime, developer instructions theo vai trò và hướng dẫn repo vẫn có thể được kế thừa.
+
+```mermaid
+flowchart LR
+  W[Worker: pipeline và gates] --> P[Một agent cha cho mỗi task]
+  P -->|Một con mới cho attempt hiện tại| C[Native subagent của stage]
+  K[Packet riêng: input, bundle, schema] --> C
+  C -->|Kết quả có cấu trúc| P
+  P --> W
+  W -->|Đối chiếu child output và metadata| C
+  W --> R[prepare, verify, deliver: runner]
+```
+
+Worker xác minh parent/child ID, model/effort, cwd, sandbox, native spawn và kết quả cuối của con trước khi chấp nhận kết quả của cha. Resume giữ cha, attempt tiếp theo dùng con mới. Pause/cancel ngắt cả cây và giữ exclusion nếu chưa xác nhận writer đã dừng; không fallback về các phiên stage độc lập. Quyền của cha và con cùng sandbox của stage, nên yêu cầu cha chỉ điều phối là giới hạn hành vi, không phải sandbox riêng.
+
+Đã kiểm chứng trên CLI `0.159.0-alpha.12.1`; runtime bật `multi_agent` và `multi_agent_v2` theo parent thread. Khi resume không có raw events, adapter đọc native spawn từ rollout path do app-server trả. Runtime này mã hóa `spawn_agent.message`: nội dung plaintext được đối chiếu khi có; ciphertext không thể đối chiếu nguyên văn. Không coi ciphertext là bằng chứng toàn bộ lời giao việc chính xác. Xem [kiểm chứng cha–con](docs/verification/2026-10-05-parent-subagents.md).
+
+| Stage | Người/tiến trình thực hiện và quyền | Agent profile nạp vào context | Skill nạp vào context | Kết quả |
+| --- | --- | --- | --- | --- |
+| `discover` | Subagent, chỉ đọc snapshot repo | `harness/repo-explorer` — hướng dẫn inline trong code | Không có file skill riêng | Repo Profile: stack, convention, lệnh đề xuất và căn cứ |
+| `analyze` | Subagent, chỉ đọc | `voltagent/business-analyst` | `mattpocock-skills/grilling` | Phân tích yêu cầu; câu hỏi chưa rõ hoặc chuyển sang plan |
+| `plan` | Subagent, chỉ đọc | `ecc/planner` | `superpowers/writing-plans` | Plan có phiên bản, file cần sửa, tiêu chí nghiệm thu và command kiểm tra |
+| `prepare` | Worker thực thi Git và cập nhật context theo plan | Không gọi model | Không nạp skill | Branch/worktree; hướng dẫn repo theo phạm vi file; bật profile E2E nếu cần |
+| `implement` | Subagent, `workspace-write` trong worktree | Một specialist hoặc `harness/implementer`, cộng `ecc/tdd-guide`; thêm `ecc/e2e-runner` nếu plan có E2E | `superpowers/test-driven-development` và `writing-good-tests.md` | Code và test trong phạm vi đã duyệt; chuyển sang verify hoặc yêu cầu replan |
+| `verify` | Worker/runner chạy command trong plan | Không gọi model | Không nạp skill | Kết quả `passed`/`failed`/`blocked`/`skipped`/`not_applicable` và evidence |
+| `review` | Subagent mới, chỉ đọc | `ecc/code-reviewer` | `superpowers/requesting-code-review` và `code-reviewer.md` | Findings, verdict và evidence cho từng tiêu chí nghiệm thu |
+| `repair` | Subagent, `workspace-write` trong worktree | `voltagent/debugger`, `ecc/build-error-resolver`, `ecc/tdd-guide`; thêm `ecc/e2e-runner` nếu plan có E2E | `receiving-code-review`, `systematic-debugging` + `root-cause-tracing.md`, `test-driven-development` + `writing-good-tests.md`, `verification-before-completion` — đều thuộc Superpowers | Sửa theo test/review, test hồi quy và quay lại verify; đổi phạm vi thì replan |
+| `deliver` | Worker thực thi Git/GitHub và xuất báo cáo | Không gọi model | Không nạp skill | Commit + báo cáo local, hoặc commit + push + GitHub PR |
+
+**Specialist của `implement` được chọn từ bằng chứng trong repo nguồn:**
+
+| Stack phát hiện | Profile |
+| --- | --- |
+| Có dependency `next` | `voltagent/nextjs-developer` |
+| React, Vue hoặc Angular, không có Next.js | `voltagent/frontend-developer` |
+| Có source/manifest Python | `voltagent/python-pro` |
+| Maven/Gradle có `org.springframework.boot` | `voltagent/spring-boot-engineer` |
+| Chưa nhận diện hoặc có nhiều stack ứng viên | `harness/implementer` dùng convention của từng vùng code |
+
+`ecc/e2e-runner` là hướng dẫn bổ sung trong cùng phiên implement/repair, không phải tiến trình E2E hay subagent riêng. Command E2E đã duyệt phải tự quản lý khởi động server, readiness, port và cleanup.
+
+**Điểm cần phân biệt với spec:** registry hiện tại chưa nạp `brainstorming` ở analyze, chưa nạp `systematic-debugging` ở analyze/implement. Debugging được nạp ở repair. Verify/deliver áp dụng gate bằng code worker, không có lượt AI nạp `verification-before-completion`. Không coi các nhánh hướng dẫn trong spec là chức năng runtime đã có.
+
+Nguồn mapping thực tế: [agent registry](src/context/agents.ts), [skill registry và adaptations](src/context/skills.ts), [stage handlers](src/worker/stages.ts).
+
 ## Chạy bằng Docker
 
 Yêu cầu Docker Desktop đang chạy.
