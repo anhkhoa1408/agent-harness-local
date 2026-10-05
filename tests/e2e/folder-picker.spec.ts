@@ -76,12 +76,12 @@ test("cancel preserves typed path; errors allow manual entry and retry", async (
   await expect(path).toHaveValue("/tmp/another-repo");
 });
 
-test("collapsing repository form preserves branch and remote input", async ({
+test("closing repository dialog preserves branch and remote input", async ({
   page,
 }) => {
   await page.goto("/");
   const toggle = page.getByRole("button", {
-    name: "+ Đăng ký repository",
+    name: "Đăng ký repository",
     exact: true,
   });
   await toggle.click();
@@ -90,7 +90,10 @@ test("collapsing repository form preserves branch and remote input", async ({
     .fill("/tmp/repo-draft");
   await page.getByLabel("Nhánh nguồn", { exact: true }).fill("develop");
   await page.getByLabel("Remote (để trống nếu local)").fill("upstream");
-  await toggle.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Đóng", exact: true })
+    .click();
   await expect(page.getByLabel("Nhánh nguồn", { exact: true })).toBeHidden();
   await toggle.click();
   await expect(page.getByLabel("Đường dẫn repo", { exact: true })).toHaveValue(

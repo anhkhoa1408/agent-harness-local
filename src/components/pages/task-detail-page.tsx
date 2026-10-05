@@ -1,4 +1,5 @@
 "use client";
+import { TaskStories } from "@/components/organisms/task-detail/task-stories";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { type Event, type ControlCommand } from "@/core/contracts";
@@ -108,7 +109,9 @@ export function TaskDetailPage({ id }: { id: string }) {
         )}
       </div>
       <div className="min-w-0">
-        <Pipeline nodes={detail.pipeline} />
+        {detail.stories?.execution?.selection.mode === "separate_pr" ? (
+          <p className="text-sm text-muted-foreground">Pipeline thực thi nằm trong từng task của story.</p>
+        ) : <Pipeline nodes={detail.pipeline} />}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {task.status === "running" && (
@@ -147,7 +150,15 @@ export function TaskDetailPage({ id }: { id: string }) {
         <FeedbackMessage tone="error">
           <strong>{task.reason}</strong>
           <p>
-            {task.reason === "runtime_state_unknown"
+            {task.reason === "story_checkpoint"
+              ? "Checkpoint đã lưu. Bấm Tiếp tục để chạy story tiếp theo hoặc kiểm tra toàn feature."
+              : task.reason === "story_running"
+                ? "Story đang chạy trong task con. Mở task của story để xem tiến độ và duyệt quyền khi cần."
+                : task.reason.startsWith("story_dependency_not_integrated")
+                  ? "Tích hợp commit của story phụ thuộc vào nhánh đích, rồi bấm Tiếp tục."
+                  : task.reason.startsWith("story_child_attention")
+                    ? "Task con cần xử lý. Mở task của story, giải quyết nguyên nhân và tiếp tục feature."
+                    : task.reason === "runtime_state_unknown"
               ? "Runtime cũ chưa được xác nhận đã dừng. Cần đối chiếu process trước khi resume."
               : task.reason.includes("skill_")
                 ? "Bộ skill đi kèm ứng dụng đang thiếu. Khôi phục thư mục skills từ repository rồi tiếp tục."
@@ -185,6 +196,8 @@ export function TaskDetailPage({ id }: { id: string }) {
           </FormField>
         </CardContent>
       </Card>
+      <TaskStories detail={detail}/>
+      {task.featureId && <Link className="text-sm text-primary underline" href={`/tasks/${task.featureId}`}>Mở feature chứa story này</Link>}
       <TaskRequests
         task={task}
         analysis={analysis}

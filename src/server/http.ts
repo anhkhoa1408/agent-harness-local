@@ -1,3 +1,4 @@
+import { executionOf, storyRuns } from "../worker/stories";
 import {
   pipelineProgress,
   type ProgressAttempt,
@@ -24,7 +25,7 @@ import {
 import { authorize, readSession } from "./local-session";
 import { createServices, planComments } from "./services";
 import { contained } from "../context/rules";
-import { gitText } from "../repositories/inspect";
+import { gitText, RepositoryRegistrationError } from "../repositories/inspect";
 import { pickFolder } from "./folder-picker";
 export const SettingsSchema = z
   .object({
@@ -169,6 +170,7 @@ export function createHttpHandler(
             ]);
             const task = NewTaskSchema.parse({
               ...raw,
+              featureId: undefined, storyId: undefined,
               sourceCommit,
               executionMode: raw.executionMode ?? settings.executionMode,
               targetBranch: raw.targetBranch ?? repo.baseBranch,
@@ -224,6 +226,7 @@ export function createHttpHandler(
             }
           return json({
             task,
+            stories: {execution: executionOf(store,task.id),runs:storyRuns(store,task.id)},
             pipeline: pipelineProgress(
               task,
               store.listRecords("attempt") as ProgressAttempt[],
@@ -268,6 +271,8 @@ export function createHttpHandler(
       }
       return json({ error: "not_found" }, 404);
     } catch (error) {
+      if (error instanceof RepositoryRegistrationError)
+        return json({ error: error.code, details: [error.message] }, 400);
       if (error instanceof z.ZodError)
         return json(
           {

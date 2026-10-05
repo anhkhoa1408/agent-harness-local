@@ -69,11 +69,9 @@ export function SettingsPage() {
             <FormField
               id="default-execution-mode"
               label="Chế độ mặc định"
-              hint="Áp dụng cho task mới. Auto vẫn yêu cầu duyệt Plan trước khi sửa code và khi thay phạm vi."
             >
               <SelectField
                 id="default-execution-mode"
-                descriptionId="default-execution-mode-hint"
                 label="Chế độ mặc định"
                 value={executionMode}
                 disabled={busy}

@@ -48,6 +48,9 @@ export type ModelChoice = z.infer<typeof ModelChoiceSchema>;
 export type ModelMap = z.infer<typeof ModelMapSchema>;
 export const ExecutionModeSchema = z.enum(["manual", "auto"]);
 export const NewTaskSchema = z.object({
+  splitIntoStories: z.boolean().optional(),
+  featureId: z.string().optional(),
+  storyId: z.string().optional(),
   repositoryId: z.string().min(1),
   title: z.string().trim().min(1).max(200),
   requirement: z.string().trim().min(1).max(100000),
@@ -170,7 +173,37 @@ export const VisualReviewSchema = z.object({
     )
     .max(6),
 });
+export const StorySchema = z.object({
+  id: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
+  title: z.string().min(1),
+  outcome: z.string().min(1),
+  points: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8)]),
+  dependsOn: z.array(z.string()),
+  criterionIds: z.array(z.string()).min(1),
+  stepIds: z.array(z.string()).min(1),
+});
+export type Story = z.infer<typeof StorySchema>;
+export const StorySelectionSchema = z.object({
+  planVersion: z.number().int().positive(),
+  storyIds: z.array(z.string()).min(1),
+  mode: z.enum(["separate_pr", "shared_pr"]),
+  continueAutomatically: z.boolean().default(false),
+});
+export type StorySelection = z.infer<typeof StorySelectionSchema>;
+export type StoryRun = {
+  featureId: string; planVersion: number; storyId: string;
+  state: "pending" | "running" | "completed" | "interrupted" | "blocked";
+  childTaskId?: string; baselineCommit: string; commit?: string;
+  checkpointPath?: string; checkpointArtifactId?: string; prUrl?: string | null; updatedAt: number;
+};
+export type StoryExecution = {
+  selection: StorySelection;
+  activeStoryId: string | null;
+  baselineCommit: string;
+  aggregate: boolean;
+};
 export const PlanSchema = z.object({
+  stories: z.array(StorySchema).min(1).optional(),
   taskId: z.string(),
   version: z.number().int().positive(),
   sourceCommit: z.string(),

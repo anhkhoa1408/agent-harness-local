@@ -1,3 +1,10 @@
+import {
+  approveStorySelection,
+  executionOf,
+  storyRuns,
+  storyKey,
+  reconcileFeatureStories,
+} from "./stories";
 import { applyEffortPolicy } from "../core/model-policy";
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/store";
@@ -15,6 +22,7 @@ import {
   type Stage,
   type Status,
   type ControlCommand,
+  type StorySelection,
 } from "../core/contracts";
 import {
   addPlanComment,
@@ -38,6 +46,9 @@ export type Handlers = Record<Stage, StageHandler>;
 export type Attempt = {
   id: string;
   taskId: string;
+  storyId?: string | null;
+  planVersion?: number | null;
+  baselineCommit?: string;
   stage: Stage;
   leaseEpoch: number;
   status: "running" | "completed" | "interrupted" | "failed";
@@ -128,6 +139,19 @@ export async function runWorker(
       if (["completed", "cancelled"].includes(task.status))
         throw new Error("terminal_task");
       if (c.kind === "pause" || c.kind === "cancel") {
+        for (const run of storyRuns(store, task.id).filter(
+          (r) => r.childTaskId && r.state !== "completed",
+        )) {
+          const child = store.getTask(run.childTaskId!);
+          if (!["completed", "cancelled"].includes(child.status))
+            store.enqueue({
+              id: `${c.id}:child:${child.id}`,
+              taskId: child.id,
+              kind: c.kind,
+              expectedRevision: child.revision,
+              payload: {},
+            });
+        }
         if (active?.taskId === task.id) {
           active.stop = c.kind === "pause" ? "paused" : "cancelled";
           active.abort.abort();
@@ -142,6 +166,19 @@ export async function runWorker(
             },
             event(`task.${c.kind}`),
           );
+        if (!active || active.taskId !== task.id) {
+          const run = storyRuns(store, task.featureId ?? task.id).find((r) =>
+            task.featureId
+              ? r.childTaskId === task.id
+              : r.storyId === executionOf(store, task.id)?.activeStoryId,
+          );
+          if (run && run.state !== "completed" && run.state !== "pending")
+            store.putRecord("story-run", storyKey(run), {
+              ...run,
+              state: "interrupted",
+              updatedAt: Date.now(),
+            });
+        }
       } else if (c.kind === "approve") {
         const plan = PlanSchema.parse(
             store.getRecord("plan", `${task.id}:${task.planVersion}`),
@@ -152,17 +189,28 @@ export async function runWorker(
         )
           throw new Error("plan_feedback_requires_revision");
         const approved = approvePlan(task, plan, version);
-        store.updateTask(
-          task.id,
-          task.revision,
-          {
-            approvedPlanVersion: approved.approvedPlanVersion,
-            stage: "prepare",
-            status: "queued",
-            reason: null,
-          },
-          event("plan.approved", { version }),
-        );
+        store.atomic(() => {
+          if (task.splitIntoStories)
+            approveStorySelection(
+              store,
+              task,
+              (c.payload as { selection: StorySelection }).selection,
+            );
+          store.updateTask(
+            task.id,
+            task.revision,
+            {
+              approvedPlanVersion: approved.approvedPlanVersion,
+              stage: "prepare",
+              status: "queued",
+              reason: null,
+            },
+            event("plan.approved", {
+              version,
+              selection: (c.payload as { selection?: unknown }).selection,
+            }),
+          );
+        });
       } else if (c.kind === "comment") {
         addPlanComment(store, task.id, c.payload);
       } else if (c.kind === "revise") {
@@ -235,12 +283,36 @@ export async function runWorker(
           throw new Error("invalid_status");
         if (task.reason === "runtime_state_unknown")
           throw new Error("runtime_reconciliation_required");
-        store.updateTask(
-          task.id,
-          task.revision,
-          { status: "queued", reason: null },
-          event("task.resumed"),
-        );
+        const e = executionOf(store, task.id);
+        const pending =
+          e?.selection.mode === "separate_pr"
+            ? storyRuns(store, task.id).find(
+                (r) => r.childTaskId && r.state !== "completed",
+              )
+            : undefined;
+        if (pending) {
+          const child = store.getTask(pending.childTaskId!);
+          if (["paused", "interrupted", "blocked"].includes(child.status))
+            store.enqueue({
+              id: `${c.id}:child:${child.id}`,
+              taskId: child.id,
+              kind: "resume",
+              expectedRevision: child.revision,
+              payload: {},
+            });
+          store.updateTask(
+            task.id,
+            task.revision,
+            { status: "blocked", reason: "story_running" },
+            event("task.resumed"),
+          );
+        } else
+          store.updateTask(
+            task.id,
+            task.revision,
+            { status: "queued", reason: null },
+            event("task.resumed"),
+          );
       } else throw new Error("approval_request_expired");
       store.finishCommand(c.id, { ok: true });
     } catch (error) {
@@ -255,6 +327,16 @@ export async function runWorker(
     while (!signal.aborted && !lost) {
       let c;
       while ((c = store.nextCommand())) command(c);
+      if (signal.aborted) break;
+      for (const feature of store
+        .listTasks()
+        .filter(
+          (t) =>
+            t.splitIntoStories &&
+            t.status === "blocked" &&
+            t.reason === "story_running",
+        ))
+        await reconcileFeatureStories(store, feature.id, signal);
       if (!active && !store.listRecords("exclusion").length) {
         const next = store
           .listTasks()
@@ -275,6 +357,13 @@ export async function runWorker(
           const attempt: Attempt = {
             id: randomUUID(),
             taskId: next.id,
+            storyId:
+              executionOf(store, next.id)?.activeStoryId ??
+              next.storyId ??
+              null,
+            planVersion: next.planVersion,
+            baselineCommit:
+              executionOf(store, next.id)?.baselineCommit ?? next.sourceCommit,
             stage: next.stage,
             leaseEpoch: lease.epoch,
             status: "running",
@@ -304,6 +393,20 @@ export async function runWorker(
               }),
             );
             store.putRecord("attempt", attempt.id, attempt);
+            const run = storyRuns(store, next.featureId ?? next.id).find(
+              (r) => r.storyId === attempt.storyId,
+            );
+            if (
+              run &&
+              !run.childTaskId &&
+              ["implement", "repair", "verify", "review"].includes(next.stage)
+            )
+              store.putRecord("story-run", storyKey(run), {
+                ...run,
+                state: "running",
+                baselineCommit: attempt.baselineCommit,
+                updatedAt: Date.now(),
+              });
             store.putRecord("ownership", next.id, {
               bootId,
               workerPid: process.pid,
@@ -328,6 +431,26 @@ export async function runWorker(
               if (lost) return;
               const current = store.getTask(next.id);
               store.atomic(() => {
+                const run = storyRuns(store, next.featureId ?? next.id).find(
+                  (r) => r.storyId === attempt.storyId,
+                );
+                if (
+                  run &&
+                  run.state !== "completed" &&
+                  (entry.stop ||
+                    ["blocked", "interrupted", "paused"].includes(
+                      result.status,
+                    ))
+                )
+                  store.putRecord("story-run", storyKey(run), {
+                    ...run,
+                    state:
+                      entry.stop ||
+                      ["paused", "interrupted"].includes(result.status)
+                        ? "interrupted"
+                        : "blocked",
+                    updatedAt: Date.now(),
+                  });
                 store.putRecord("attempt", attempt.id, {
                   ...attempt,
                   ...(store.getRecord("attempt", attempt.id) as object),
@@ -364,6 +487,15 @@ export async function runWorker(
                     taskId: current.id,
                     reason: "runtime_state_unknown",
                     bootId,
+                  });
+                const run = storyRuns(store, next.featureId ?? next.id).find(
+                  (r) => r.storyId === attempt.storyId,
+                );
+                if (run && run.state !== "completed")
+                  store.putRecord("story-run", storyKey(run), {
+                    ...run,
+                    state: abort.signal.aborted ? "interrupted" : "blocked",
+                    updatedAt: Date.now(),
                   });
                 store.putRecord("attempt", attempt.id, {
                   ...attempt,

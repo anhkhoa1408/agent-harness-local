@@ -28,7 +28,12 @@ export function WorkspacePage() {
     [configured, setConfigured] = useState(false),
     [repoId, setRepoId] = useState(""),
     [taskDialogOpen, setTaskDialogOpen] = useState(false),
-    [repoDialogOpen, setRepoDialogOpen] = useState(false);
+    [repoDialogOpen, setRepoDialogOpen] = useState(false),
+    [repositoryDraft, setRepositoryDraft] = useState({
+      path: "",
+      base: "main",
+      remote: "",
+    });
   async function load() {
     try {
       const [r, t, h, s] = await Promise.all([
@@ -62,6 +67,7 @@ export function WorkspacePage() {
         title: f.get("title"),
         requirement: f.get("requirement"),
         deliveryMode: f.get("deliveryMode"),
+        splitIntoStories: f.get("splitIntoStories") === "on",
       });
       router.push(`/tasks/${task.id}`);
     } catch (e) {
@@ -141,7 +147,14 @@ export function WorkspacePage() {
               </DialogDescription>
             </div>
             {error && <FeedbackMessage tone="error">{error}</FeedbackMessage>}
-            <RepositoryForm onSubmit={register} busy={busy} />
+            <RepositoryForm
+              onSubmit={register}
+              busy={busy}
+              draft={repositoryDraft}
+              onDraftChange={(field, value) =>
+                setRepositoryDraft((old) => ({ ...old, [field]: value }))
+              }
+            />
           </DialogContent>
         </Dialog>
       </div>

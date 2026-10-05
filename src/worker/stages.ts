@@ -1,3 +1,5 @@
+import { createStoryCheckpoint } from "../delivery/checkpoint";
+import { executionOf, prepareSeparateStory, executionPlan, effectiveStoryTask, recordStoryEvidence, requireStoryEvidence, completeSharedStory, storyRuns, assertSharedHead } from "./stories";
 import { stages } from "../core/contracts";
 import type { Handlers } from "./engine";
 import { z } from "zod";
@@ -61,19 +63,23 @@ export function createHandlers(
   client: AgentClient,
   data: string,
 ): Handlers {
-  const artifacts = (task: Task) => join(data, "artifacts", task.id);
+  const artifacts = (task: Task) => {
+    const e=executionOf(store,task.id);
+    return e?.selection.mode === "shared_pr" ? join(data,"artifacts",task.id,`stories-v${e.selection.planVersion}`,e.aggregate ? "aggregate" : e.activeStoryId!) : join(data,"artifacts",task.id);
+  };
   const repository = (task: Task) => ({
     ...RepositorySchema.parse(store.getRecord("repository", task.repositoryId)),
     head: task.sourceCommit,
   });
-  const planOf = (task: Task) =>
-    PlanSchema.parse(store.getRecord("plan", `${task.id}:${task.planVersion}`));
+  const planOf = (task: Task) => executionPlan(store, task);
   const stageTask = (task: Task) => ({
     id: task.id,
     title: task.title,
     requirement: task.requirement,
     sourceCommit: task.sourceCommit,
     planVersion: task.planVersion,
+    splitIntoStories: task.splitIntoStories,
+    storyId: executionOf(store,task.id)?.activeStoryId ?? task.storyId ?? null,
   });
   const fingerprint = (task: Task, plan: Plan) =>
     fingerprintWorktree(
@@ -346,7 +352,7 @@ export function createHandlers(
       throw new Error("scope_changed_requires_plan");
     return next("verify", result);
   }
-  return {
+  const handlers: Handlers = {
     ...unavailableHandlers(),
     discover: async (task, signal) => {
       const repo = repository(task), docs = await sourceDocuments(repo);
@@ -399,6 +405,7 @@ export function createHandlers(
             "profile",
             `${task.repositoryId}:${task.sourceCommit}`,
           ),
+          storyInstruction: task.splitIntoStories ? "Return nonempty stories partitioning all criteria and steps exactly once. Each story needs id, title, outcome, points (1,2,3,5,8), dependsOn, criterionIds, stepIds. Stories should be small independently testable deliveries. Dependencies must be acyclic and include cross-story step dependencies. Never estimate quota or choose stories for the user." : "Do not include stories.",
           instruction:
             "Address all feedback on the previous plan when present. Return an implementation plan with exact argv feature checks, explicit file paths, acceptance/check mappings, prerequisites, dependencies and unresolved decisions. Do not implement. Tests must produce TAP or JUnit (reportPath); exit-code checks need a literal successPattern. E2E command owns isolated server readiness and cleanup. For visible UI changes include uiVerification with 1-6 selected PNG screenshots, each produced by a required E2E check, criterionIds, viewport dimensions and optional local PNG referencePath. Capture viewport-only images with deviceScaleFactor=1 at exact paths relative to the worktree root. Define visual expectations in the mapped criteria. Do not select screenshots for logic-only tasks. References must exist; never invent design evidence. If reference is missing, evaluate against explicit UI criteria or ask for clarification.",
         },
@@ -413,14 +420,23 @@ export function createHandlers(
       };
     },
     prepare: async (task, signal) => {
-      const plan = planOf(task);
-      if (!canImplement(task, plan)) throw new Error("plan_not_approved");
+      const e = executionOf(store,task.id);
+      if (e?.selection.mode === "separate_pr") {
+        const approvedPlan = PlanSchema.parse(store.getRecord("plan",`${task.id}:${task.planVersion}`));
+        if (!canImplement(task,approvedPlan) || e.selection.planVersion !== task.approvedPlanVersion) throw new Error("plan_not_approved");
+        const child = await prepareSeparateStory(store,task,signal);
+        return {stage:"prepare",status:"blocked",reason:"story_running",output:child} as const;
+      }
+      await freeze(task);
+      const effective = effectiveStoryTask(store,task), plan = planOf(effective);
+      if (!canImplement(effective, plan)) throw new Error("plan_not_approved");
+      const resumingStories = e?.selection.mode === "shared_pr" && !!task.worktree && storyRuns(store,task.id).some(r=>r.state!=="pending");
       const path = await prepareWorktree(
         repository(task),
         task,
         join(data, "worktrees"),
       );
-      const sync = await synchronizeBase(repository(task), task, path, join(data, "worktrees"), signal, async (conflicts) => {
+      const sync = resumingStories ? {sourceCommit:task.sourceCommit,baseCommit:task.sourceCommit} : await synchronizeBase(repository(task), task, path, join(data, "worktrees"), signal, async (conflicts) => {
         await freeze(task);
         const baseline = (store.getRecord("bundle", `${task.id}:repair`) as Bundle).files.find(f => f.id === "baseline")?.content ?? "";
         const rules = await repoRules(path, conflicts, /\b(liquid|shopify)\b/i.test(task.requirement));
@@ -497,7 +513,10 @@ export function createHandlers(
         { worktree: path },
         { type: "worktree.prepared", data: { path, branch: task.branch } },
       );
-      return next(stageAfterPreparation(task), { path });
+      const nextStage = e?.selection.mode === "shared_pr"
+        ? task.resumeStage === "repair" ? "repair" : e.aggregate ? "verify" : "implement"
+        : stageAfterPreparation(task);
+      return next(nextStage, { path });
     },
     implement: mutate,
     repair: mutate,
@@ -506,6 +525,7 @@ export function createHandlers(
       if (!canImplement(task, plan)) throw new Error("plan_not_approved");
       const checks = await runChecks(task, plan, signal, artifacts(task));
       store.putRecord("checks", task.id, checks);
+      recordStoryEvidence(store,task);
       for (const check of checks)
         if (check.evidencePath.startsWith(artifacts(task) + "/"))
           store.putRecord("artifact", `${task.id}-${check.id}-evidence`, {
@@ -567,7 +587,19 @@ export function createHandlers(
       return next("review", checks);
     },
     deliver: async (task, signal) => {
-      const delivery = await createDelivery(store, data)(task, signal);
+      const e=executionOf(store,task.id);
+      if(e?.selection.mode === "shared_pr") {
+        requireStoryEvidence(store,task);
+        if(!e.aggregate) {
+          const checkpoint=await createStoryCheckpoint(store,data,task,signal);
+          signal.throwIfAborted();
+          return completeSharedStory(store,task,checkpoint);
+        }
+      }
+      await assertSharedHead(store,task,true);
+      const delivery = await createDelivery(store, data, e?.selection.mode === "shared_pr" ? {
+        plan: planOf(task), reportAppendix: `\n\n## Story checkpoints\n${storyRuns(store,task.id).map(r=>`- ${r.storyId}: ${r.state}; commit ${r.commit ?? "—"}`).join("\n")}`,
+      } : {})(task, signal);
       store.putRecord("delivery", task.id, delivery);
       return {
         stage: "deliver",
@@ -577,6 +609,7 @@ export function createHandlers(
       };
     },
     review: async (task, signal) => {
+      requireStoryEvidence(store,task);
       const plan = planOf(task),
         before = await fingerprint(task, plan),
         checks = (store.getRecord("checks", task.id) ?? []) as CheckResult[];
@@ -625,4 +658,9 @@ export function createHandlers(
       return { ...nextAfterReview(task, review), output: review };
     },
   };
+  return Object.fromEntries(stages.map(stage => [stage, async (task: Task, signal: AbortSignal) => {
+    if(["implement","repair","verify","review"].includes(stage)) await assertSharedHead(store,task);
+    return handlers[stage](["implement","repair","verify","review","deliver"].includes(stage) ? effectiveStoryTask(store,task) : task,signal);
+  },
+  ])) as Handlers;
 }

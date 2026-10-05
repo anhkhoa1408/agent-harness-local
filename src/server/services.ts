@@ -1,3 +1,4 @@
+import { validateStoryReplan } from "../worker/stories";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Store } from "../storage/store";
@@ -19,6 +20,8 @@ export function savePlan(store: Store, taskId: string, raw: Plan) {
       plan.version !== (task.planVersion ?? 0) + 1
     )
       throw new Error("stale_plan");
+    if (task.splitIntoStories && !plan.stories) throw new Error("stories_required");
+    validateStoryReplan(store, task, plan);
     const key = `${taskId}:${plan.version}`;
     if (store.getRecord("plan", key)) throw new Error("immutable_plan");
     store.putRecord("plan", key, plan);

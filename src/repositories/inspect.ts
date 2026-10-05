@@ -1,6 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { realpath, mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import {
+  realpath,
+  mkdtemp,
+  mkdir,
+  writeFile,
+  rm,
+  stat,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -14,6 +21,15 @@ import type { AgentClient, AgentEvent } from "../codex/client";
 import type { Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";
 const exec = promisify(execFile);
+export class RepositoryRegistrationError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RepositoryRegistrationError";
+  }
+}
 export async function gitText(root: string, args: string[], signal?: AbortSignal): Promise<string> {
   return (
     await exec("git", ["-C", root, ...args], { maxBuffer: 8 * 1024 * 1024, signal, timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
@@ -24,24 +40,55 @@ export async function inspectRepository(
   baseBranch: string,
   remote: string | null,
 ): Promise<Repository> {
-  const root = await realpath(
-    await gitText(path, ["rev-parse", "--show-toplevel"]),
+  let failure = new RepositoryRegistrationError(
+    "repository_path_unavailable",
+    `Đường dẫn “${path}” không tồn tại, không phải thư mục hoặc không thể truy cập từ máy/container chạy Harness.`,
   );
-  await gitText(root, ["check-ref-format", "--branch", baseBranch]);
-  const head = await gitText(root, [
-    "rev-parse",
-    "--verify",
-    `${baseBranch}^{commit}`,
-  ]);
-  if (remote) await gitText(root, ["remote", "get-url", remote]);
-  return {
-    id: randomUUID(),
-    root,
-    baseBranch,
-    remote,
-    head,
-    dirty: !!(await gitText(root, ["status", "--porcelain=v1", "-z"])),
-  };
+  try {
+    if (!(await stat(path)).isDirectory()) throw failure;
+    failure = new RepositoryRegistrationError(
+      "repository_not_git",
+      `Thư mục “${path}” không phải repository Git có thể truy cập. Kiểm tra thư mục .git và Git trên máy/container chạy Harness.`,
+    );
+    const root = await realpath(
+      await gitText(path, ["rev-parse", "--show-toplevel"]),
+    );
+    failure = new RepositoryRegistrationError(
+      "repository_branch_invalid",
+      `Tên nhánh “${baseBranch}” không hợp lệ. Hãy nhập tên nhánh Git hợp lệ.`,
+    );
+    await gitText(root, ["check-ref-format", "--branch", baseBranch]);
+    failure = new RepositoryRegistrationError(
+      "repository_branch_unavailable",
+      `Không tìm thấy nhánh “${baseBranch}” có commit trong repo local. Kiểm tra tên nhánh (main/master); nếu repo mới, hãy tạo commit đầu tiên.`,
+    );
+    const head = await gitText(root, [
+      "rev-parse",
+      "--verify",
+      `${baseBranch}^{commit}`,
+    ]);
+    if (remote) {
+      failure = new RepositoryRegistrationError(
+        "repository_remote_unavailable",
+        `Không tìm thấy remote “${remote}” trong repo. Kiểm tra tên remote hoặc để trống nếu chỉ dùng local.`,
+      );
+      await gitText(root, ["remote", "get-url", remote]);
+    }
+    failure = new RepositoryRegistrationError(
+      "repository_inspection_failed",
+      "Không thể đọc trạng thái repository. Kiểm tra quyền truy cập và cấu hình Git của repo.",
+    );
+    return {
+      id: randomUUID(),
+      root,
+      baseBranch,
+      remote,
+      head,
+      dirty: !!(await gitText(root, ["status", "--porcelain=v1", "-z"])),
+    };
+  } catch {
+    throw failure;
+  }
 }
 export async function sourceDocuments(
   repo: Repository,

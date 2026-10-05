@@ -1,3 +1,6 @@
+import { useState } from "react";
+import type { StorySelection } from "@/core/contracts";
+import { StoryPicker, validStorySelection } from "./task-stories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -17,12 +20,14 @@ export function TaskPlan({
   task,
   plan,
   comments,
+  stories,
   busy,
   command,
-}: Pick<TaskDetailData, "task" | "plan" | "comments"> & {
+}: Pick<TaskDetailData, "task" | "plan" | "comments" | "stories"> & {
   busy: boolean;
   command: TaskCommand;
 }) {
+  const [selection,setSelection]=useState<StorySelection>({storyIds:[],mode:"separate_pr",continueAutomatically:false,...stories?.execution?.selection,planVersion:plan?.version??1});
   const currentComments = comments.filter((c) => c.version === plan?.version);
   const editable =
     task.stage === "plan" &&
@@ -33,6 +38,7 @@ export function TaskPlan({
       <p className="break-words text-xs text-muted-foreground">
         Source {plan.sourceCommit.slice(0, 12)} · Version {plan.version}
       </p>
+      {task.splitIntoStories && editable && plan.stories && <StoryPicker plan={plan} selection={selection} onChange={setSelection} disabled={busy} locked={stories?.runs.some(r=>r.state!=="pending"||!!r.childTaskId)}/>}
       <h3>Acceptance criteria</h3>
       {plan.criteria.map((c) => (
         <p key={c.id}>
@@ -176,8 +182,8 @@ export function TaskPlan({
       {task.status === "waiting_approval" && (
         <Button
           variant="default"
-          disabled={busy || currentComments.length > 0}
-          onClick={() => command("approve", { version: plan.version })}
+          disabled={busy || currentComments.length > 0 || (!!task.splitIntoStories && !validStorySelection(plan,selection))}
+          onClick={() => command("approve", { version: plan.version, ...(task.splitIntoStories ? {selection}: {}) })}
         >
           Duyệt plan
         </Button>

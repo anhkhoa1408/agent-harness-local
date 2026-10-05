@@ -38,9 +38,11 @@ export function TaskEvidence({
           </TabsList>
           <TabsContent value="plan" forceMount hidden={tab !== "plan"}>
             <TaskPlan
+              key={plan?.version ?? 0}
               task={task}
               plan={plan}
               comments={detail.comments}
+              stories={detail.stories}
               busy={busy}
               command={command}
             />

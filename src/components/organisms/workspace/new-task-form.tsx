@@ -69,6 +69,10 @@ export function NewTaskForm({
           ]}
         />
       </FormField>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="splitIntoStories" className="mt-1" disabled={busy}/>
+        Chia thành stories để chọn
+      </label>
       <p className="text-xs text-muted-foreground">
         Bạn sẽ duyệt plan trước khi agent bắt đầu sửa code.
       </p>

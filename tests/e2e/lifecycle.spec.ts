@@ -272,7 +272,9 @@ test("repository registration reports errors and selects the registered reposito
     await page
       .getByRole("button", { name: "Đăng ký repo", exact: true })
       .click();
-    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+    await expect(
+      page.getByRole("dialog", { name: "Đăng ký repository", exact: true }),
+    ).toHaveCount(0);
     const repositories = await (
       await page.request.get("/api/repositories")
     ).json();
