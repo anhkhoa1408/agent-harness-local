@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { selectOption } from "../support/select";
 import { createTempRepo } from "../support/temp-repo";
 test("unavailable model is rejected; stale skill roots cannot override bundled context", async ({
   page,
@@ -51,6 +52,7 @@ test("unavailable model is rejected; stale skill roots cannot override bundled c
 async function create(page: Page, requirement: string) {
   await page.goto("/");
   await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
+  await page.getByRole("button", { name: "Tạo task mới", exact: true }).click();
   await page.getByLabel("Tên task").fill(`Feature ${requirement}`);
   await page.getByLabel("Yêu cầu", { exact: true }).fill(requirement);
   await page.getByRole("button", { name: "Tạo task" }).click();
@@ -70,10 +72,19 @@ test("approval unlocks isolated implementation, repair, review and local report"
   await expect(page.getByText("Repair 1/3", { exact: false })).toBeVisible();
   await page.getByRole("tab", { name: "Tests", exact: true }).click();
   await expect(page.getByText("passed", { exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "Diff", exact: true }).click();
-  await expect(page.locator("pre")).toContainText("module.exports=2");
+  await expect(
+    page.getByRole("tab", { name: "Diff", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveText([
+    "Plan",
+    "Tests",
+    "Review",
+    "Context",
+  ]);
   await page.getByRole("tab", { name: "Review", exact: true }).click();
-  await expect(page.locator("pre").first()).toContainText('"verdict": "pass"');
+  await expect(page.locator("pre:visible").first()).toContainText(
+    '"verdict": "pass"',
+  );
   await page.getByRole("tab", { name: "Context", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Model hiện tại" }),
@@ -159,12 +170,12 @@ test("new plan requires fresh approval; quota never silently switches model", as
   await page.getByRole("button", { name: "Hủy task" }).click();
 });
 
-test("settings expose fixed effort and mapped agents, preserving models on save", async ({
+test("settings hide catalog hint and effort badges, preserving models on save", async ({
   page,
 }) => {
   await page.goto("/");
   await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
-  await page.getByRole("link", { name: "⚙ Model & skills" }).click();
+  await page.getByRole("link", { name: "Model & skills", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Agent theo stage", exact: true }),
   ).toHaveCount(0);
@@ -172,15 +183,16 @@ test("settings expose fixed effort and mapped agents, preserving models on save"
     page.getByRole("heading", { name: "Skill roots", exact: true }),
   ).toHaveCount(0);
   await expect(page.getByRole("textbox")).toHaveCount(0);
-  await expect(page.getByText("Effort high", { exact: true })).toHaveCount(1);
-  await expect(page.getByText("Effort medium", { exact: true })).toHaveCount(5);
+  await expect(page.getByText(/Catalog từ Codex local/)).toHaveCount(0);
+  await expect(page.getByText("Effort high", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Effort medium", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("combobox", { name: /Effort/ })).toHaveCount(0);
   await expect(
     page.getByRole("combobox", { name: "Model plan", exact: true }),
-  ).toHaveValue("fixture-strong");
+  ).toContainText("fixture-strong");
   await expect(
     page.getByRole("combobox", { name: "Model review", exact: true }),
-  ).toHaveValue("fixture-medium");
+  ).toContainText("fixture-medium");
   await page.getByRole("button", { name: "Lưu cấu hình" }).click();
   await expect(page.getByRole("status")).toContainText("Đã lưu cấu hình");
   const settings = await (await page.request.get("/api/settings")).json();
@@ -244,19 +256,23 @@ test("repository registration reports errors and selects the registered reposito
   try {
     await page.goto("/");
     await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
-    await page.getByText("+ Đăng ký repository", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "Đăng ký repository", exact: true })
+      .click();
     await page
       .getByLabel("Đường dẫn repo", { exact: true })
       .fill("/missing-harness-refactor-repo");
     await page
       .getByRole("button", { name: "Đăng ký repo", exact: true })
       .click();
-    await expect(page.locator("p[role=alert]")).toContainText("request_failed");
+    await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+      "request_failed",
+    );
     await page.getByLabel("Đường dẫn repo", { exact: true }).fill(repo.root);
     await page
       .getByRole("button", { name: "Đăng ký repo", exact: true })
       .click();
-    await expect(page.locator("p[role=alert]")).toHaveCount(0);
+    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
     const repositories = await (
       await page.request.get("/api/repositories")
     ).json();
@@ -264,9 +280,12 @@ test("repository registration reports errors and selects the registered reposito
       (r: { root: string }) => r.root === repo.root,
     );
     expect(registered).toBeDefined();
+    await page
+      .getByRole("button", { name: "Tạo task mới", exact: true })
+      .click();
     await expect(
       page.getByRole("combobox", { name: "Repository", exact: true }),
-    ).toHaveValue(registered.id);
+    ).toContainText(repo.root.split("/").pop()!);
     await expect(page.getByRole("button", { name: "Tạo task" })).toBeEnabled();
   } finally {
     await repo.dispose();
@@ -278,18 +297,18 @@ test("model settings report save errors without losing stage selections", async 
 }) => {
   await page.goto("/");
   await expect(page.getByText("Worker sẵn sàng")).toBeVisible();
-  await page.getByRole("link", { name: "⚙ Model & skills" }).click();
+  await page.getByRole("link", { name: "Model & skills", exact: true }).click();
   await expect(
     page.getByRole("combobox", { name: "Model plan", exact: true }),
-  ).toHaveValue("fixture-strong");
-  await page
-    .getByRole("combobox", { name: "Model plan", exact: true })
-    .selectOption("fixture-medium");
+  ).toContainText("fixture-strong");
+  await selectOption(page, "Model plan", "fixture-medium");
   await page.getByRole("button", { name: "Lưu cấu hình" }).click();
-  await expect(page.getByRole("status")).toContainText("effort_unavailable");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "effort_unavailable",
+  );
   await expect(
     page.getByRole("combobox", { name: "Model plan", exact: true }),
-  ).toHaveValue("fixture-medium");
+  ).toContainText("fixture-medium");
   const settings = await (await page.request.get("/api/settings")).json();
   expect(settings.models.plan.model).toBe("fixture-strong");
 });

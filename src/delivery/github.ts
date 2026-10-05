@@ -14,6 +14,7 @@ import type { CheckResult } from "../execution/checks";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { renderReport } from "./report";
+import { evidenceExclusions, verifyImageEvidence } from "../execution/ui-verification";
 export type Delivery = {
   mode: "github" | "local";
   commit: string;
@@ -110,14 +111,13 @@ export function createDelivery(
       ),
       review = ReviewSchema.parse(store.getRecord("review", task.id)),
       checks = store.getRecord("checks", task.id) as CheckResult[];
-    const exclusions = plan.checks.flatMap((c) =>
-        c.reportPath ? [c.reportPath] : [],
-      ),
+    const exclusions = evidenceExclusions(plan),
       fingerprint = () =>
         fingerprintWorktree(path, exclusions, task.sourceCommit),
       before = await fingerprint();
     const errors = acceptanceErrors(task, plan, checks, review, before);
     if (errors.length) throw new Error(`acceptance_failed:${errors.join(",")}`);
+    await verifyImageEvidence(checks);
     if ((await gitText(path, ["branch", "--show-current"])) !== task.branch)
       throw new Error("branch_collision");
     const changed = [

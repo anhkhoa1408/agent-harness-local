@@ -20,8 +20,19 @@ export async function prepareWorktree(
   };
   try {
     const old = JSON.parse(await readFile(intentPath, "utf8"));
-    if (JSON.stringify(old) !== JSON.stringify(intent))
+    if (
+      old.taskId !== intent.taskId ||
+      old.repository !== intent.repository ||
+      old.branch !== intent.branch ||
+      old.path !== intent.path
+    )
       throw new Error("worktree_collision");
+    await gitText(repo.root, [
+      "merge-base",
+      "--is-ancestor",
+      old.sourceCommit,
+      task.sourceCommit,
+    ]);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     const existing = await gitText(repo.root, [

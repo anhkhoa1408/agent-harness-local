@@ -13,6 +13,8 @@ function fixture(
     pending?: boolean;
     unconfirmed?: boolean;
     delayed?: boolean;
+    childStartupError?: string;
+    childStartupFailures?: number;
     rolloutPath?: string;
     pendingStart?: boolean;
     onStart?: () => void;
@@ -81,14 +83,16 @@ function fixture(
       m.method === "thread/resume" &&
       m.params.threadId === "child" &&
       options.delayed &&
-      resumeCount++ < 2
+      resumeCount++ < (options.childStartupFailures ?? 2)
     ) {
       output.write(
         JSON.stringify({
           id: m.id,
           error: {
             code: -32000,
-            message: "no rollout found for thread id child",
+            message:
+              options.childStartupError ??
+              "no rollout found for thread id child",
           },
         }) + "\n",
       );
@@ -397,6 +401,67 @@ test.each([false, true])(
     }
   },
 );
+
+test.each([
+  "list_turns is not supported yet",
+  "failed to read thread: thread-store internal error: failed to read session metadata /codex/sessions/child.jsonl: rollout at /codex/sessions/child.jsonl is empty",
+])(
+  "child startup race does not interrupt a valid stage: %s",
+  async (childStartupError) => {
+    const f = fixture({
+      delayed: true,
+      childStartupError,
+    });
+    try {
+      await expect(
+        f.client.run(f.agentInput, () => {}, new AbortController().signal),
+      ).resolves.toMatchObject({
+        result: { ok: true },
+        child: { threadId: "child" },
+      });
+    } finally {
+      await f.client.close();
+    }
+  },
+);
+
+test("child metadata corruption is rejected without startup retries", async () => {
+  const f = fixture({
+    delayed: true,
+    childStartupError:
+      "failed to read thread: thread-store internal error: invalid session metadata",
+    childStartupFailures: Infinity,
+  });
+  try {
+    await expect(
+      f.client.run(f.agentInput, () => {}, new AbortController().signal),
+    ).rejects.toThrow();
+    expect(
+      f.sent.filter(
+        (m) => m.method === "thread/resume" && m.params.threadId === "child",
+      ),
+    ).toHaveLength(1);
+  } finally {
+    await f.client.close();
+  }
+});
+
+test("persistent child startup error keeps runtime excluded instead of accepting output", async () => {
+  const f = fixture({
+    delayed: true,
+    childStartupError: "list_turns is not supported yet",
+    childStartupFailures: Infinity,
+    unconfirmed: true,
+    pending: true,
+  });
+  try {
+    await expect(
+      f.client.run(f.agentInput, () => {}, new AbortController().signal),
+    ).rejects.toThrow("runtime_state_unknown");
+  } finally {
+    await f.client.close();
+  }
+});
 
 test("already cancelled input does not start a parent", async () => {
   const f = fixture(),

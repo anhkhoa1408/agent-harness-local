@@ -1,13 +1,6 @@
 import { test, expect, vi } from "vitest";
 import { spawn } from "node:child_process";
-import {
-  mkdtemp,
-  mkdir,
-  writeFile,
-  readFile,
-  rm,
-  chmod,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
@@ -26,7 +19,7 @@ test.each([undefined, "0.0.0.0", "docker-oauth"])(
         "node_modules/next/dist/bin",
         "node_modules/tsx",
         "src/worker",
-        "bin",
+        "scripts",
       ])
         await mkdir(join(root, dir), { recursive: true });
       await writeFile(
@@ -45,11 +38,7 @@ test.each([undefined, "0.0.0.0", "docker-oauth"])(
         stub("dashboard"),
       );
       await writeFile(join(root, "src/worker/main.ts"), stub("worker"));
-      await writeFile(
-        join(root, "bin/socat"),
-        `#!${process.execPath}\n${stub("callback")}`,
-      );
-      await chmod(join(root, "bin/socat"), 0o700);
+      await writeFile(join(root, "scripts/oauth-proxy.ts"), stub("callback"));
       const env: NodeJS.ProcessEnv = {
         ...process.env,
         HARNESS_TEST_MODE: "0",
@@ -83,10 +72,7 @@ test.each([undefined, "0.0.0.0", "docker-oauth"])(
           if (proxy)
             expect(
               JSON.parse(await readFile(join(root, "callback.json"), "utf8")),
-            ).toEqual([
-              "TCP-LISTEN:1456,bind=0.0.0.0,reuseaddr,fork",
-              "TCP:127.0.0.1:1455",
-            ]);
+            ).toEqual([]);
         },
         { timeout: 5000 },
       );

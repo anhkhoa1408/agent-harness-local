@@ -23,10 +23,14 @@ async function childRequest(
     try {
       return await rpc.request(method, params);
     } catch (error) {
-      // Native spawn announces the ID before its rollout is durable.
+      // Native spawn announces the ID before its rollout/turn reader is ready.
       if (
         !(error instanceof RpcRemoteError) ||
-        !error.message.startsWith("no rollout found for thread id") ||
+        !(
+          error.message.startsWith("no rollout found for thread id") ||
+          error.message === "list_turns is not supported yet" ||
+          /^failed to read thread: thread-store internal error: failed to read session metadata .+: rollout at .+ is empty$/.test(error.message)
+        ) ||
         Date.now() >= deadline
       )
         throw error;
