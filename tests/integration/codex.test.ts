@@ -192,3 +192,70 @@ test("an interrupt acknowledgement is not mistaken for a stopped turn", async ()
   ).rejects.toThrow("runtime_state_unknown");
   await client.close();
 });
+
+test.each(["manual", "auto"] as const)(
+  "%s mode sets runtime policy while retaining sandbox on start and resume",
+  async (executionMode) => {
+    const f = fixture(),
+      client = new CodexClient(f.rpc);
+    f.input.on("data", (chunk) => {
+      const m = JSON.parse(String(chunk));
+      if (!m.id) return;
+      const result =
+        m.method === "turn/start"
+          ? { turn: { id: "u" } }
+          : { thread: { id: "t" } };
+      f.output.write(JSON.stringify({ id: m.id, result }) + "\n");
+      if (m.method === "turn/start")
+        setTimeout(() => {
+          f.output.write(
+            JSON.stringify({
+              method: "item/completed",
+              params: {
+                threadId: "t",
+                item: { type: "agentMessage", text: "{}" },
+              },
+            }) + "\n",
+          );
+          f.output.write(
+            JSON.stringify({
+              method: "turn/completed",
+              params: { threadId: "t", turn: { id: "u", status: "completed" } },
+            }) + "\n",
+          );
+        }, 1);
+    });
+    try {
+      for (const write of [false, true]) {
+        for (const threadId of [undefined, "t"]) {
+          await client.run(
+            {
+              cwd: "/fixture",
+              model: { model: "medium", effort: "medium" },
+              instructions: "",
+              prompt: "",
+              outputSchema: { type: "object" },
+              write,
+              executionMode,
+              threadId,
+            },
+            () => {},
+            new AbortController().signal,
+          );
+          expect(
+            f.sent
+              .filter((m) =>
+                ["thread/start", "thread/resume"].includes(m.method),
+              )
+              .at(-1).params,
+          ).toMatchObject({
+            sandbox: write ? "workspace-write" : "read-only",
+            approvalPolicy: executionMode === "auto" ? "never" : "on-request",
+          });
+        }
+      }
+    } finally {
+      await client.close();
+    }
+  },
+);

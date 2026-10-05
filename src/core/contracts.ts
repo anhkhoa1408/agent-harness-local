@@ -46,6 +46,7 @@ export const ModelMapSchema = z.object(
 );
 export type ModelChoice = z.infer<typeof ModelChoiceSchema>;
 export type ModelMap = z.infer<typeof ModelMapSchema>;
+export const ExecutionModeSchema = z.enum(["manual", "auto"]);
 export const NewTaskSchema = z.object({
   repositoryId: z.string().min(1),
   title: z.string().trim().min(1).max(200),
@@ -53,6 +54,7 @@ export const NewTaskSchema = z.object({
   sourceCommit: z.string().regex(/^[a-f0-9]{40,64}$/),
   targetBranch: z.string().min(1),
   deliveryMode: z.enum(["github", "local"]),
+  executionMode: ExecutionModeSchema.optional(),
   models: ModelMapSchema,
 });
 export const TaskSchema = NewTaskSchema.extend({
@@ -84,6 +86,8 @@ export const ControlCommandSchema = z.object({
     "cancel",
     "configure",
     "grant",
+    "comment",
+    "revise",
   ]),
   expectedRevision: z.number().int().nonnegative(),
   payload: z.unknown(),
@@ -197,3 +201,14 @@ export const ReviewSchema = z.object({
   verdict: z.enum(["pass", "changes_requested", "needs_input"]),
 });
 export type Review = z.infer<typeof ReviewSchema>;
+
+export const PlanCommentInputSchema = z.object({
+  version: z.number().int().positive(),
+  target: z.string().min(1),
+  text: z.string().trim().min(1).max(10000),
+});
+export type PlanComment = z.infer<typeof PlanCommentInputSchema> & {
+  id: string;
+  taskId: string;
+  at: number;
+};

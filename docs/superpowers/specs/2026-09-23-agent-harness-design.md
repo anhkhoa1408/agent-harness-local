@@ -3,6 +3,8 @@
 Ngày: 2026-09-23
 Trạng thái: thiết kế đã duyệt ngày 2026-09-23; bổ sung theo yêu cầu người dùng ngày 2026-10-03: agent GitHub theo stage, effort cố định trong code (plan high, còn lại medium), model tiết kiệm ngoài planning và worktree riêng mỗi feature.
 
+Bổ sung đã duyệt ngày 2026-10-05: [một agent cha và các subagent theo stage](2026-10-05-parent-subagents-design.md) thay cơ chế phiên AI độc lập. Một parent thread/task (`gpt-6-luna/medium`), con native mới cho từng attempt AI (`fork_turns="none"`), reviewer là con riêng chỉ đọc. Worker vẫn giữ gates, quyền, test verdict và delivery. Các đoạn “worker tạo phiên reviewer” dưới đây được thực hiện bằng việc cấp stage cho cha spawn đúng một con reviewer; skill của con không tự điều phối thêm. Xem [bằng chứng và giới hạn runtime](../../verification/2026-10-05-parent-subagents.md).
+
 ## 1. Mục tiêu và phạm vi
 
 Xây công cụ cá nhân giúp giao một task trên repo có sẵn, làm rõ requirement, duyệt plan, rồi tự code, viết test, review, sửa và bàn giao PR. Mục tiêu là giảm thời gian người dùng phải can thiệp mà vẫn đáp ứng tiêu chí nghiệm thu.
