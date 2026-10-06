@@ -1,10 +1,6 @@
 import { JsonRpc } from "./rpc";
 import type { DelegatedStageInput, AgentEvent } from "./types";
-import {
-  parentInstructions,
-  parentReceiptSchema,
-  stageAssignment,
-} from "../context/prompts";
+import { parentInstructions, parentReceiptSchema, stageAssignment } from "../context/prompts";
 import { listDescendantThreads, matchesAgentSettings } from "./protocol";
 import { PARENT_AGENT_MODEL } from "./limits";
 export { PARENT_AGENT_MODEL } from "./limits";

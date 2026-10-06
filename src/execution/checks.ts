@@ -1,6 +1,6 @@
 import { MAX_EVIDENCE_FILE_BYTES } from "./limits";
 import { readFile, stat, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { Parser } from "tap-parser";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import type { Task, Plan, CheckSpec } from "../core/contracts";

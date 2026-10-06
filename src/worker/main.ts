@@ -21,8 +21,10 @@ const get = async (): Promise<AgentClient> => {
 };
 const client: AgentClient = {
   listModels: async () => (await get()).listModels(),
-  runDelegatedStage: async (...args) => (await get()).runDelegatedStage(...args),
-  respondToApproval: async (...args) => (await get()).respondToApproval(...args),
+  runDelegatedStage: async (...args) =>
+    (await get()).runDelegatedStage(...args),
+  respondToApproval: async (...args) =>
+    (await get()).respondToApproval(...args),
   interruptTurn: async (...args) => (await get()).interruptTurn(...args),
   runDirectTurn: async (...args) => (await get()).runDirectTurn(...args),
   close: async () => {

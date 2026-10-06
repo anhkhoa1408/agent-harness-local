@@ -1,15 +1,7 @@
 import { BRANCH_SLUG_CHARACTERS, EVENT_PAGE_SIZE } from "./limits";
 import { randomUUID } from "node:crypto";
 import { openDatabase, transaction } from "./database";
-import {
-  NewTaskSchema,
-  TaskSchema,
-  ControlCommandSchema,
-  type NewTask,
-  type Task,
-  type ControlCommand,
-  type Event,
-} from "../core/contracts";
+import { NewTaskSchema, TaskSchema, ControlCommandSchema, type NewTask, type Task, type ControlCommand, type Event } from "../core/contracts";
 
 const json = (value: unknown): string => JSON.stringify(value ?? null);
 type Row = { body: string };
