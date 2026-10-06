@@ -3,12 +3,7 @@ import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
-import {
-  aiStages,
-  type Task,
-  type AiStage,
-  type Stage,
-} from "../core/contracts";
+import { aiStages, type Task, type AiStage, type Stage } from "../core/contracts";
 
 import type { AgentClient, DelegatedStageInput } from "../codex/types";
 import { PARENT_AGENT_MODEL as parentModel } from "../codex/limits";

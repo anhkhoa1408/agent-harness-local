@@ -3,11 +3,7 @@ import { MAX_REPAIR_ROUNDS } from "../../core/limits";
 import { VisualReviewSchema } from "../../core/contracts";
 
 import { runChecks } from "../../execution/checks";
-import {
-  collectScreenshots,
-  visualChecks,
-  verifyImageEvidence,
-} from "../../execution/ui-verification";
+import { collectScreenshots, visualChecks, verifyImageEvidence } from "../../execution/ui-verification";
 
 import { canImplement } from "../../core/transitions";
 

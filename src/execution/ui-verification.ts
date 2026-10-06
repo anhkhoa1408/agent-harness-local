@@ -9,12 +9,7 @@ import type { CheckResult } from "./checks";
 import { contained, contentHash } from "../context/rules";
 import { gitText } from "../repositories/inspect";
 
-export function evidenceExclusions(plan: Plan) {
-  return [
-    ...plan.checks.flatMap((c) => (c.reportPath ? [c.reportPath] : [])),
-    ...(plan.uiVerification?.screenshots.map((s) => s.path) ?? []),
-  ];
-}
+export { evidenceExclusions } from "../core/evidence";
 export async function clearScreenshots(
   root: string,
   plan: Plan,
