@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { ModelInfo } from "../core/model-policy";
 import { JsonRpc, RpcRemoteError } from "./rpc";
-import { runSubagentStage } from "./subagents";
+import { executeDelegatedStage } from "./subagents";
 import type { AgentClient, DirectTurnInput, DelegatedStageInput, AgentEvent, AgentRun } from "./types";
 export type { AgentClient, AgentInput, AgentEvent, AgentRun } from "./types";
 import { RUNTIME_PAGE_SIZE, AGENT_INTERRUPT_TIMEOUT_MS } from "./limits";
@@ -45,7 +45,7 @@ export class CodexClient implements AgentClient {
     return models;
   }
   async runDelegatedStage(input: DelegatedStageInput, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<AgentRun> {
-    return runSubagentStage(this.rpc, input, onEvent, signal, this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS);
+    return executeDelegatedStage(this.rpc, input, onEvent, signal, this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS);
   }
   async runDirectTurn(
     input: DirectTurnInput,
