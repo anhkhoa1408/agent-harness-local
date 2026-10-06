@@ -74,14 +74,15 @@ async function fixture() {
     }),
   );
   const fake: AgentClient = {
-    models: async () => [
+    listModels: async () => [
       { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
       { id: "medium", efforts: ["medium"], isDefault: false },
     ],
-    answer: async () => {},
-    interrupt: async () => {},
+    respondToApproval: async () => {},
+    interruptTurn: async () => {},
+    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
     close: async () => {},
-    run: async (input) => {
+    runDelegatedStage: async (input) => {
       const context = JSON.parse(input.prompt);
       return {
         threadId: "parent",

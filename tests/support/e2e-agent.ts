@@ -7,15 +7,16 @@ import { planFixture } from "./task-fixture";
 export function createFixtureAgent(): AgentClient {
   const interruptedStories=new Set<string>();
   return {
-    models: async () => [
+    listModels: async () => [
       { id: "fixture-strong", efforts: ["high"], isDefault: false },
       { id: "fixture-medium", efforts: ["medium"], isDefault: false },
       { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
     ],
-    answer: async () => {},
-    interrupt: async () => {},
+    respondToApproval: async () => {},
+    interruptTurn: async () => {},
+    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
     close: async () => {},
-    async run(input, onEvent, signal) {
+    async runDelegatedStage(input, onEvent, signal) {
       const stage = /stage: (\w+)/.exec(input.instructions)![1],
         threadId = input.threadId ?? randomUUID(),
         child = { threadId: randomUUID(), turnId: "child-turn", model: input.model, usage: null };

@@ -1,49 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import type { ModelChoice, Stage } from "../core/contracts";
 import type { ModelInfo } from "../core/model-policy";
 import { JsonRpc, RpcRemoteError } from "./rpc";
 import { runSubagentStage } from "./subagents";
-export type AgentInput = {
-  cwd: string;
-  model: ModelChoice;
-  instructions: string;
-  prompt: string;
-  outputSchema: Record<string, unknown>;
-  write: boolean;
-  executionMode?: "manual" | "auto";
-  threadId?: string;
-  delegation?: { stage: Stage; attemptId: string; packetPath: string };
-};
-export type AgentEvent = {
-  type:
-    | "parent"
-    | "child"
-    | "started"
-    | "message"
-    | "tool"
-    | "approval"
-    | "completed"
-    | "error";
-  data: any;
-};
-export type AgentRun = {
-  threadId: string;
-  turnId: string;
-  result: unknown;
-  usage: unknown;
-  child?: { threadId: string; turnId: string; model: ModelChoice; usage: unknown };
-};
-export interface AgentClient {
-  models(): Promise<ModelInfo[]>;
-  run(
-    input: AgentInput,
-    onEvent: (event: AgentEvent) => void,
-    signal: AbortSignal,
-  ): Promise<AgentRun>;
-  answer(id: string | number, result: unknown): Promise<void>;
-  interrupt(threadId: string, turnId: string): Promise<void>;
-  close(): Promise<void>;
-}
+import type { AgentClient, DirectTurnInput, DelegatedStageInput, AgentEvent, AgentRun } from "./types";
+export type { AgentClient, AgentInput, AgentEvent, AgentRun } from "./types";
+import { RUNTIME_PAGE_SIZE, AGENT_INTERRUPT_TIMEOUT_MS } from "./limits";
 export class CodexClient implements AgentClient {
   constructor(
     private rpc: JsonRpc,
@@ -59,13 +20,13 @@ export class CodexClient implements AgentClient {
     });
     this.rpc.notify("initialized");
   }
-  async models(): Promise<ModelInfo[]> {
+  async listModels(): Promise<ModelInfo[]> {
     const models: ModelInfo[] = [];
     let cursor: string | null = null;
     const seen = new Set<string>();
     do {
       const page = await this.rpc.request("model/list", {
-        limit: 100,
+        limit: RUNTIME_PAGE_SIZE,
         includeHidden: false,
         ...(cursor ? { cursor } : {}),
       });
@@ -83,16 +44,14 @@ export class CodexClient implements AgentClient {
     } while (cursor);
     return models;
   }
-  async run(
-    input: AgentInput,
+  async runDelegatedStage(input: DelegatedStageInput, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<AgentRun> {
+    return runSubagentStage(this.rpc, input, onEvent, signal, this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS);
+  }
+  async runDirectTurn(
+    input: DirectTurnInput,
     onEvent: (e: AgentEvent) => void,
     signal: AbortSignal,
   ): Promise<AgentRun> {
-    if (input.delegation)
-      return runSubagentStage(
-        this.rpc, input, onEvent, signal,
-        this.options.interruptTimeoutMs ?? 10000,
-      );
     if (signal.aborted) throw new Error("interrupted");
     const thread = await this.rpc.request(
       input.threadId ? "thread/resume" : "thread/start",
@@ -130,9 +89,9 @@ export class CodexClient implements AgentClient {
         interrupting = true;
         timer = setTimeout(
           () => fail(new Error("runtime_state_unknown")),
-          this.options.interruptTimeoutMs ?? 10000,
+          this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS,
         );
-        this.interrupt(threadId, turnId).catch(() =>
+        this.interruptTurn(threadId, turnId).catch(() =>
           fail(new Error("runtime_state_unknown")),
         );
       };
@@ -145,7 +104,7 @@ export class CodexClient implements AgentClient {
         if (m.id !== undefined) {
           onEvent({
             type: "approval",
-            data: { requestId: m.id, method: m.method, params: p },
+            data: { requestId: m.id, method: m.method!, params: p },
           });
           return;
         }
@@ -202,10 +161,10 @@ export class CodexClient implements AgentClient {
         );
     });
   }
-  async answer(id: string | number, result: unknown) {
+  async respondToApproval(id: string | number, result: unknown) {
     this.rpc.respond(id, result);
   }
-  async interrupt(threadId: string, turnId: string) {
+  async interruptTurn(threadId: string, turnId: string) {
     await this.rpc.request("turn/interrupt", { threadId, turnId });
   }
   async close() {

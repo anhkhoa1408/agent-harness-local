@@ -20,10 +20,11 @@ const get = async (): Promise<AgentClient> => {
   return connected!;
 };
 const client: AgentClient = {
-  models: async () => (await get()).models(),
-  run: async (...args) => (await get()).run(...args),
-  answer: async (...args) => (await get()).answer(...args),
-  interrupt: async (...args) => (await get()).interrupt(...args),
+  listModels: async () => (await get()).listModels(),
+  runDelegatedStage: async (...args) => (await get()).runDelegatedStage(...args),
+  respondToApproval: async (...args) => (await get()).respondToApproval(...args),
+  interruptTurn: async (...args) => (await get()).interruptTurn(...args),
+  runDirectTurn: async (...args) => (await get()).runDirectTurn(...args),
   close: async () => {
     await connected?.close();
   },

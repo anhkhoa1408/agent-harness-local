@@ -1,5 +1,6 @@
+import { ROLLOUT_INITIAL_RETRY_DELAY_MS, ROLLOUT_MAX_RETRY_DELAY_MS, RUNTIME_PAGE_SIZE, AGENT_TREE_STOP_SWEEPS } from "./limits";
 import { isDeepStrictEqual } from "node:util";
-import type { AgentInput, AgentEvent, AgentRun } from "./client";
+import type { DelegatedStageInput, AgentEvent, AgentRun } from "./types";
 import { JsonRpc, RpcRemoteError } from "./rpc";
 import {
   parentInstructions,
@@ -18,7 +19,7 @@ async function childRequest(
   timeoutMs: number,
 ) {
   const deadline = Date.now() + timeoutMs;
-  let delay = 5;
+  let delay = ROLLOUT_INITIAL_RETRY_DELAY_MS;
   for (;;) {
     try {
       return await rpc.request(method, params);
@@ -37,7 +38,7 @@ async function childRequest(
       await new Promise((resolve) =>
         setTimeout(resolve, Math.min(delay, deadline - Date.now())),
       );
-      delay = Math.min(delay * 2, 200);
+      delay = Math.min(delay * 2, ROLLOUT_MAX_RETRY_DELAY_MS);
     }
   }
 }
@@ -51,7 +52,7 @@ async function descendants(rpc: JsonRpc, threadId: string): Promise<any[]> {
       .request("thread/list", {
         ancestorThreadId: threadId,
         sourceKinds: ["subAgent", "subAgentThreadSpawn"],
-        limit: 100,
+        limit: RUNTIME_PAGE_SIZE,
         ...(cursor ? { cursor } : {}),
       })
       .catch(() => {
@@ -65,7 +66,7 @@ async function descendants(rpc: JsonRpc, threadId: string): Promise<any[]> {
   return data;
 }
 
-function settingsMatch(response: any, input: AgentInput, child: boolean) {
+function settingsMatch(response: any, input: DelegatedStageInput, child: boolean) {
   const choice = child ? input.model : parentModel;
   return (
     response.model === choice.model &&
@@ -80,7 +81,7 @@ function settingsMatch(response: any, input: AgentInput, child: boolean) {
 
 export async function runSubagentStage(
   rpc: JsonRpc,
-  input: AgentInput,
+  input: DelegatedStageInput,
   onEvent: (event: AgentEvent) => void,
   signal: AbortSignal,
   timeoutMs: number,
@@ -210,7 +211,7 @@ export async function runSubagentStage(
         if (startFailure && !(startFailure instanceof RpcRemoteError))
           throw new Error("runtime_state_unknown");
         // Reconcile after stopping the parent so a spawn in flight cannot escape cancellation.
-        for (let sweep = 0; sweep < 2; sweep++) {
+        for (let sweep = 0; sweep < AGENT_TREE_STOP_SWEEPS; sweep++) {
           for (const t of await descendants(rpc, threadId))
             if (!previous.has(t.id)) {
               if (!live.has(t.id)) live.set(t.id, {});
@@ -386,7 +387,7 @@ export async function runSubagentStage(
       if (m.id !== undefined) {
         onEvent({
           type: "approval",
-          data: { requestId: m.id, method: m.method, params: p },
+          data: { requestId: m.id, method: m.method!, params: p },
         });
         return;
       }

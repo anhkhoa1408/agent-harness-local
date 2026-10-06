@@ -1,0 +1,1 @@
+export const MAX_REQUEST_BODY_SIZE = 1_048_576;

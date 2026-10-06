@@ -1,3 +1,4 @@
+import { MAX_FAILURE_EXCERPT_CHARACTERS, MAX_FAILURE_EXCERPTS } from "./limits";
 import { open } from "node:fs/promises";
 import type { CheckResult } from "./checks";
 async function tail(path: string | undefined) {
@@ -6,14 +7,14 @@ async function tail(path: string | undefined) {
     const file = await open(path, "r");
     try {
       const size = (await file.stat()).size,
-        buffer = Buffer.alloc(Math.min(size, 2000));
+        buffer = Buffer.alloc(Math.min(size, MAX_FAILURE_EXCERPT_CHARACTERS));
       await file.read(
         buffer,
         0,
         buffer.length,
         Math.max(0, size - buffer.length),
       );
-      return buffer.toString("utf8").slice(-2000);
+      return buffer.toString("utf8").slice(-MAX_FAILURE_EXCERPT_CHARACTERS);
     } finally {
       await file.close();
     }
@@ -28,7 +29,7 @@ export async function failureEvidence(checks: CheckResult[]) {
   return {
     checks: await Promise.all(
       failures
-        .slice(0, 6)
+         .slice(0, MAX_FAILURE_EXCERPTS)
         .map(async (check) => ({
           ...check,
           stdoutExcerpt: check.imageEvidence

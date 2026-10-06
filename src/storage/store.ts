@@ -1,3 +1,4 @@
+import { BRANCH_SLUG_CHARACTERS, EVENT_PAGE_SIZE } from "./limits";
 import { randomUUID } from "node:crypto";
 import { openDatabase, transaction } from "./database";
 import {
@@ -55,7 +56,7 @@ export function openStore(filename: string) {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-|-$/g, "")
-            .slice(0, 40) || "task"
+            .slice(0, BRANCH_SLUG_CHARACTERS) || "task"
         }`,
         resumeStage: null,
         createdAt: now,
@@ -114,7 +115,7 @@ export function openStore(filename: string) {
       return (
         db
           .prepare(
-            "SELECT seq,task_id,type,data,at FROM events WHERE task_id=? AND seq>? ORDER BY seq LIMIT 500",
+            `SELECT seq,task_id,type,data,at FROM events WHERE task_id=? AND seq>? ORDER BY seq LIMIT ${EVENT_PAGE_SIZE}`,
           )
           .all(taskId, after) as {
           seq: number;

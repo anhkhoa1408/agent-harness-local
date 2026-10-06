@@ -1,3 +1,4 @@
+import { GIT_MAX_BUFFER_BYTES, GIT_COMMAND_TIMEOUT_MS, MAX_SOURCE_DOCUMENT_BYTES, MAX_SOURCE_CONTEXT_BYTES } from "./limits";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -32,7 +33,7 @@ export class RepositoryRegistrationError extends Error {
 }
 export async function gitText(root: string, args: string[], signal?: AbortSignal): Promise<string> {
   return (
-    await exec("git", ["-C", root, ...args], { maxBuffer: 8 * 1024 * 1024, signal, timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
+    await exec("git", ["-C", root, ...args], { maxBuffer: GIT_MAX_BUFFER_BYTES, signal, timeout: GIT_COMMAND_TIMEOUT_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
   ).stdout.trim();
 }
 export async function inspectRepository(
@@ -110,10 +111,10 @@ export async function sourceDocuments(
     const size = Number(
       await gitText(repo.root, ["cat-file", "-s", `${repo.head}:${path}`]),
     );
-    if (size > 64000 || total + size > 500000) continue;
+    if (size > MAX_SOURCE_DOCUMENT_BYTES || total + size > MAX_SOURCE_CONTEXT_BYTES) continue;
     const content = (
       await exec("git", ["-C", repo.root, "show", `${repo.head}:${path}`], {
-        maxBuffer: 8 * 1024 * 1024,
+        maxBuffer: GIT_MAX_BUFFER_BYTES,
       })
     ).stdout;
     if (content.includes("\0")) continue;
@@ -155,7 +156,7 @@ export async function discoverRepository(
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, doc.content);
     }
-    const run = await client.run(
+    const run = await client.runDirectTurn(
       {
         cwd: snapshot,
         model,

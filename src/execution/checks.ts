@@ -1,3 +1,4 @@
+import { MAX_EVIDENCE_FILE_BYTES } from "./limits";
 import { readFile, stat, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Parser } from "tap-parser";
@@ -7,19 +8,8 @@ import { runProcess } from "./process";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { contained } from "../context/rules";
 import { evidenceExclusions, clearScreenshots } from "./ui-verification";
-export type CheckResult = {
-  id: string;
-  taskId: string;
-  planVersion: number;
-  fingerprint: string;
-  status: "passed" | "failed" | "blocked" | "skipped" | "not_applicable";
-  executed: number | null;
-  exitCode: number | null;
-  evidencePath: string;
-  reason: string | null;
-  imageEvidence?: { path: string; sha256: string }[];
-  stderrPath?: string;
-};
+import type { CheckResult } from "../core/evidence";
+export type { CheckResult } from "../core/evidence";
 type Counts = { executed: number | null; failed: number; skipped: number };
 export function evaluateCheck(
   spec: CheckSpec,
@@ -91,7 +81,7 @@ export async function parseEvidence(
   return { executed, failed, skipped };
 }
 async function boundedRead(path: string) {
-  if ((await stat(path)).size > 8 * 1024 * 1024)
+  if ((await stat(path)).size > MAX_EVIDENCE_FILE_BYTES)
     throw new Error("report_too_large");
   return readFile(path, "utf8");
 }

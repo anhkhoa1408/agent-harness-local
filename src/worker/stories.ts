@@ -1,3 +1,4 @@
+import { MAX_TITLE_CHARACTERS } from "../core/limits";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { evidenceExclusions } from "../execution/ui-verification";
 import type { Store } from "../storage/store";
@@ -296,7 +297,7 @@ export async function prepareSeparateStory(
     if (current.childTaskId) return current;
     const child = store.createTask({
       repositoryId: task.repositoryId,
-      title: `${task.title}: ${story.title}`.slice(0, 200),
+      title: `${task.title}: ${story.title}`.slice(0, MAX_TITLE_CHARACTERS),
       requirement: `Implement ONLY story ${story.id}: ${story.outcome}. Acceptance: ${plan.criteria
         .filter((c) => story.criterionIds.includes(c.id))
         .map((c) => c.description)

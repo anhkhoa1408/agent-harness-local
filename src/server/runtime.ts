@@ -13,7 +13,7 @@ export async function modelCatalog() {
     ];
   const client = await connectCodex();
   try {
-    return await client.models();
+    return await client.listModels();
   } finally {
     await client.close();
   }
