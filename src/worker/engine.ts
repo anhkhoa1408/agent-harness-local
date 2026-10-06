@@ -1,12 +1,9 @@
+import { gitText } from "../repositories/inspect";
+import { fingerprintWorktree } from "../repositories/fingerprint";
+import { PlanService } from "../application/plan-service";
+import { StoryService, storyKey } from "../application/story-service";
 import { STAGE_TIMEOUT_MS, WORKER_POLL_INTERVAL_MS } from "./limits";
 import { MAX_REPAIR_ROUNDS, WORKER_LEASE_TTL_MS, WORKER_HEARTBEAT_INTERVAL_MS } from "../core/limits";
-import {
-  approveStorySelection,
-  executionOf,
-  storyRuns,
-  storyKey,
-  reconcileFeatureStories,
-} from "./stories";
 import { applyEffortPolicy } from "../core/model-policy";
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/store";
@@ -26,11 +23,6 @@ import {
   type ControlCommand,
   type StorySelection,
 } from "../core/contracts";
-import {
-  addPlanComment,
-  requestPlanRevision,
-  planComments,
-} from "../server/services";
 import { ExecutionModeSchema } from "../core/contracts";
 import { approvePlan } from "../core/transitions";
 import { bootIdentity } from "./recovery";
@@ -74,6 +66,8 @@ export async function runWorker(
   const store = fencedStore(raw, lease),
     handlers = typeof source === "function" ? source(store, lease) : source,
     bootId = bootIdentity();
+  const storyService = new StoryService(store, { readGit: gitText, fingerprintWorktree });
+  const planService = new PlanService(store, storyService);
   let active: {
     taskId: string;
     abort: AbortController;
@@ -141,7 +135,7 @@ export async function runWorker(
       if (["completed", "cancelled"].includes(task.status))
         throw new Error("terminal_task");
       if (c.kind === "pause" || c.kind === "cancel") {
-        for (const run of storyRuns(store, task.id).filter(
+        for (const run of storyService.listStoryRuns(task.id).filter(
           (r) => r.childTaskId && r.state !== "completed",
         )) {
           const child = store.getTask(run.childTaskId!);
@@ -169,10 +163,10 @@ export async function runWorker(
             event(`task.${c.kind}`),
           );
         if (!active || active.taskId !== task.id) {
-          const run = storyRuns(store, task.featureId ?? task.id).find((r) =>
+          const run = storyService.listStoryRuns(task.featureId ?? task.id).find((r) =>
             task.featureId
               ? r.childTaskId === task.id
-              : r.storyId === executionOf(store, task.id)?.activeStoryId,
+              : r.storyId === storyService.getExecution(task.id)?.activeStoryId,
           );
           if (run && run.state !== "completed" && run.state !== "pending")
             store.putRecord("story-run", storyKey(run), {
@@ -187,15 +181,13 @@ export async function runWorker(
           ),
           version = (c.payload as { version: number })?.version;
         if (
-          planComments(store, task.id).some((c) => c.version === plan.version)
+          planService.planComments(task.id).some((c) => c.version === plan.version)
         )
           throw new Error("plan_feedback_requires_revision");
         const approved = approvePlan(task, plan, version);
         store.atomic(() => {
           if (task.splitIntoStories)
-            approveStorySelection(
-              store,
-              task,
+            storyService.approveStorySelection(task,
               (c.payload as { selection: StorySelection }).selection,
             );
           store.updateTask(
@@ -214,9 +206,9 @@ export async function runWorker(
           );
         });
       } else if (c.kind === "comment") {
-        addPlanComment(store, task.id, c.payload);
+        planService.addPlanComment(task.id, c.payload);
       } else if (c.kind === "revise") {
-        requestPlanRevision(store, task.id, c.payload);
+        planService.requestPlanRevision(task.id, c.payload);
       } else if (c.kind === "answer") {
         if (task.status !== "waiting_input") throw new Error("invalid_status");
         const answer = (c.payload as { answer: string })?.answer;
@@ -285,10 +277,10 @@ export async function runWorker(
           throw new Error("invalid_status");
         if (task.reason === "runtime_state_unknown")
           throw new Error("runtime_reconciliation_required");
-        const e = executionOf(store, task.id);
+        const e = storyService.getExecution(task.id);
         const pending =
           e?.selection.mode === "separate_pr"
-            ? storyRuns(store, task.id).find(
+            ? storyService.listStoryRuns(task.id).find(
                 (r) => r.childTaskId && r.state !== "completed",
               )
             : undefined;
@@ -338,7 +330,7 @@ export async function runWorker(
             t.status === "blocked" &&
             t.reason === "story_running",
         ))
-        await reconcileFeatureStories(store, feature.id, signal);
+        await storyService.reconcileFeatureStories(feature.id, signal);
       if (!active && !store.listRecords("exclusion").length) {
         const next = store
           .listTasks()
@@ -360,12 +352,12 @@ export async function runWorker(
             id: randomUUID(),
             taskId: next.id,
             storyId:
-              executionOf(store, next.id)?.activeStoryId ??
+              storyService.getExecution(next.id)?.activeStoryId ??
               next.storyId ??
               null,
             planVersion: next.planVersion,
             baselineCommit:
-              executionOf(store, next.id)?.baselineCommit ?? next.sourceCommit,
+              storyService.getExecution(next.id)?.baselineCommit ?? next.sourceCommit,
             stage: next.stage,
             leaseEpoch: lease.epoch,
             status: "running",
@@ -395,7 +387,7 @@ export async function runWorker(
               }),
             );
             store.putRecord("attempt", attempt.id, attempt);
-            const run = storyRuns(store, next.featureId ?? next.id).find(
+            const run = storyService.listStoryRuns(next.featureId ?? next.id).find(
               (r) => r.storyId === attempt.storyId,
             );
             if (
@@ -433,7 +425,7 @@ export async function runWorker(
               if (lost) return;
               const current = store.getTask(next.id);
               store.atomic(() => {
-                const run = storyRuns(store, next.featureId ?? next.id).find(
+                const run = storyService.listStoryRuns(next.featureId ?? next.id).find(
                   (r) => r.storyId === attempt.storyId,
                 );
                 if (
@@ -490,7 +482,7 @@ export async function runWorker(
                     reason: "runtime_state_unknown",
                     bootId,
                   });
-                const run = storyRuns(store, next.featureId ?? next.id).find(
+                const run = storyService.listStoryRuns(next.featureId ?? next.id).find(
                   (r) => r.storyId === attempt.storyId,
                 );
                 if (run && run.state !== "completed")

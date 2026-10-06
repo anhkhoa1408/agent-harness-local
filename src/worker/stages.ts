@@ -1,7 +1,8 @@
+import { PlanService } from "../application/plan-service";
+import { StoryService, storyKey } from "../application/story-service";
 import { APPROVAL_POLL_INTERVAL_MS } from "./limits";
 import { MAX_REPAIR_ROUNDS } from "../core/limits";
 import { createStoryCheckpoint } from "../delivery/checkpoint";
-import { executionOf, prepareSeparateStory, executionPlan, effectiveStoryTask, recordStoryEvidence, requireStoryEvidence, completeSharedStory, storyRuns, assertSharedHead } from "./stories";
 import { stages } from "../core/contracts";
 import type { Handlers } from "./engine";
 import { z } from "zod";
@@ -47,7 +48,6 @@ import {
   stageAfterPreparation,
 } from "../core/transitions";
 import { acceptanceErrors } from "../core/acceptance";
-import { savePlan, planComments } from "../server/services";
 export function unavailableHandlers(): Handlers {
   return Object.fromEntries(
     stages.map((stage) => [
@@ -66,15 +66,17 @@ export function createHandlers(
   client: AgentClient,
   data: string,
 ): Handlers {
+  const storyService = new StoryService(store, { readGit: gitText, fingerprintWorktree });
+  const planService = new PlanService(store, storyService);
   const artifacts = (task: Task) => {
-    const e=executionOf(store,task.id);
+    const e=storyService.getExecution(task.id);
     return e?.selection.mode === "shared_pr" ? join(data,"artifacts",task.id,`stories-v${e.selection.planVersion}`,e.aggregate ? "aggregate" : e.activeStoryId!) : join(data,"artifacts",task.id);
   };
   const repository = (task: Task) => ({
     ...RepositorySchema.parse(store.getRecord("repository", task.repositoryId)),
     head: task.sourceCommit,
   });
-  const planOf = (task: Task) => executionPlan(store, task);
+  const planOf = (task: Task) => storyService.getExecutionPlan(task);
   const stageTask = (task: Task) => ({
     id: task.id,
     title: task.title,
@@ -82,7 +84,7 @@ export function createHandlers(
     sourceCommit: task.sourceCommit,
     planVersion: task.planVersion,
     splitIntoStories: task.splitIntoStories,
-    storyId: executionOf(store,task.id)?.activeStoryId ?? task.storyId ?? null,
+    storyId: storyService.getExecution(task.id)?.activeStoryId ?? task.storyId ?? null,
   });
   const fingerprint = (task: Task, plan: Plan) =>
     fingerprintWorktree(
@@ -400,7 +402,7 @@ export function createHandlers(
           task: stageTask(task),
           version: (task.planVersion ?? 0) + 1,
           previousPlan: task.planVersion ? planOf(task) : null,
-          feedback: planComments(store, task.id).filter(
+          feedback: planService.planComments(task.id).filter(
             (c) => c.version === task.planVersion,
           ),
           analysis: store.getRecord("analysis", task.id),
@@ -415,7 +417,7 @@ export function createHandlers(
         signal,
       );
       const plan = parsePlanOutput(output);
-      const saved = savePlan(store, task.id, plan);
+      const saved = planService.savePlan(task.id, plan);
       return {
         stage: saved.stage,
         status: saved.status,
@@ -424,17 +426,17 @@ export function createHandlers(
       };
     },
     prepare: async (task, signal) => {
-      const e = executionOf(store,task.id);
+      const e = storyService.getExecution(task.id);
       if (e?.selection.mode === "separate_pr") {
         const approvedPlan = PlanSchema.parse(store.getRecord("plan",`${task.id}:${task.planVersion}`));
         if (!canImplement(task,approvedPlan) || e.selection.planVersion !== task.approvedPlanVersion) throw new Error("plan_not_approved");
-        const child = await prepareSeparateStory(store,task,signal);
+        const child = await storyService.prepareSeparateStory(task,signal);
         return {stage:"prepare",status:"blocked",reason:"story_running",output:child} as const;
       }
       await freeze(task);
-      const effective = effectiveStoryTask(store,task), plan = planOf(effective);
+      const effective = storyService.getEffectiveTask(task), plan = planOf(effective);
       if (!canImplement(effective, plan)) throw new Error("plan_not_approved");
-      const resumingStories = e?.selection.mode === "shared_pr" && !!task.worktree && storyRuns(store,task.id).some(r=>r.state!=="pending");
+      const resumingStories = e?.selection.mode === "shared_pr" && !!task.worktree && storyService.listStoryRuns(task.id).some(r=>r.state!=="pending");
       const path = await prepareWorktree(
         repository(task),
         task,
@@ -529,7 +531,7 @@ export function createHandlers(
       if (!canImplement(task, plan)) throw new Error("plan_not_approved");
       const checks = await runChecks(task, plan, signal, artifacts(task));
       store.putRecord("checks", task.id, checks);
-      recordStoryEvidence(store,task);
+      storyService.recordEvidence(task);
       for (const check of checks)
         if (check.evidencePath.startsWith(artifacts(task) + "/"))
           store.putRecord("artifact", `${task.id}-${check.id}-evidence`, {
@@ -591,18 +593,18 @@ export function createHandlers(
       return next("review", checks);
     },
     deliver: async (task, signal) => {
-      const e=executionOf(store,task.id);
+      const e=storyService.getExecution(task.id);
       if(e?.selection.mode === "shared_pr") {
-        requireStoryEvidence(store,task);
+        storyService.assertEvidence(task);
         if(!e.aggregate) {
-          const checkpoint=await createStoryCheckpoint(store,data,task,signal);
+          const checkpoint=await createStoryCheckpoint(store,data,task,signal,storyService.getCheckpointContext(task));
           signal.throwIfAborted();
-          return completeSharedStory(store,task,checkpoint);
+          return storyService.completeSharedStory(task,checkpoint);
         }
       }
-      await assertSharedHead(store,task,true);
+      await storyService.assertSharedHead(task,true);
       const delivery = await createDelivery(store, data, e?.selection.mode === "shared_pr" ? {
-        plan: planOf(task), reportAppendix: `\n\n## Story checkpoints\n${storyRuns(store,task.id).map(r=>`- ${r.storyId}: ${r.state}; commit ${r.commit ?? "—"}`).join("\n")}`,
+        plan: planOf(task), reportAppendix: `\n\n## Story checkpoints\n${storyService.listStoryRuns(task.id).map(r=>`- ${r.storyId}: ${r.state}; commit ${r.commit ?? "—"}`).join("\n")}`,
       } : {})(task, signal);
       store.putRecord("delivery", task.id, delivery);
       return {
@@ -613,7 +615,7 @@ export function createHandlers(
       };
     },
     review: async (task, signal) => {
-      requireStoryEvidence(store,task);
+      storyService.assertEvidence(task);
       const plan = planOf(task),
         before = await fingerprint(task, plan),
         checks = (store.getRecord("checks", task.id) ?? []) as CheckResult[];
@@ -663,8 +665,8 @@ export function createHandlers(
     },
   };
   return Object.fromEntries(stages.map(stage => [stage, async (task: Task, signal: AbortSignal) => {
-    if(["implement","repair","verify","review"].includes(stage)) await assertSharedHead(store,task);
-    return handlers[stage](["implement","repair","verify","review","deliver"].includes(stage) ? effectiveStoryTask(store,task) : task,signal);
+    if(["implement","repair","verify","review"].includes(stage)) await storyService.assertSharedHead(task);
+    return handlers[stage](["implement","repair","verify","review","deliver"].includes(stage) ? storyService.getEffectiveTask(task) : task,signal);
   },
   ])) as Handlers;
 }

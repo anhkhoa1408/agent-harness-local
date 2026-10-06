@@ -1,6 +1,5 @@
 import { MAX_REQUEST_BODY_SIZE } from "./limits";
 import { WORKER_LEASE_TTL_MS } from "../core/limits";
-import { executionOf, storyRuns } from "../worker/stories";
 import {
   pipelineProgress,
   type ProgressAttempt,
@@ -25,7 +24,7 @@ import {
   aiStages,
 } from "../core/contracts";
 import { authorize, readSession } from "./local-session";
-import { createServices, planComments } from "./services";
+import { createServices } from "./services";
 import { contained } from "../context/rules";
 import { gitText, RepositoryRegistrationError } from "../repositories/inspect";
 import { pickFolder } from "./folder-picker";
@@ -53,6 +52,7 @@ export function createHttpHandler(
   login: LoginService = getCodexLogin(),
   folderPicker: () => Promise<string | null> = pickFolder,
 ) {
+  const { stories: storyService, plans: planService } = createServices(store);
   return async (request: Request): Promise<Response> => {
     if (!authorize(request, store))
       return json({ error: "origin_or_session_invalid" }, 403);
@@ -228,13 +228,13 @@ export function createHttpHandler(
             }
           return json({
             task,
-            stories: {execution: executionOf(store,task.id),runs:storyRuns(store,task.id)},
+            stories: {execution: storyService.getExecution(task.id),runs:storyService.listStoryRuns(task.id)},
             pipeline: pipelineProgress(
               task,
               store.listRecords("attempt") as ProgressAttempt[],
             ),
             plan: store.getRecord("plan", `${task.id}:${task.planVersion}`),
-            comments: planComments(store, task.id),
+            comments: planService.planComments(task.id),
             analysis: store.getRecord("analysis", task.id),
             checks: store.getRecord("checks", task.id),
             review: store.getRecord("review", task.id),
