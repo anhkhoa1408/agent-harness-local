@@ -1,10 +1,5 @@
 import { MAX_TITLE_CHARACTERS } from "../core/limits";
-import {
-  PlanSchema,
-  RepositorySchema,
-  type Task,
-  type StoryRun,
-} from "../core/contracts";
+import { PlanSchema, RepositorySchema, type Task, type StoryRun } from "../core/contracts";
 import { selectedStories, projectStoryPlan } from "../core/stories";
 import { evidenceExclusions } from "../execution/ui-verification";
 import type { StoryService } from "./story-service";

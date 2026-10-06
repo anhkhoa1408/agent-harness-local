@@ -1,5 +1,5 @@
-import { StoryService, storyKey } from "../../src/application/story-service";
-import { PlanService } from "../../src/application/plan-service";
+import { StoryService } from "../../src/application/story-service";
+
 import { gitText as readStoryGit } from "../../src/repositories/inspect";
 import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/repositories/fingerprint";
 import { test, expect } from "vitest";
@@ -15,11 +15,7 @@ import { createDelivery } from "../../src/delivery/github";
 import { fingerprintWorktree } from "../../src/repositories/fingerprint";
 import { gitText, inspectRepository } from "../../src/repositories/inspect";
 import { createHandlers } from "../../src/worker/stages";
-import {
-  aiStages,
-  StorySelectionSchema,
-  type Task,
-} from "../../src/core/contracts";
+import { aiStages, StorySelectionSchema } from "../../src/core/contracts";
 import type { AgentClient } from "../../src/codex/client";
 async function fixture() {
   const f = await createTempRepo({

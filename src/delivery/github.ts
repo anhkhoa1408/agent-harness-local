@@ -3,13 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  PlanSchema,
-  ReviewSchema,
-  RepositorySchema,
-  type Task,
-  type Plan,
-} from "../core/contracts";
+import { PlanSchema, ReviewSchema, RepositorySchema, type Task, type Plan } from "../core/contracts";
 import type { Store } from "../storage/store";
 import { acceptanceErrors } from "../core/acceptance";
 import type { CheckResult } from "../execution/checks";

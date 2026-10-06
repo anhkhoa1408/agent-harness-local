@@ -1,23 +1,12 @@
 import { GIT_MAX_BUFFER_BYTES, GIT_COMMAND_TIMEOUT_MS, MAX_SOURCE_DOCUMENT_BYTES, MAX_SOURCE_CONTEXT_BYTES } from "./limits";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import {
-  realpath,
-  mkdtemp,
-  mkdir,
-  writeFile,
-  rm,
-  stat,
-} from "node:fs/promises";
+import { realpath, mkdtemp, mkdir, writeFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import {
-  RepoProfileSchema,
-  type Repository,
-  type ModelChoice,
-} from "../core/contracts";
+import { RepoProfileSchema, type Repository, type ModelChoice } from "../core/contracts";
 import type { AgentClient, AgentEvent } from "../codex/client";
 import type { Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";

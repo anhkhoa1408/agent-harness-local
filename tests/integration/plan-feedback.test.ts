@@ -1,4 +1,4 @@
-import { StoryService, storyKey } from "../../src/application/story-service";
+import { StoryService } from "../../src/application/story-service";
 import { PlanService } from "../../src/application/plan-service";
 import { gitText as readStoryGit } from "../../src/repositories/inspect";
 import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/repositories/fingerprint";

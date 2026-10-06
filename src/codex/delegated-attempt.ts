@@ -1,12 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import type { DelegatedStageInput, AgentEvent, AgentRun } from "./types";
 import { JsonRpc, RpcRemoteError, type RpcMessage } from "./rpc";
-import {
-  requestThreadWhenRolloutReady,
-  listDescendantThreads,
-  matchesAgentSettings,
-  verifyChildSpawn,
-} from "./protocol";
+import { requestThreadWhenRolloutReady, listDescendantThreads, matchesAgentSettings, verifyChildSpawn } from "./protocol";
 import type { ParentSessionContext } from "./parent-session";
 import { PARENT_AGENT_MODEL, AGENT_TREE_STOP_SWEEPS } from "./limits";
 import { durableSpawnEvidence } from "./spawn-evidence";
