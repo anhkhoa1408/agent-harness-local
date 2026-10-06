@@ -25,7 +25,7 @@ import {
 } from "../core/contracts";
 import type { Store } from "../storage/store";
 import type { AgentClient, DelegatedStageInput } from "../codex/types";
-import { parentModel } from "../codex/subagents";
+import { PARENT_AGENT_MODEL as parentModel } from "../codex/limits";
 import { resolveModel, applyEffortPolicy } from "../core/model-policy";
 import { resolveBundle, snapshotBundle, type Bundle } from "../context/skills";
 import { composeInstructions, stageEnvelope } from "../context/prompts";
