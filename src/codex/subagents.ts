@@ -3,7 +3,7 @@ import type { AgentInput, AgentEvent, AgentRun } from "./client";
 import { JsonRpc, RpcRemoteError } from "./rpc";
 import {
   parentInstructions,
-  stageEnvelope,
+  parentReceiptSchema,
   stageAssignment,
 } from "../context/prompts";
 import { durableSpawnEvidence } from "./spawn-evidence";
@@ -149,7 +149,7 @@ export async function runSubagentStage(
     throw new Error("subagent_capability_unavailable");
   if (signal.aborted) throw new Error("interrupted");
   const assignment = stageAssignment(input),
-    envelope = stageEnvelope(input);
+    receiptSchema = parentReceiptSchema(input);
   const validSpawn = (args: any) =>
     args?.task_name === assignment.task_name &&
     args.fork_turns === "none" &&
@@ -305,7 +305,10 @@ export async function runSubagentStage(
         if (
           result.stage !== input.delegation!.stage ||
           result.attemptId !== input.delegation!.attemptId ||
-          !isDeepStrictEqual(result, parentResult)
+          !isDeepStrictEqual(parentResult, {
+            stage: result.stage,
+            attemptId: result.attemptId,
+          })
         )
           throw new Error("subagent_output_mismatch");
         const tree = (await descendants(rpc, threadId)).filter(
@@ -482,7 +485,9 @@ export async function runSubagentStage(
           !stopping
         ) {
           unsafe(
-            p.turn.status === "interrupted" ? "interrupted" : "agent_failed",
+            p.turn.status === "interrupted"
+              ? "interrupted"
+              : p.turn.error?.message ?? "agent_failed",
           );
           return;
         }
@@ -525,7 +530,7 @@ export async function runSubagentStage(
         model: parentModel.model,
         effort: parentModel.effort,
         input: [{ type: "text", text: JSON.stringify(assignment) }],
-        outputSchema: envelope,
+        outputSchema: receiptSchema,
       })
       .then((r) => {
         settleStart();

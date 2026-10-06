@@ -1,7 +1,7 @@
 FROM node:24.18.0-bookworm-slim
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git python3 socat gh \
+    && apt-get install -y --no-install-recommends ca-certificates git openssh-client python3 socat gh \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g --omit=optional @openai/codex@0.159.0-alpha.12.1 \
     && git config --system --add safe.directory '*' \

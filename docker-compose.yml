@@ -20,6 +20,9 @@ services:
             - playwright-report/
             - "*.tsbuildinfo"
     init: true
+    environment:
+      SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
+      GIT_SSH_COMMAND: ssh -o BatchMode=yes -o StrictHostKeyChecking=yes
     security_opt:
       - seccomp=./config/docker-seccomp.json
     ports:
@@ -28,6 +31,16 @@ services:
     volumes:
       - harness-data:/data
       - codex-login:/codex
+      - type: bind
+        source: /run/host-services/ssh-auth.sock
+        target: /run/host-services/ssh-auth.sock
+        read_only: true
+      - type: bind
+        source: ${HOME}/.ssh/known_hosts
+        target: /etc/ssh/ssh_known_hosts
+        read_only: true
+        bind:
+          create_host_path: false
       - type: bind
         source: ${HARNESS_REPOS_DIR:-${HOME}/Documents/Personal}
         target: /repos

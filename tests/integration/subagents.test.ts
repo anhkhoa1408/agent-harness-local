@@ -20,6 +20,7 @@ function fixture(
     onStart?: () => void;
     completionRace?: boolean;
     nativeInteraction?: boolean;
+    parentError?: string;
   } = {},
 ) {
   const input = new PassThrough(),
@@ -175,6 +176,14 @@ function fixture(
     }
     if (m.method === "turn/start")
       setTimeout(() => {
+        if (options.parentError) {
+          parentStatus = "failed";
+          notify("turn/completed", {
+            threadId: "parent",
+            turn: { id: "parent-turn", status: "failed", error: { message: options.parentError } },
+          });
+          return;
+        }
         notify("item/started", {
           threadId: "parent",
           turnId: "parent-turn",
@@ -263,8 +272,8 @@ function fixture(
             phase: "final_answer",
             text: JSON.stringify(
               options.bad === "mismatch"
-                ? { ...envelope, result: { ok: false } }
-                : envelope,
+                ? { stage: "plan", attemptId: "a1" }
+                : { stage: "analyze", attemptId: "a1" },
             ),
           },
         });
@@ -305,6 +314,17 @@ function fixture(
   return { client, agentInput, sent, notify };
 }
 
+test("retains the actual parent runtime failure instead of hiding it as agent_failed", async () => {
+  const message = "invalid_json_schema: Missing 'stories'";
+  const f = fixture({ parentError: message });
+  try {
+    await expect(f.client.run(f.agentInput, () => {}, new AbortController().signal))
+      .rejects.toThrow(message);
+  } finally {
+    await f.client.close();
+  }
+});
+
 test("native stage uses a persistent parent and verified clean-context child evidence", async () => {
   const f = fixture();
   try {
@@ -324,6 +344,15 @@ test("native stage uses a persistent parent and verified clean-context child evi
       },
     });
     expect(events.some((e) => e.type === "child")).toBe(true);
+    expect(f.sent.find((m) => m.method === "turn/start").params.outputSchema)
+      .toEqual({
+        type: "object", additionalProperties: false,
+        required: ["stage", "attemptId"],
+        properties: {
+          stage: { type: "string", const: "analyze" },
+          attemptId: { type: "string", const: "a1" },
+        },
+      });
     expect(
       f.sent.find((m) => m.method === "thread/start").params,
     ).toMatchObject({

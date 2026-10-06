@@ -2,6 +2,8 @@
 
 Ngày: 2026-10-05. Trạng thái: người dùng đã duyệt bằng yêu cầu “implement đi”; triển khai theo [báo cáo](../../verification/2026-10-05-parent-subagents.md). Bổ sung spec gốc, thay cơ chế session độc lập theo stage.
 
+Cập nhật đã duyệt ngày 2026-10-06: worker dùng JSON trực tiếp từ subagent đã xác minh; cha chỉ trả receipt `stage`/`attemptId`. Thay yêu cầu cha chép lại toàn bộ output, vì chạy thật đã phát hiện cha đổi ký tự trong Plan và gây `subagent_output_mismatch`.
+
 ## Mục tiêu và phạm vi
 
 Theo yêu cầu người dùng, mỗi task có đúng một Codex agent cha giữ bối cảnh điều phối. Các stage AI được giao cho subagent native, mỗi con chỉ làm một nhiệm vụ và không nhận lịch sử của cha. Pipeline cố định, approval, feature tests, repair budget và worktree riêng theo spec `2026-09-23-agent-harness-design.md` tiếp tục có hiệu lực.
@@ -39,7 +41,7 @@ Con chỉ nhận nhiệm vụ stage, dữ liệu cần thiết do handler hiện
 
 Giới hạn kiểm chứng của CLI hiện tại: raw events và durable rollout mã hóa `spawn_agent.message`; thread/read không trả task message nguyên văn. Worker kiểm tra task_name, fork_turns, model/effort và metadata native, đối chiếu plaintext khi runtime có cung cấp. Ciphertext không chứng minh nguyên văn message đúng packet hoặc không kèm nội dung bổ sung. Instructions yêu cầu cha chỉ truyền lời giao việc đã cấp; đây là ràng buộc hành vi. Test marker kiểm chứng không fork lịch sử, không phải chứng minh đầy đủ mọi token trong context. Không hứa giảm token vì con vẫn có system/tools/developer context và cha thêm một lượt điều phối.
 
-Con trả JSON đúng schema của stage. Worker đọc output cuối của child thread đã xác minh parent ID, đối chiếu output do cha trả và validate schema. Parent không được tự tạo kết quả stage nếu không có child evidence. Cha trả xong khi con chưa hoàn tất, output lệch nhau, con sai model/effort hoặc stage đều không được coi là thành công.
+Con trả JSON envelope đúng schema của stage. Worker đọc output cuối của child thread đã xác minh parent ID và validate schema. Cha chỉ trả receipt gồm `stage` và `attemptId`; worker đối chiếu receipt với assignment và envelope của con, lấy `result` trực tiếp từ con. Parent không được tự tạo kết quả stage nếu không có child evidence. Child chưa hoàn tất, receipt sai stage/attemptId, JSON con không hợp lệ, con sai model/effort hoặc stage đều không được coi là thành công. Worker vẫn chờ child hoàn tất nếu receipt đến sớm.
 
 ## Quyền và giới hạn
 
@@ -74,7 +76,7 @@ Task cũ chưa có parent nhận parent ở attempt mới sau khi không còn ru
 
 1. Live read-only smoke hai stage trên cùng parent: hai child IDs khác nhau, đúng parent ID, context không có marker của stage trước.
 2. Parent resume với cwd/sandbox mới; child read-only không thể sửa fixture, implement child sửa được fixture; reviewer sau đó trở về read-only. Model/effort child đúng cấu hình, không fallback.
-3. Integration test: một parent/task; con chỉ nhận input stage; parent fake success, child incomplete/error/invalid JSON, output mismatch, child thứ hai/cháu hoặc sai identity đều bị chặn.
+3. Integration test: một parent/task; con chỉ nhận input stage; parent fake success, child incomplete/error/invalid JSON, receipt sai stage/attemptId, child thứ hai/cháu hoặc sai identity đều bị chặn. Result lấy trực tiếp từ con, không phụ thuộc vào cha chép lại nội dung.
 4. Pause/cancel trước spawn, khi con đang chạy và khi cha trả kết quả: không có writer còn sống bị xem là đã dừng; lỗi mất phản hồi giữ unknown state.
 5. Pipeline feature tests: approval bắt buộc, replan/version feedback, verify/review gates và ba repair rounds vẫn đúng. Không tạo nhiều worktree hoặc PR trùng do lifecycle mới.
 6. Khởi động lại/resume giữ mapping, không spawn trùng khi child chưa dừng; task cũ tiếp tục ở attempt mới sau reconciliation.
