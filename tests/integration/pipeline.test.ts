@@ -76,6 +76,9 @@ test.each(["manual", "auto"] as const)(
           else if (stage === "analyze")
             result = { requirement: task.requirement, questions: [] };
           else if (stage === "plan") {
+            expect(input.outputSchema.required).toEqual(Object.keys(input.outputSchema.properties as object));
+            const packet = JSON.parse(await readFile(input.delegation!.packetPath, "utf8"));
+            expect(packet.outputSchema.properties.result).toEqual(input.outputSchema);
             const context = JSON.parse(input.prompt);
             if (context.version === 2) {
               expect(context.previousPlan.version).toBe(1);
@@ -84,6 +87,7 @@ test.each(["manual", "auto"] as const)(
               ]);
             }
             result = planFixture({
+              uiVerification: null,
               version: context.version,
               taskId: task.id,
               sourceCommit: repo.head,
@@ -96,6 +100,7 @@ test.each(["manual", "auto"] as const)(
                 },
               ],
             });
+            result = { ...result as object, stories: null };
           } else if (stage === "implement" || stage === "repair") {
             if (executionMode === "auto") {
               onEvent({

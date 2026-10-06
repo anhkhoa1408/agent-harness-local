@@ -1,0 +1,27 @@
+import { test, expect } from "vitest";
+import { z } from "zod";
+import { PlanSchema } from "../../src/core/contracts";
+import { PlanOutputSchema, parsePlanOutput } from "../../src/context/plan-output";
+import { planFixture } from "../support/task-fixture";
+
+test("Plan Structured Outputs requires every property, including optional stories and UI evidence", () => {
+  const check = (schema: any) => {
+    if (schema.properties) {
+      expect([...schema.required ?? []].sort()).toEqual(Object.keys(schema.properties).sort());
+      expect(schema.additionalProperties).toBe(false);
+    }
+    for (const value of Object.values(schema)) {
+      if (Array.isArray(value)) value.forEach(v => v && typeof v === "object" && check(v));
+      else if (value && typeof value === "object") check(value);
+    }
+  };
+  check(z.toJSONSchema(PlanOutputSchema));
+});
+
+test("wire nulls preserve omitted stories in persisted plans without weakening story validation", () => {
+  const plan = planFixture();
+  expect(parsePlanOutput({ ...plan, stories: null, uiVerification: null }))
+    .toEqual(PlanSchema.parse({ ...plan, uiVerification: null }));
+  expect(PlanOutputSchema.safeParse({ ...plan, stories: [], uiVerification: null }).success).toBe(false);
+  expect(PlanSchema.parse(plan).stories).toBeUndefined();
+});

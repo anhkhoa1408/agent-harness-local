@@ -26,6 +26,7 @@ import { parentModel } from "../codex/subagents";
 import { resolveModel, applyEffortPolicy } from "../core/model-policy";
 import { resolveBundle, snapshotBundle, type Bundle } from "../context/skills";
 import { composeInstructions, stageEnvelope } from "../context/prompts";
+import { PlanOutputSchema, parsePlanOutput } from "../context/plan-output";
 import {
   sourceDocuments,
   gitText,
@@ -389,10 +390,10 @@ export function createHandlers(
       };
     },
     plan: async (task, signal) => {
-      const plan = await ai(
+      const output = await ai(
         task,
         "plan",
-        PlanSchema,
+        PlanOutputSchema,
         {
           task: stageTask(task),
           version: (task.planVersion ?? 0) + 1,
@@ -405,12 +406,13 @@ export function createHandlers(
             "profile",
             `${task.repositoryId}:${task.sourceCommit}`,
           ),
-          storyInstruction: task.splitIntoStories ? "Return nonempty stories partitioning all criteria and steps exactly once. Each story needs id, title, outcome, points (1,2,3,5,8), dependsOn, criterionIds, stepIds. Stories should be small independently testable deliveries. Dependencies must be acyclic and include cross-story step dependencies. Never estimate quota or choose stories for the user." : "Do not include stories.",
+          storyInstruction: task.splitIntoStories ? "Return nonempty stories partitioning all criteria and steps exactly once. Each story needs id, title, outcome, points (1,2,3,5,8), dependsOn, criterionIds, stepIds. Stories should be small independently testable deliveries. Dependencies must be acyclic and include cross-story step dependencies. Never estimate quota or choose stories for the user." : "Return stories: null.",
           instruction:
             "Address all feedback on the previous plan when present. Return an implementation plan with exact argv feature checks, explicit file paths, acceptance/check mappings, prerequisites, dependencies and unresolved decisions. Do not implement. Tests must produce TAP or JUnit (reportPath); exit-code checks need a literal successPattern. E2E command owns isolated server readiness and cleanup. For visible UI changes include uiVerification with 1-6 selected PNG screenshots, each produced by a required E2E check, criterionIds, viewport dimensions and optional local PNG referencePath. Capture viewport-only images with deviceScaleFactor=1 at exact paths relative to the worktree root. Define visual expectations in the mapped criteria. Do not select screenshots for logic-only tasks. References must exist; never invent design evidence. If reference is missing, evaluate against explicit UI criteria or ask for clarification.",
         },
         signal,
       );
+      const plan = parsePlanOutput(output);
       const saved = savePlan(store, task.id, plan);
       return {
         stage: saved.stage,
