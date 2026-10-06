@@ -1,3 +1,5 @@
+import { STAGE_TIMEOUT_MS, WORKER_POLL_INTERVAL_MS } from "./limits";
+import { MAX_REPAIR_ROUNDS, WORKER_LEASE_TTL_MS, WORKER_HEARTBEAT_INTERVAL_MS } from "../core/limits";
 import {
   approveStorySelection,
   executionOf,
@@ -67,7 +69,7 @@ export async function runWorker(
   source: Handlers | ((store: Store, lease: Lease) => Handlers),
   signal: AbortSignal,
 ) {
-  const lease = claimLease(raw.db, randomUUID(), Date.now(), 15000);
+  const lease = claimLease(raw.db, randomUUID(), Date.now(), WORKER_LEASE_TTL_MS);
   if (!lease) throw new Error("worker_already_running");
   const store = fencedStore(raw, lease),
     handlers = typeof source === "function" ? source(store, lease) : source,
@@ -81,7 +83,7 @@ export async function runWorker(
   let lost = false;
   store.putRecord("health", "worker", { at: Date.now(), owner: lease.owner });
   const heartbeat = setInterval(() => {
-    if (!renewLease(raw.db, lease, Date.now(), 15000)) {
+    if (!renewLease(raw.db, lease, Date.now(), WORKER_LEASE_TTL_MS)) {
       lost = true;
       active?.abort.abort();
     } else
@@ -89,7 +91,7 @@ export async function runWorker(
         at: Date.now(),
         owner: lease.owner,
       });
-  }, 5000);
+  }, WORKER_HEARTBEAT_INTERVAL_MS);
   const stop = () => active?.abort.abort();
   signal.addEventListener("abort", stop);
   // Unknown runtimes survive process death. An explicit reconciliation is required before reuse.
@@ -343,7 +345,7 @@ export async function runWorker(
           .reverse()
           .find((t) => t.status === "queued");
         if (next) {
-          if (next.stage === "repair" && next.repairCount >= 3) {
+          if (next.stage === "repair" && next.repairCount >= MAX_REPAIR_ROUNDS) {
             store.updateTask(
               next.id,
               next.revision,
@@ -425,7 +427,7 @@ export async function runWorker(
                 task!,
                 AbortSignal.any([
                   abort.signal,
-                  AbortSignal.timeout(30 * 60 * 1000),
+                  AbortSignal.timeout(STAGE_TIMEOUT_MS),
                 ]),
               );
               if (lost) return;
@@ -521,7 +523,7 @@ export async function runWorker(
           })();
         }
       }
-      await new Promise((r) => setTimeout(r, 25));
+      await new Promise((r) => setTimeout(r, WORKER_POLL_INTERVAL_MS));
     }
     const pending = active;
     if (pending) {

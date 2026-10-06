@@ -1,0 +1,4 @@
+export const MAX_EVIDENCE_FILE_BYTES = 8 * 1024 * 1024;
+export const PROCESS_KILL_GRACE_MS = 5_000;
+export const MAX_FAILURE_EXCERPT_CHARACTERS = 2000;
+export const MAX_FAILURE_EXCERPTS = 6;

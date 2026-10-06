@@ -1,3 +1,5 @@
+import { MAX_REQUEST_BODY_SIZE } from "./limits";
+import { WORKER_LEASE_TTL_MS } from "../core/limits";
 import { executionOf, storyRuns } from "../worker/stories";
 import {
   pipelineProgress,
@@ -61,10 +63,10 @@ export function createHttpHandler(
         .map(decodeURIComponent),
       method = request.method;
     const body = async () => {
-      if (Number(request.headers.get("content-length")) > 1048576)
+      if (Number(request.headers.get("content-length")) > MAX_REQUEST_BODY_SIZE)
         throw new Error("body_too_large");
       const text = await request.text();
-      if (text.length > 1048576) throw new Error("body_too_large");
+      if (text.length > MAX_REQUEST_BODY_SIZE) throw new Error("body_too_large");
       return JSON.parse(text);
     };
     try {
@@ -82,7 +84,7 @@ export function createHttpHandler(
         } | null;
         return json({
           app: "ready",
-          worker: lease && Date.now() - lease.at < 15000 ? "online" : "offline",
+          worker: lease && Date.now() - lease.at < WORKER_LEASE_TTL_MS ? "online" : "offline",
           heartbeat: lease?.at ?? null,
         });
       }
@@ -208,7 +210,7 @@ export function createHttpHandler(
           const health = store.getRecord("health", "worker") as {
             at: number;
           } | null;
-          if (!health || Date.now() - health.at > 15000)
+          if (!health || Date.now() - health.at > WORKER_LEASE_TTL_MS)
             return json({ error: "worker_unavailable" }, 503);
           return json({ accepted: store.enqueue(command) }, 202);
         }

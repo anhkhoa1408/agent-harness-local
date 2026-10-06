@@ -1,3 +1,5 @@
+import { APPROVAL_POLL_INTERVAL_MS } from "./limits";
+import { MAX_REPAIR_ROUNDS } from "../core/limits";
 import { createStoryCheckpoint } from "../delivery/checkpoint";
 import { executionOf, prepareSeparateStory, executionPlan, effectiveStoryTask, recordStoryEvidence, requireStoryEvidence, completeSharedStory, storyRuns, assertSharedHead } from "./stories";
 import { stages } from "../core/contracts";
@@ -21,7 +23,7 @@ import {
   type Stage,
 } from "../core/contracts";
 import type { Store } from "../storage/store";
-import type { AgentClient, AgentInput } from "../codex/client";
+import type { AgentClient, DelegatedStageInput } from "../codex/types";
 import { parentModel } from "../codex/subagents";
 import { resolveModel, applyEffortPolicy } from "../core/model-policy";
 import { resolveBundle, snapshotBundle, type Bundle } from "../context/skills";
@@ -130,7 +132,7 @@ export function createHandlers(
         ai({ ...task, worktree: cwd }, stage, schema, context, signal, options),
       );
     task = { ...task, models: applyEffortPolicy(task.models) };
-    const catalog = await client.models();
+    const catalog = await client.listModels();
     if (!catalog.some(m => m.id === parentModel.model && m.efforts.includes(parentModel.effort)))
       throw new Error("parent_model_unavailable");
     const runtimeStage = options.runtimeStage ?? stage;
@@ -152,7 +154,7 @@ export function createHandlers(
       packetDir = join(artifacts(task), "delegations");
     await mkdir(packetDir, { recursive: true });
     const parent = store.getRecord("parent", task.id) as { threadId: string } | undefined;
-    const input: AgentInput = {
+    const input: DelegatedStageInput = {
       cwd: task.worktree!,
       model,
       instructions: composeInstructions(bundle),
@@ -197,17 +199,17 @@ export function createHandlers(
           if (grant.decision) {
             pending.delete(key);
             client
-              .answer(grant.requestId, { decision: grant.decision })
+              .respondToApproval(grant.requestId, { decision: grant.decision })
               .catch(() => {});
           }
         }
-      }, 100);
-      const run = await client.run(
+      }, APPROVAL_POLL_INTERVAL_MS);
+      const run = await client.runDelegatedStage(
         input,
         (event) => {
           if (event.type === "approval") {
             if (task.executionMode === "auto") {
-              void client.answer(event.data.requestId, { decision: "decline" });
+              void client.respondToApproval(event.data.requestId, { decision: "decline" });
               store.addEvent(task.id, "approval.auto_declined", {
                 method: event.data.method,
               });
@@ -220,7 +222,7 @@ export function createHandlers(
                 "item/fileChange/requestApproval",
               ].includes(event.data.method)
             ) {
-              void client.answer(event.data.requestId, { decision: "decline" });
+              void client.respondToApproval(event.data.requestId, { decision: "decline" });
               store.addEvent(task.id, "approval.unsupported", {
                 method: event.data.method,
               });
@@ -551,7 +553,7 @@ export function createHandlers(
               "test_blocked",
             output: checks,
           };
-        if (task.repairCount >= 3)
+        if (task.repairCount >= MAX_REPAIR_ROUNDS)
           return {
             stage: "verify",
             status: "blocked",
@@ -582,7 +584,7 @@ export function createHandlers(
             store.putRecord("artifact", `${task.id}-${check.id}-${index}-${before}`, { id: `${task.id}-${check.id}-${index}-${before}`, taskId: task.id, path: image.path, type: "screenshot" });
         }
         if (checks.some(c => c.id.startsWith("ui:") && c.status !== "passed")) {
-          if (task.repairCount >= 3) return { stage: "verify", status: "blocked", reason: "repair_limit", output: checks };
+          if (task.repairCount >= MAX_REPAIR_ROUNDS) return { stage: "verify", status: "blocked", reason: "repair_limit", output: checks };
           return next("repair", checks);
         }
       }

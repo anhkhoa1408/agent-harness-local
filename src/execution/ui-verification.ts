@@ -1,3 +1,4 @@
+import { MAX_EVIDENCE_FILE_BYTES } from "./limits";
 import { z } from "zod";
 import { mkdir, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -36,7 +37,7 @@ export type ScreenshotEvidence = {
   reference: Image | null;
 };
 async function png(path: string) {
-  if ((await stat(path)).size > 8 * 1024 * 1024)
+  if ((await stat(path)).size > MAX_EVIDENCE_FILE_BYTES)
     throw new Error("ui_image_too_large");
   const data = await readFile(path);
   if (

@@ -1,3 +1,4 @@
+import { RPC_REQUEST_TIMEOUT_MS } from "./limits";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 export type RpcMessage = {
@@ -50,7 +51,7 @@ export class JsonRpc {
     output.on("error", () => this.fail(new Error("runtime_disconnected")));
     input.on("error", () => this.fail(new Error("runtime_disconnected")));
   }
-  request(method: string, params: unknown, timeoutMs = 30000): Promise<any> {
+  request(method: string, params: unknown, timeoutMs = RPC_REQUEST_TIMEOUT_MS): Promise<any> {
     if (this.closed) return Promise.reject(new Error("runtime_disconnected"));
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {

@@ -1,3 +1,4 @@
+import { GITHUB_CLI_MAX_BUFFER_BYTES } from "./limits";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -39,7 +40,7 @@ export interface GitHubPort {
 const exec = promisify(execFile),
   marker = (head: string) => `<!-- agent-harness:branch:${head} -->`;
 async function gh(args: string[]) {
-  return (await exec("gh", args, { maxBuffer: 4 * 1024 * 1024 })).stdout.trim();
+  return (await exec("gh", args, { maxBuffer: GITHUB_CLI_MAX_BUFFER_BYTES })).stdout.trim();
 }
 export const githubCli: GitHubPort = {
   async findPullRequest(repo, head, base) {
