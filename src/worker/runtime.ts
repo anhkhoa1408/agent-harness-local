@@ -3,21 +3,11 @@ import { fingerprintWorktree } from "../repositories/fingerprint";
 import { PlanService } from "../application/plan-service";
 import { StoryService, storyKey } from "../application/story-service";
 import { WORKER_POLL_INTERVAL_MS } from "./limits";
-import {
-  MAX_REPAIR_ROUNDS,
-  WORKER_LEASE_TTL_MS,
-  WORKER_HEARTBEAT_INTERVAL_MS,
-} from "../core/limits";
+import { MAX_REPAIR_ROUNDS, WORKER_LEASE_TTL_MS, WORKER_HEARTBEAT_INTERVAL_MS } from "../core/limits";
 import { applyEffortPolicy } from "../core/model-policy";
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/store";
-import {
-  claimLease,
-  renewLease,
-  releaseLease,
-  fencedStore,
-  type Lease,
-} from "../storage/lease";
+import { claimLease, renewLease, releaseLease, fencedStore, type Lease } from "../storage/lease";
 import { type Task } from "../core/contracts";
 
 import { bootIdentity } from "./recovery";

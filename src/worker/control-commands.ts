@@ -5,13 +5,7 @@ import { applyEffortPolicy } from "../core/model-policy";
 
 import type { Store } from "../storage/store";
 
-import {
-  ModelMapSchema,
-  PlanSchema,
-  type Task,
-  type ControlCommand,
-  type StorySelection,
-} from "../core/contracts";
+import { ModelMapSchema, PlanSchema, type Task, type ControlCommand, type StorySelection } from "../core/contracts";
 import { ExecutionModeSchema } from "../core/contracts";
 import { approvePlan } from "../core/transitions";
 

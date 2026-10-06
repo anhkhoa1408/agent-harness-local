@@ -1,89 +1,30 @@
-import { GITHUB_CLI_MAX_BUFFER_BYTES } from "./limits";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PlanSchema, ReviewSchema, RepositorySchema, type Task, type Plan } from "../core/contracts";
+import {
+  PlanSchema,
+  ReviewSchema,
+  RepositorySchema,
+  type Task,
+  type Plan,
+} from "../core/contracts";
 import type { Store } from "../storage/store";
 import { acceptanceErrors } from "../core/acceptance";
 import type { CheckResult } from "../execution/checks";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { renderReport } from "./report";
-import { evidenceExclusions, verifyImageEvidence } from "../execution/ui-verification";
-export type Delivery = {
-  mode: "github" | "local";
-  commit: string;
-  reportPath: string;
-  prUrl: string | null;
-};
-export interface GitHubPort {
-  findPullRequest(
-    repo: string,
-    head: string,
-    base: string,
-  ): Promise<{ url: string; headCommit: string } | null>;
-  createPullRequest(input: {
-    repo: string;
-    head: string;
-    base: string;
-    title: string;
-    bodyFile: string;
-  }): Promise<string>;
-}
-const exec = promisify(execFile),
-  marker = (head: string) => `<!-- agent-harness:branch:${head} -->`;
-async function gh(args: string[]) {
-  return (await exec("gh", args, { maxBuffer: GITHUB_CLI_MAX_BUFFER_BYTES })).stdout.trim();
-}
-export const githubCli: GitHubPort = {
-  async findPullRequest(repo, head, base) {
-    const list = JSON.parse(
-      await gh([
-        "pr",
-        "list",
-        "--repo",
-        repo,
-        "--head",
-        head,
-        "--base",
-        base,
-        "--state",
-        "all",
-        "--json",
-        "url,headRefOid,state,body",
-      ]),
-    ) as { url: string; headRefOid: string; state: string; body: string }[];
-    if (!list.length) return null;
-    const own = list.find((p) => p.body.includes(marker(head)));
-    if (!own || own.state !== "OPEN") throw new Error("pull_request_collision");
-    return { url: own.url, headCommit: own.headRefOid };
-  },
-  async createPullRequest(i) {
-    return gh([
-      "pr",
-      "create",
-      "--repo",
-      i.repo,
-      "--head",
-      i.head,
-      "--base",
-      i.base,
-      "--title",
-      i.title,
-      "--body-file",
-      i.bodyFile,
-    ]);
-  },
-};
-export function githubRepository(url: string) {
-  const match =
-    /^(?:https:\/\/github\.com\/|git@github\.com:)([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(
-      url,
-    );
-  if (!match) throw new Error("delivery_error:remote_not_github");
-  return match[1];
-}
+import {
+  evidenceExclusions,
+  verifyImageEvidence,
+} from "../execution/ui-verification";
+import {
+  githubCli,
+  githubRepository,
+  deliveryBranchMarker as marker,
+} from "./github-cli";
+import type { GitHubPort, Delivery } from "./types";
+export type { GitHubPort, Delivery } from "./types";
+export { githubCli, githubRepository } from "./github-cli";
 export function createDelivery(
   store: Store,
   data: string,
@@ -107,9 +48,11 @@ export function createDelivery(
       repo = RepositorySchema.parse(
         store.getRecord("repository", task.repositoryId),
       ),
-      plan = options.plan ?? PlanSchema.parse(
-        store.getRecord("plan", `${task.id}:${task.planVersion}`),
-      ),
+      plan =
+        options.plan ??
+        PlanSchema.parse(
+          store.getRecord("plan", `${task.id}:${task.planVersion}`),
+        ),
       review = ReviewSchema.parse(store.getRecord("review", task.id)),
       checks = store.getRecord("checks", task.id) as CheckResult[];
     const exclusions = evidenceExclusions(plan),
@@ -139,7 +82,9 @@ export function createDelivery(
       )
     )
       throw new Error("scope_changed_requires_plan");
-    const commitMessage = options.commitMessage ?? `feat: ${task.title}\n\nHarness-Task: ${task.id}`;
+    const commitMessage =
+      options.commitMessage ??
+      `feat: ${task.title}\n\nHarness-Task: ${task.id}`;
     const commitKey = `${options.effectPrefix ?? task.id}:commit:${before}`,
       commitEffect = store.getRecord("effect", commitKey) as {
         state: string;
@@ -164,11 +109,7 @@ export function createDelivery(
         changed.length
       ) {
         await gitText(path, ["add", "--", ...changed]);
-        await gitText(path, [
-          "commit",
-          "-m",
-          commitMessage,
-        ]);
+        await gitText(path, ["commit", "-m", commitMessage]);
         head = await gitText(path, ["rev-parse", "HEAD"]);
       }
       if ((await fingerprint()) !== before)
@@ -181,7 +122,10 @@ export function createDelivery(
     }
     const folder = join(data, "artifacts", task.id);
     await mkdir(folder, { recursive: true });
-    const reportPath = join(folder, options.reportName ?? `delivery-v${plan.version}.md`);
+    const reportPath = join(
+      folder,
+      options.reportName ?? `delivery-v${plan.version}.md`,
+    );
     await writeFile(
       reportPath,
       `${marker(task.branch)}\n\n${renderReport(plan, checks, review)}${options.reportAppendix ?? ""}\n\nTarget: ${task.targetBranch}; branch: ${task.branch}; commit: ${head}.\n`,
