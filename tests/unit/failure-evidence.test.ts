@@ -43,3 +43,30 @@ test("repair receives only failing checks and bounded tails of logs, preserving 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("repair evidence keeps six failing checks and counts omitted failures", async () => {
+  const failed = Array.from({ length: 8 }, (_, i) => ({
+    id: String(i),
+    taskId: "task",
+    planVersion: 1,
+    fingerprint: "snap",
+    status: "failed" as const,
+    executed: 1,
+    exitCode: 1,
+    evidencePath: "",
+    reason: null,
+  }));
+  const result = await failureEvidence([
+    ...failed,
+    { ...failed[0], id: "pass", status: "passed" },
+  ]);
+  expect(result.checks.map((check) => check.id)).toEqual([
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+  ]);
+  expect(result.omittedFailures).toBe(2);
+});

@@ -1,3 +1,4 @@
+import { PROCESS_KILL_GRACE_MS } from "./limits";
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
@@ -61,7 +62,7 @@ export async function runProcess(
   };
   const stop = () => {
     kill("SIGTERM");
-    killer ??= setTimeout(() => kill("SIGKILL"), 5000);
+    killer ??= setTimeout(() => kill("SIGKILL"), PROCESS_KILL_GRACE_MS);
   };
   signal.addEventListener("abort", stop, { once: true });
   const timer = setTimeout(() => {
@@ -80,7 +81,7 @@ export async function runProcess(
       });
     });
     // A child may exit while a grandchild still holds its pipes. Bound that cleanup too.
-    killer ??= setTimeout(() => kill("SIGKILL"), 5000);
+    killer ??= setTimeout(() => kill("SIGKILL"), PROCESS_KILL_GRACE_MS);
     await Promise.all([finished(out), finished(err)]);
     kill("SIGKILL");
     return { ...result, stdoutPath, stderrPath, timedOut };

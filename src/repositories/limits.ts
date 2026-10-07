@@ -1,0 +1,4 @@
+export const GIT_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
+export const GIT_COMMAND_TIMEOUT_MS = 120_000;
+export const MAX_SOURCE_DOCUMENT_BYTES = 64_000;
+export const MAX_SOURCE_CONTEXT_BYTES = 500_000;

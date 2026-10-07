@@ -33,15 +33,16 @@ test.each(["manual", "auto"] as const)(
         sourceCommit: repo.head,
       });
       const fake: AgentClient = {
-        models: async () => [
+        listModels: async () => [
           { id: "strong", efforts: ["high"], isDefault: false },
           { id: "medium", efforts: ["medium"], isDefault: false },
           { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
         ],
-        answer: vi.fn(async () => {}),
-        interrupt: async () => {},
-        close: async () => {},
-        run: async (input, onEvent) => {
+        respondToApproval: vi.fn(async () => {}),
+        interruptTurn: async () => {},
+        runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
+    close: async () => {},
+        runDelegatedStage: async (input, onEvent) => {
           calls.push(input);
           const stage = /stage: (\w+)/.exec(input.instructions)![1];
           const parentId = input.threadId ?? "parent-pipeline";
@@ -111,7 +112,7 @@ test.each(["manual", "auto"] as const)(
                   params: {},
                 },
               });
-              expect(fake.answer).toHaveBeenCalledWith(123, {
+              expect(fake.respondToApproval).toHaveBeenCalledWith(123, {
                 decision: "decline",
               });
               expect(store.listRecords("approval")).toHaveLength(0);
@@ -156,7 +157,7 @@ test.each(["manual", "auto"] as const)(
       await wait(() => store.getTask(task.id).status === "waiting_approval");
       expect(calls.some((c) => c.write)).toBe(false);
       if (executionMode === "auto") {
-        expect(fake.answer).toHaveBeenCalledWith("discovery-approval", {
+        expect(fake.respondToApproval).toHaveBeenCalledWith("discovery-approval", {
           decision: "decline",
         });
         expect(

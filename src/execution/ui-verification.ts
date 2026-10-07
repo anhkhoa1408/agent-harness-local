@@ -1,19 +1,15 @@
+import { MAX_EVIDENCE_FILE_BYTES } from "./limits";
 import { z } from "zod";
 import { mkdir, readFile, writeFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Task, Plan } from "../core/contracts";
 import { VisualReviewSchema } from "../core/contracts";
-import type { CheckResult } from "./checks";
+import type { CheckResult } from "../core/evidence";
 import { contained, contentHash } from "../context/rules";
 import { gitText } from "../repositories/inspect";
 
-export function evidenceExclusions(plan: Plan) {
-  return [
-    ...plan.checks.flatMap((c) => (c.reportPath ? [c.reportPath] : [])),
-    ...(plan.uiVerification?.screenshots.map((s) => s.path) ?? []),
-  ];
-}
+export { evidenceExclusions } from "../core/evidence";
 export async function clearScreenshots(
   root: string,
   plan: Plan,
@@ -36,7 +32,7 @@ export type ScreenshotEvidence = {
   reference: Image | null;
 };
 async function png(path: string) {
-  if ((await stat(path)).size > 8 * 1024 * 1024)
+  if ((await stat(path)).size > MAX_EVIDENCE_FILE_BYTES)
     throw new Error("ui_image_too_large");
   const data = await readFile(path);
   if (

@@ -69,7 +69,7 @@ test("approval unlocks isolated implementation, repair, review and local report"
   await expect(
     page.getByRole("link", { name: "Báo cáo nghiệm thu" }),
   ).toBeVisible();
-  await expect(page.getByText("Repair 1/3", { exact: false })).toBeVisible();
+  await expect(page.getByText("Repair 1 · Plan v1", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Tests", exact: true }).click();
   await expect(page.getByText("passed", { exact: true })).toBeVisible();
   await expect(
@@ -100,6 +100,14 @@ test("approval unlocks isolated implementation, repair, review and local report"
     page.getByRole("heading", { name: "Test plan", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Duyệt plan" })).toHaveCount(0);
+});
+test("a feature that needs four repairs completes and shows its repair count", async ({ page }) => {
+  await create(page, "repair-many");
+  await expect(page.getByRole("button", { name: "Duyệt plan" })).toBeVisible();
+  await page.getByRole("button", { name: "Duyệt plan" }).click();
+  await expect(page.getByRole("heading", { name: "Đã bàn giao local" })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByText("Repair 4 · Plan v1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Báo cáo nghiệm thu" })).toBeVisible();
 });
 test("questions block planning until answered and Python commands need no npm", async ({
   page,
@@ -150,7 +158,7 @@ test("new plan requires fresh approval; quota never silently switches model", as
   await expect(page.getByText("Chờ duyệt plan", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Duyệt plan" }).click();
   await expect(
-    page.getByText("Repair 0/3 · Plan v2", { exact: true }),
+    page.getByText("Repair 0 · Plan v2", { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Duyệt plan" })).toBeVisible();
   await expect(
@@ -233,6 +241,7 @@ test("pipeline circles track pause, completion and skipped repair on dashboard a
     "skipped",
   );
   await page.getByRole("link", { name: "← Workspace" }).click();
+  await selectOption(page, "Lọc theo trạng thái", "Tất cả trạng thái");
   const card = page.getByRole("link").filter({
     has: page.getByRole("heading", {
       name: "Feature slow pipeline",
@@ -266,7 +275,7 @@ test("repository registration reports errors and selects the registered reposito
       .getByRole("button", { name: "Đăng ký repo", exact: true })
       .click();
     await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
-      "request_failed",
+      "repository_path_unavailable",
     );
     await page.getByLabel("Đường dẫn repo", { exact: true }).fill(repo.root);
     await page

@@ -58,13 +58,6 @@ export function nextAfterReview(
       reason: null,
       repairCount: task.repairCount,
     };
-  if (task.repairCount >= 3)
-    return {
-      stage: "review",
-      status: "blocked",
-      reason: "repair_limit",
-      repairCount: task.repairCount,
-    };
   return {
     stage: "repair",
     status: "queued",

@@ -29,7 +29,7 @@ test("lost turn-start response retains unknown writer exclusion", async () => {
         );
     });
     const result = client
-      .run(
+      .runDirectTurn(
         {
           cwd: "/fixture",
           model: { model: "medium", effort: "medium" },
@@ -132,11 +132,11 @@ test("loads every catalog page and passes explicit model and effort to turns", a
       }, 5);
   });
   await client.initialize();
-  expect((await client.models()).map((m) => m.id)).toEqual([
+  expect((await client.listModels()).map((m) => m.id)).toEqual([
     "strong",
     "medium",
   ]);
-  const result = await client.run(
+  const result = await client.runDirectTurn(
     {
       cwd: "/fixture",
       model: { model: "strong", effort: "high" },
@@ -177,7 +177,7 @@ test("an interrupt acknowledgement is not mistaken for a stopped turn", async ()
   });
   await client.initialize();
   await expect(
-    client.run(
+    client.runDirectTurn(
       {
         cwd: "/fixture",
         model: { model: "medium", effort: "medium" },
@@ -228,7 +228,7 @@ test.each(["manual", "auto"] as const)(
     try {
       for (const write of [false, true]) {
         for (const threadId of [undefined, "t"]) {
-          await client.run(
+          await client.runDirectTurn(
             {
               cwd: "/fixture",
               model: { model: "medium", effort: "medium" },

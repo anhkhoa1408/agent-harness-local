@@ -1,4 +1,4 @@
-import { writeFile, readFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { AgentClient } from "../../src/codex/client";
@@ -6,16 +6,18 @@ import { type Plan } from "../../src/core/contracts";
 import { planFixture } from "./task-fixture";
 export function createFixtureAgent(): AgentClient {
   const interruptedStories=new Set<string>();
+  const repairAttempts = new Map<string, number>();
   return {
-    models: async () => [
+    listModels: async () => [
       { id: "fixture-strong", efforts: ["high"], isDefault: false },
       { id: "fixture-medium", efforts: ["medium"], isDefault: false },
       { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
     ],
-    answer: async () => {},
-    interrupt: async () => {},
+    respondToApproval: async () => {},
+    interruptTurn: async () => {},
+    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
     close: async () => {},
-    async run(input, onEvent, signal) {
+    async runDelegatedStage(input, onEvent, signal) {
       const stage = /stage: (\w+)/.exec(input.instructions)![1],
         threadId = input.threadId ?? randomUUID(),
         child = { threadId: randomUUID(), turnId: "child-turn", model: input.model, usage: null };
@@ -121,8 +123,12 @@ export function createFixtureAgent(): AgentClient {
                 { once: true },
               );
             });
+          const repairs = repairAttempts.get(task.id) ?? 0;
+          if (stage === "repair") repairAttempts.set(task.id, repairs + 1);
           const value =
-            task.requirement.includes("repair") && stage === "implement"
+            task.requirement.includes("repair-many") && (stage === "implement" || repairs < 3)
+              ? 1
+              : task.requirement.includes("repair") && stage === "implement"
               ? 1
               : 2;
           if (context.plan.steps.some((s: any)=>s.files.includes("second.cjs"))) await writeFile(join(input.cwd,"second.cjs"),"module.exports=3\n");

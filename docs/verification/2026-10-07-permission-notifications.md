@@ -41,3 +41,7 @@ Spec E2E thông báo dùng `headless: false`, cần desktop có cửa sổ. Serv
 - Test OAuth proxy cũ bị sandbox chặn mở loopback ở lượt integration ban đầu; đã chạy lại riêng với quyền chạy server local và pass.
 
 Thay đổi Plan đang có trong cùng checkout thuộc công việc khác; không nằm trong phạm vi review và kiểm chứng feature này.
+
+## Tích hợp main trước khi push
+
+Đã merge main mới nhất gồm refactor backend và bỏ giới hạn repair. Giữ router refactor, đưa feed thông báo vào `src/server/routes/system.ts` và filter approval hết hiệu lực vào `src/server/routes/tasks.ts`. Kiểm chứng lại trên checkout tích hợp với Node 24.18.0: 13 Unit/Integration/boundary tests passed, 7 E2E passed, production build và TypeScript passed. Cổng E2E tạm được tách riêng và đã trả config về nguyên bản trước commit.
