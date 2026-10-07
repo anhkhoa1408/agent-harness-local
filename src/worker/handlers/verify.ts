@@ -1,5 +1,3 @@
-import { MAX_REPAIR_ROUNDS } from "../../core/limits";
-
 import { VisualReviewSchema } from "../../core/contracts";
 
 import { runChecks } from "../../execution/checks";
@@ -42,13 +40,6 @@ export function createVerifyHandler(
           reason:
             checks.find((c) => c.status === "blocked")?.reason ??
             "test_blocked",
-          output: checks,
-        };
-      if (task.repairCount >= MAX_REPAIR_ROUNDS)
-        return {
-          stage: "verify",
-          status: "blocked",
-          reason: "repair_limit",
           output: checks,
         };
       return queuedStageResult("repair", checks);
@@ -106,13 +97,6 @@ export function createVerifyHandler(
           );
       }
       if (checks.some((c) => c.id.startsWith("ui:") && c.status !== "passed")) {
-        if (task.repairCount >= MAX_REPAIR_ROUNDS)
-          return {
-            stage: "verify",
-            status: "blocked",
-            reason: "repair_limit",
-            output: checks,
-          };
         return queuedStageResult("repair", checks);
       }
     }

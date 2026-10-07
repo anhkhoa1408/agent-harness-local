@@ -35,7 +35,7 @@ test("comment on a step, request a new version and approve it in auto mode", asy
     .getByRole("button", { name: "Yêu cầu sửa plan", exact: true })
     .click();
   await expect(
-    page.getByText("Repair 0/3 · Plan v2", { exact: true }),
+    page.getByText("Repair 0 · Plan v2", { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Duyệt plan" })).toBeEnabled();
   await page.reload();

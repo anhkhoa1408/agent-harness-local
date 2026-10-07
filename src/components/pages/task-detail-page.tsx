@@ -142,7 +142,7 @@ export function TaskDetailPage({ id }: { id: string }) {
           </Button>
         )}
         <span className="text-xs text-muted-foreground sm:ml-auto">
-          Repair {task.repairCount}/3 · Plan v{task.planVersion ?? "—"}
+          Repair {task.repairCount} · Plan v{task.planVersion ?? "—"}
         </span>
       </div>
       {error && <FeedbackMessage tone="error">{error}</FeedbackMessage>}

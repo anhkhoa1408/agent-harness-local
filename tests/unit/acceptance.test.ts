@@ -73,15 +73,16 @@ test("delivery requires current evidence and rejects skipped, stale, disputed or
     ),
   ).toBe(true);
 });
-test("repair budget survives restart and configuration changes", () => {
+test.each([3, 8])("review requests another repair after %i rounds without resetting the count", (repairCount) => {
   expect(
     nextAfterReview(
-      { ...task, repairCount: 3 },
+      { ...task, repairCount },
       { ...review, verdict: "changes_requested" },
     ),
   ).toMatchObject({
-    status: "blocked",
-    reason: "repair_limit",
-    repairCount: 3,
+    stage: "repair",
+    status: "queued",
+    reason: null,
+    repairCount,
   });
 });

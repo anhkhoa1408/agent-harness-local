@@ -6,6 +6,7 @@ import { type Plan } from "../../src/core/contracts";
 import { planFixture } from "./task-fixture";
 export function createFixtureAgent(): AgentClient {
   const interruptedStories=new Set<string>();
+  const repairAttempts = new Map<string, number>();
   return {
     listModels: async () => [
       { id: "fixture-strong", efforts: ["high"], isDefault: false },
@@ -122,8 +123,12 @@ export function createFixtureAgent(): AgentClient {
                 { once: true },
               );
             });
+          const repairs = repairAttempts.get(task.id) ?? 0;
+          if (stage === "repair") repairAttempts.set(task.id, repairs + 1);
           const value =
-            task.requirement.includes("repair") && stage === "implement"
+            task.requirement.includes("repair-many") && (stage === "implement" || repairs < 3)
+              ? 1
+              : task.requirement.includes("repair") && stage === "implement"
               ? 1
               : 2;
           if (context.plan.steps.some((s: any)=>s.files.includes("second.cjs"))) await writeFile(join(input.cwd,"second.cjs"),"module.exports=3\n");

@@ -1,4 +1,3 @@
-export const MAX_REPAIR_ROUNDS = 3;
 export const WORKER_LEASE_TTL_MS = 15_000;
 export const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
 export const MAX_TITLE_CHARACTERS = 200;
