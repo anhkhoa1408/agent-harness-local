@@ -3,7 +3,7 @@ import { fingerprintWorktree } from "../repositories/fingerprint";
 import { PlanService } from "../application/plan-service";
 import { StoryService, storyKey } from "../application/story-service";
 import { WORKER_POLL_INTERVAL_MS } from "./limits";
-import { MAX_REPAIR_ROUNDS, WORKER_LEASE_TTL_MS, WORKER_HEARTBEAT_INTERVAL_MS } from "../core/limits";
+import { WORKER_LEASE_TTL_MS, WORKER_HEARTBEAT_INTERVAL_MS } from "../core/limits";
 import { applyEffortPolicy } from "../core/model-policy";
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/store";
@@ -84,18 +84,6 @@ export class WorkerRuntime {
             .reverse()
             .find((t) => t.status === "queued");
           if (next) {
-            if (
-              next.stage === "repair" &&
-              next.repairCount >= MAX_REPAIR_ROUNDS
-            ) {
-              store.updateTask(
-                next.id,
-                next.revision,
-                { status: "blocked", reason: "repair_limit" },
-                event("repair.limit"),
-              );
-              continue;
-            }
             const abort = new AbortController();
             let task: Task;
             const attempt: Attempt = {
