@@ -7,7 +7,7 @@ import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { RepoProfileSchema, type Repository, type ModelChoice } from "../core/contracts";
-import type { AgentClient, AgentEvent } from "../codex/client";
+import type { AgentClient, AgentEvent } from "../codex/types";
 import type { Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";
 const exec = promisify(execFile);

@@ -96,8 +96,6 @@ export class StoryService {
     });
   }
   getEffectiveTask(task: Task): Task {
-    const store = this.store;
-
     const e = this.getExecution(task.id);
     return e?.selection.mode === "shared_pr"
       ? {

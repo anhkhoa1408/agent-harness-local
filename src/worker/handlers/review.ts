@@ -2,7 +2,7 @@ import { ReviewSchema } from "../../core/contracts";
 
 import { gitText } from "../../repositories/inspect";
 
-import { type CheckResult } from "../../execution/checks";
+import { type CheckResult } from "../../core/evidence";
 import { verifyImageEvidence } from "../../execution/ui-verification";
 
 import { nextAfterReview } from "../../core/transitions";

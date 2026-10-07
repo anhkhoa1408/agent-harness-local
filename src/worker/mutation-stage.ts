@@ -4,7 +4,7 @@ import { type Task } from "../core/contracts";
 
 import { gitText } from "../repositories/inspect";
 
-import { type CheckResult } from "../execution/checks";
+import { type CheckResult } from "../core/evidence";
 import { evidenceExclusions } from "../execution/ui-verification";
 import { failureEvidence } from "../execution/failure-evidence";
 import { canImplement } from "../core/transitions";

@@ -51,8 +51,7 @@ export function createHttpHandler(
       parts = url.pathname
         .slice("/api/".length)
         .split("/")
-        .map(decodeURIComponent),
-      method = request.method;
+        .map(decodeURIComponent);
     const body = async () => {
       if (Number(request.headers.get("content-length")) > MAX_REQUEST_BODY_SIZE)
         throw new Error("body_too_large");

@@ -9,7 +9,7 @@ import {
 } from "../core/contracts";
 import type { Store } from "../storage/store";
 import { acceptanceErrors } from "../core/acceptance";
-import type { CheckResult } from "../execution/checks";
+import type { CheckResult } from "../core/evidence";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
 import { renderReport } from "./report";
