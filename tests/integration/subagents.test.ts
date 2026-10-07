@@ -1,6 +1,7 @@
 import { test, expect } from "vitest";
 import { PassThrough } from "node:stream";
-import { CodexClient, type AgentInput } from "../../src/codex/client";
+import { CodexClient } from "../../src/codex/client";
+import type { DelegatedStageInput } from "../../src/codex/types";
 import { JsonRpc } from "../../src/codex/rpc";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -310,7 +311,7 @@ function fixture(
       attemptId: "a1",
       packetPath: "/packets/a1.json",
     },
-  } as AgentInput;
+  } as DelegatedStageInput;
   return { client, agentInput, sent, notify };
 }
 
@@ -318,7 +319,7 @@ test("retains the actual parent runtime failure instead of hiding it as agent_fa
   const message = "invalid_json_schema: Missing 'stories'";
   const f = fixture({ parentError: message });
   try {
-    await expect(f.client.run(f.agentInput, () => {}, new AbortController().signal))
+    await expect(f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal))
       .rejects.toThrow(message);
   } finally {
     await f.client.close();
@@ -329,7 +330,7 @@ test("native stage uses a persistent parent and verified clean-context child evi
   const f = fixture();
   try {
     const events: any[] = [];
-    const run = await f.client.run(
+    const run = await f.client.runDelegatedStage(
       f.agentInput,
       (e) => events.push(e),
       new AbortController().signal,
@@ -361,7 +362,7 @@ test("native stage uses a persistent parent and verified clean-context child evi
       experimentalRawEvents: true,
       config: { "features.multi_agent_v2": true },
     });
-    await f.client.run(
+    await f.client.runDelegatedStage(
       { ...f.agentInput, threadId: "parent" },
       () => {},
       new AbortController().signal,
@@ -395,7 +396,7 @@ test.each([
   const f = fixture({ bad });
   try {
     await expect(
-      f.client.run(f.agentInput, () => {}, new AbortController().signal),
+      f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
     ).rejects.toThrow();
   } finally {
     await f.client.close();
@@ -408,7 +409,7 @@ test.each([false, true])(
     const f = fixture({ pending: true, unconfirmed }),
       abort = new AbortController();
     try {
-      const outcome = f.client.run(
+      const outcome = f.client.runDelegatedStage(
         f.agentInput,
         (e) => {
           if (e.type === "child") abort.abort();
@@ -443,7 +444,7 @@ test.each([
     });
     try {
       await expect(
-        f.client.run(f.agentInput, () => {}, new AbortController().signal),
+        f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
       ).resolves.toMatchObject({
         result: { ok: true },
         child: { threadId: "child" },
@@ -463,7 +464,7 @@ test("child metadata corruption is rejected without startup retries", async () =
   });
   try {
     await expect(
-      f.client.run(f.agentInput, () => {}, new AbortController().signal),
+      f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
     ).rejects.toThrow();
     expect(
       f.sent.filter(
@@ -485,7 +486,7 @@ test("persistent child startup error keeps runtime excluded instead of accepting
   });
   try {
     await expect(
-      f.client.run(f.agentInput, () => {}, new AbortController().signal),
+      f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
     ).rejects.toThrow("runtime_state_unknown");
   } finally {
     await f.client.close();
@@ -498,7 +499,7 @@ test("already cancelled input does not start a parent", async () => {
   abort.abort();
   try {
     await expect(
-      f.client.run(f.agentInput, () => {}, abort.signal),
+      f.client.runDelegatedStage(f.agentInput, () => {}, abort.signal),
     ).rejects.toThrow("interrupted");
     expect(f.sent).toHaveLength(0);
   } finally {
@@ -512,7 +513,7 @@ test.each([false, true])(
     const f = fixture({ bad: "reuse", nativeInteraction });
     try {
       await expect(
-        f.client.run(f.agentInput, () => {}, new AbortController().signal),
+        f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
       ).rejects.toThrow("subagent_reuse_violation");
       expect(
         f.sent.some(
@@ -529,7 +530,7 @@ test("failure to inspect a resumed parent's tree retains unknown writer exclusio
   const f = fixture({ bad: "preflight" });
   try {
     await expect(
-      f.client.run(
+      f.client.runDelegatedStage(
         { ...f.agentInput, threadId: "parent" },
         () => {},
         new AbortController().signal,
@@ -560,7 +561,7 @@ test("cancellation waits for a pending turn/start before confirming the parent s
   });
   try {
     await expect(
-      f.client.run(f.agentInput, () => {}, abort.signal),
+      f.client.runDelegatedStage(f.agentInput, () => {}, abort.signal),
     ).rejects.toThrow("interrupted");
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(
@@ -576,7 +577,7 @@ test("cancellation waits for a pending turn/start before confirming the parent s
 test("child completion while its status is being read cannot lose the verification wakeup", async () => {
   const f = fixture({ pending: true, completionRace: true });
   try {
-    const run = await f.client.run(
+    const run = await f.client.runDelegatedStage(
       f.agentInput,
       () => {},
       new AbortController().signal,
@@ -590,7 +591,7 @@ test("child completion while its status is being read cannot lose the verificati
 test("spawn event can precede durable child rollout creation", async () => {
   const f = fixture({ delayed: true });
   try {
-    const run = await f.client.run(
+    const run = await f.client.runDelegatedStage(
       f.agentInput,
       () => {},
       new AbortController().signal,
@@ -605,7 +606,7 @@ test("an existing active parent is excluded before another turn can start", asyn
   const f = fixture({ bad: "active-parent" });
   try {
     await expect(
-      f.client.run(
+      f.client.runDelegatedStage(
         { ...f.agentInput, threadId: "parent" },
         () => {},
         new AbortController().signal,
@@ -620,7 +621,7 @@ test("an existing active parent is excluded before another turn can start", asyn
 test("loaded parent permissions are updated and verified before review can spawn", async () => {
   const f = fixture({ bad: "sticky-sandbox" });
   try {
-    const run = await f.client.run(
+    const run = await f.client.runDelegatedStage(
       { ...f.agentInput, threadId: "parent" },
       () => {},
       new AbortController().signal,
@@ -664,7 +665,7 @@ test("resumed local parent verifies native spawn from its durable rollout when r
   );
   const f = fixture({ rolloutPath });
   try {
-    const run = await f.client.run(
+    const run = await f.client.runDelegatedStage(
       { ...f.agentInput, threadId: "parent" },
       () => {},
       new AbortController().signal,

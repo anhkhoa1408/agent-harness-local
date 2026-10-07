@@ -1,3 +1,9 @@
+import {
+  CODEX_LOGIN_TIMEOUT_MS,
+  CODEX_LOGIN_STATUS_TIMEOUT_MS,
+  CLI_STATUS_MAX_BUFFER_BYTES,
+  MAX_LOGIN_OUTPUT_CHARACTERS,
+} from "./limits";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -29,15 +35,15 @@ export class CodexLogin {
   } | null = null;
   constructor(
     private binary = process.env.CODEX_BIN ?? "codex",
-    private timeoutMs = 10 * 60 * 1000,
+    private timeoutMs = CODEX_LOGIN_TIMEOUT_MS,
   ) {}
 
   async status(): Promise<LoginState> {
     if (this.pending || this.starting) return { ...this.current };
     try {
       await exec(this.binary, ["login", "status"], {
-        timeout: 10000,
-        maxBuffer: 16384,
+        timeout: CODEX_LOGIN_STATUS_TIMEOUT_MS,
+        maxBuffer: CLI_STATUS_MAX_BUFFER_BYTES,
       });
       if (this.pending) return { ...this.current };
       this.current = state("authenticated");
@@ -75,7 +81,7 @@ export class CodexLogin {
     const receive = (chunk: Buffer) => {
       output = (output + chunk.toString())
         .replace(/\x1b\[[0-9;]*m/g, "")
-        .slice(-65536);
+        .slice(-MAX_LOGIN_OUTPUT_CHARACTERS);
       const match =
         /https:\/\/auth\.openai\.com\/oauth\/authorize\?[^\s]+(?=\s)/.exec(
           output,

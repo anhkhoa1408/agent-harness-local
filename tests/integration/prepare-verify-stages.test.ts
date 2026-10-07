@@ -78,14 +78,15 @@ async function fixture(ui = false, pass = true) {
   const calls: AgentInput[] = [];
   let visualPass = true;
   const fake: AgentClient = {
-    models: async () => [
+    listModels: async () => [
       { id: "medium", efforts: ["medium"], isDefault: false },
       { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
     ],
-    answer: vi.fn(async () => {}),
-    interrupt: async () => {},
+    respondToApproval: vi.fn(async () => {}),
+    interruptTurn: async () => {},
+    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
     close: async () => {},
-    run: async (input) => {
+    runDelegatedStage: async (input) => {
       calls.push(input);
       let result: unknown;
       if (input.delegation?.stage === "prepare") {

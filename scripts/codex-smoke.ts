@@ -4,13 +4,13 @@ const value = (flag: string) => args[args.indexOf(flag) + 1];
 const client = await connectCodex();
 try {
   if (args.includes("--catalog"))
-    console.log(JSON.stringify(await client.models(), null, 2));
+    console.log(JSON.stringify(await client.listModels(), null, 2));
   else if (
     args.includes("--read-only") &&
     args.includes("--model") &&
     args.includes("--effort")
   ) {
-    const run = await client.run(
+    const run = await client.runDirectTurn(
       {
         cwd: process.cwd(),
         model: { model: value("--model"), effort: value("--effort") },

@@ -1,3 +1,4 @@
+import { MAX_TITLE_CHARACTERS, MAX_REQUIREMENT_CHARACTERS, MIN_CHECK_TIMEOUT_MS, MAX_CHECK_TIMEOUT_MS, MAX_SCREENSHOT_ID_CHARACTERS, MAX_VIEWPORT_PIXELS, MAX_SELECTED_SCREENSHOTS, MAX_VISUAL_EVIDENCE_CHARACTERS, MAX_STORY_ID_CHARACTERS, MAX_PLAN_COMMENT_CHARACTERS, MAX_COMMAND_ID_CHARACTERS } from "./limits";
 import { z } from "zod";
 export const stages = [
   "discover",
@@ -52,8 +53,8 @@ export const NewTaskSchema = z.object({
   featureId: z.string().optional(),
   storyId: z.string().optional(),
   repositoryId: z.string().min(1),
-  title: z.string().trim().min(1).max(200),
-  requirement: z.string().trim().min(1).max(100000),
+  title: z.string().trim().min(1).max(MAX_TITLE_CHARACTERS),
+  requirement: z.string().trim().min(1).max(MAX_REQUIREMENT_CHARACTERS),
   sourceCommit: z.string().regex(/^[a-f0-9]{40,64}$/),
   targetBranch: z.string().min(1),
   deliveryMode: z.enum(["github", "local"]),
@@ -78,7 +79,7 @@ export const TaskSchema = NewTaskSchema.extend({
 export type Task = z.infer<typeof TaskSchema>;
 export type NewTask = z.infer<typeof NewTaskSchema>;
 export const ControlCommandSchema = z.object({
-  id: z.string().min(1).max(200),
+  id: z.string().min(1).max(MAX_COMMAND_ID_CHARACTERS),
   taskId: z.string().min(1),
   kind: z.enum([
     "start",
@@ -118,7 +119,7 @@ export const CommandSpecSchema = z.object({
   args: z.array(z.string()),
   cwd: z.string().min(1),
   envNames: z.array(z.string()),
-  timeoutMs: z.number().int().min(100).max(3600000),
+  timeoutMs: z.number().int().min(MIN_CHECK_TIMEOUT_MS).max(MAX_CHECK_TIMEOUT_MS),
   reportPath: z.string().nullable(),
 });
 export type CommandSpec = z.infer<typeof CommandSpecSchema>;
@@ -148,19 +149,19 @@ export const UiVerificationSchema = z.object({
         id: z
           .string()
           .regex(/^[a-zA-Z0-9_-]+$/)
-          .max(80),
+          .max(MAX_SCREENSHOT_ID_CHARACTERS),
         checkId: z.string().min(1),
         path: z.string().min(1),
         criterionIds: z.array(z.string().min(1)).min(1),
         viewport: z.object({
-          width: z.number().int().min(1).max(3840),
-          height: z.number().int().min(1).max(3840),
+          width: z.number().int().min(1).max(MAX_VIEWPORT_PIXELS),
+          height: z.number().int().min(1).max(MAX_VIEWPORT_PIXELS),
         }),
         referencePath: z.string().min(1).nullable(),
       }),
     )
     .min(1)
-    .max(6),
+    .max(MAX_SELECTED_SCREENSHOTS),
 });
 export const VisualReviewSchema = z.object({
   screenshots: z
@@ -168,13 +169,13 @@ export const VisualReviewSchema = z.object({
       z.object({
         id: z.string(),
         passed: z.boolean(),
-        evidence: z.string().trim().min(1).max(2000),
+        evidence: z.string().trim().min(1).max(MAX_VISUAL_EVIDENCE_CHARACTERS),
       }),
     )
-    .max(6),
+    .max(MAX_SELECTED_SCREENSHOTS),
 });
 export const StorySchema = z.object({
-  id: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/),
+  id: z.string().min(1).max(MAX_STORY_ID_CHARACTERS).regex(/^[a-zA-Z0-9_-]+$/),
   title: z.string().min(1),
   outcome: z.string().min(1),
   points: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8)]),
@@ -271,7 +272,7 @@ export type Review = z.infer<typeof ReviewSchema>;
 export const PlanCommentInputSchema = z.object({
   version: z.number().int().positive(),
   target: z.string().min(1),
-  text: z.string().trim().min(1).max(10000),
+  text: z.string().trim().min(1).max(MAX_PLAN_COMMENT_CHARACTERS),
 });
 export type PlanComment = z.infer<typeof PlanCommentInputSchema> & {
   id: string;

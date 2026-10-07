@@ -1,3 +1,4 @@
+import { SESSION_TOKEN_BYTES, SESSION_TTL_SECONDS } from "./limits";
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import type { Store } from "../storage/store";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -66,17 +67,17 @@ export function bootstrapSession(request: Request, store: Store): Response {
       !validMutationOrigin(request.headers.get("origin"), host))
   )
     return new Response("Forbidden", { status: 403 });
-  const token = randomBytes(32).toString("hex"),
-    csrf = randomBytes(32).toString("hex");
+  const token = randomBytes(SESSION_TOKEN_BYTES).toString("hex"),
+    csrf = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
   store.putRecord("session", hash(token), {
     csrf,
-    expiresAt: Date.now() + 86400000,
+    expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000,
   });
   return new Response(null, {
     status: 303,
     headers: {
       location: "/",
-      "set-cookie": `harness_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400`,
+      "set-cookie": `harness_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
       "cache-control": "no-store",
       "content-security-policy": "frame-ancestors 'none'",
     },
