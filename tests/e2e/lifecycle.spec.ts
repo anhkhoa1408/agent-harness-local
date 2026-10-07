@@ -233,6 +233,7 @@ test("pipeline circles track pause, completion and skipped repair on dashboard a
     "skipped",
   );
   await page.getByRole("link", { name: "← Workspace" }).click();
+  await selectOption(page, "Lọc theo trạng thái", "Tất cả trạng thái");
   const card = page.getByRole("link").filter({
     has: page.getByRole("heading", {
       name: "Feature slow pipeline",
@@ -266,7 +267,7 @@ test("repository registration reports errors and selects the registered reposito
       .getByRole("button", { name: "Đăng ký repo", exact: true })
       .click();
     await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
-      "request_failed",
+      "repository_path_unavailable",
     );
     await page.getByLabel("Đường dẫn repo", { exact: true }).fill(repo.root);
     await page
