@@ -1,7 +1,10 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/molecules/form-field";
+import { FeedbackMessage } from "@/components/molecules/feedback-message";
 import type {
   TaskDetailData,
   TaskCommand,
@@ -16,8 +19,37 @@ export function TaskRequests({
   busy: boolean;
   command: TaskCommand;
 }) {
+  const [requestedApproval, setRequestedApproval] = useState<string | null>(
+    null,
+  );
+  const focusedApproval = useRef<string | null>(null);
+  useEffect(() => {
+    const read = () =>
+      setRequestedApproval(
+        new URLSearchParams(window.location.hash.slice(1)).get("approval"),
+      );
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  useEffect(() => {
+    if (!requestedApproval || focusedApproval.current === requestedApproval)
+      return;
+    const target = document.getElementById(`approval-${requestedApproval}`);
+    if (target) {
+      target.scrollIntoView({ block: "center" });
+      target.focus({ preventScroll: true });
+      focusedApproval.current = requestedApproval;
+    }
+  }, [requestedApproval, approvals]);
   return (
     <>
+      {requestedApproval &&
+        !approvals.some((approval) => approval.id === requestedApproval) && (
+          <FeedbackMessage tone="info">
+            Yêu cầu quyền này đã được xử lý hoặc hết hiệu lực.
+          </FeedbackMessage>
+        )}
       {task.status === "waiting_input" && (
         <Card>
           <CardContent className="space-y-4">
@@ -52,7 +84,12 @@ export function TaskRequests({
         </Card>
       )}
       {approvals.map((a) => (
-        <Card key={a.id}>
+        <Card
+          key={a.id}
+          id={`approval-${a.id}`}
+          tabIndex={-1}
+          className="scroll-mt-5 focus:outline-2 focus:outline-primary"
+        >
           <CardContent className="space-y-4">
             <h2>Agent cần quyền thực thi</h2>
             <pre>{JSON.stringify(a.params, null, 2)}</pre>

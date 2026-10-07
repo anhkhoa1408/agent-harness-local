@@ -276,6 +276,8 @@ Các màn hình: danh sách repo/task; tạo task; hỏi đáp và duyệt plan;
 
 Web và worker chỉ lắng nghe loopback. Mutation endpoint kiểm tra origin/session local; không mở quyền thực thi local ra mạng. Credential không gửi đến browser hoặc lưu trong database/log. Repository-controlled content không được thay policy, approval hoặc giới hạn của harness.
 
+Bổ sung đã duyệt ngày 2026-10-07: người dùng bật thông báo hệ điều hành từ workspace để nhận yêu cầu quyền thực thi khi còn ít nhất một tab Harness mở. Nhấn thông báo đưa tab lên trước, mở đúng task và yêu cầu; quyết định cấp/từ chối quyền vẫn qua dashboard và worker. Polling toàn workspace đọc các yêu cầu đang chờ của task manual đang chạy qua API có session local; không đưa command/params vào nội dung thông báo. Chống lặp giữa các tab cùng origin và khi tải lại, đóng thông báo khi yêu cầu đã xử lý/hết hiệu lực; liên kết cũ hiển thị trạng thái hiện tại. Bản đầu dùng Notifications API và Web Locks trên browser desktop hỗ trợ, không gửi yêu cầu mới khi đóng hết tab và không mở rộng sang duyệt Plan.
+
 ## 12. Kiểm chứng harness và thứ tự xây
 
 Các lát cắt triển khai dự kiến, mỗi lát có kết quả quan sát được:
