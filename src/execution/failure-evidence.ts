@@ -1,6 +1,6 @@
 import { MAX_FAILURE_EXCERPT_CHARACTERS, MAX_FAILURE_EXCERPTS } from "./limits";
 import { open } from "node:fs/promises";
-import type { CheckResult } from "./checks";
+import type { CheckResult } from "../core/evidence";
 async function tail(path: string | undefined) {
   if (!path) return null;
   try {
@@ -28,16 +28,14 @@ export async function failureEvidence(checks: CheckResult[]) {
   );
   return {
     checks: await Promise.all(
-      failures
-         .slice(0, MAX_FAILURE_EXCERPTS)
-        .map(async (check) => ({
-          ...check,
-          stdoutExcerpt: check.imageEvidence
-            ? null
-            : await tail(check.evidencePath),
-          stderrExcerpt: await tail(check.stderrPath),
-        })),
+      failures.slice(0, MAX_FAILURE_EXCERPTS).map(async (check) => ({
+        ...check,
+        stdoutExcerpt: check.imageEvidence
+          ? null
+          : await tail(check.evidencePath),
+        stderrExcerpt: await tail(check.stderrPath),
+      })),
     ),
-    omittedFailures: Math.max(0, failures.length - 6),
+    omittedFailures: Math.max(0, failures.length - MAX_FAILURE_EXCERPTS),
   };
 }

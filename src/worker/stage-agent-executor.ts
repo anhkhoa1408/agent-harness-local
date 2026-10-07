@@ -26,7 +26,6 @@ export class StageAgentExecutor {
   ) {}
   async freezeTaskBundles(task: Task) {
     const { store, artifacts, repository } = this.context;
-    const client = this.client;
 
     if (
       aiStages.every((stage) =>

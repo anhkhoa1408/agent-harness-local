@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Task, Plan } from "../core/contracts";
 import { VisualReviewSchema } from "../core/contracts";
-import type { CheckResult } from "./checks";
+import type { CheckResult } from "../core/evidence";
 import { contained, contentHash } from "../context/rules";
 import { gitText } from "../repositories/inspect";
 

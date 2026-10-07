@@ -2,7 +2,8 @@ import { resolve, join } from "node:path";
 import { openStore } from "../storage/store";
 import { runWorker } from "./engine";
 import { createHandlers } from "./stages";
-import { connectCodex, type AgentClient } from "../codex/client";
+import { connectCodex } from "../codex/client";
+import type { AgentClient } from "../codex/types";
 const data = resolve(process.env.HARNESS_DATA_DIR ?? ".harness"),
   store = openStore(join(data, "harness.db")),
   abort = new AbortController();
