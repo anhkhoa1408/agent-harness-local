@@ -78,14 +78,15 @@ async function fixture(ui = false, pass = true) {
   const calls: AgentInput[] = [];
   let visualPass = true;
   const fake: AgentClient = {
-    models: async () => [
+    listModels: async () => [
       { id: "medium", efforts: ["medium"], isDefault: false },
       { id: "gpt-6-luna", efforts: ["medium"], isDefault: false },
     ],
-    answer: vi.fn(async () => {}),
-    interrupt: async () => {},
+    respondToApproval: vi.fn(async () => {}),
+    interruptTurn: async () => {},
+    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
     close: async () => {},
-    run: async (input) => {
+    runDelegatedStage: async (input) => {
       calls.push(input);
       let result: unknown;
       if (input.delegation?.stage === "prepare") {
@@ -174,13 +175,13 @@ test("UI verify makes one read-only compact image assignment and routes visual f
     ).toMatchObject({ stage: "repair" });
     expect(
       await f.handlers.verify(
-        { ...f.task, repairCount: 3 },
+        { ...f.task, repairCount: 8 },
         new AbortController().signal,
       ),
     ).toMatchObject({
-      stage: "verify",
-      status: "blocked",
-      reason: "repair_limit",
+      stage: "repair",
+      status: "queued",
+      reason: null,
     });
   } finally {
     await f.dispose();
@@ -191,7 +192,7 @@ test("E2E failure avoids image AI and missing screenshot blocks handoff", async 
   const f = await fixture(true, false);
   try {
     expect(
-      await f.handlers.verify(f.task, new AbortController().signal),
+      await f.handlers.verify({ ...f.task, repairCount: 3 }, new AbortController().signal),
     ).toMatchObject({ stage: "repair" });
     expect(f.calls).toHaveLength(0);
     const missing: Plan = {

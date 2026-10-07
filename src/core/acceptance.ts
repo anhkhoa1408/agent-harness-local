@@ -1,6 +1,6 @@
 import { validateStories } from "./stories";
 import { PlanSchema, type Plan, type Task, type Review } from "./contracts";
-import type { CheckResult } from "../execution/checks";
+import type { CheckResult } from "./evidence";
 export function validatePlan(plan: Plan): string[] {
   const parsed = PlanSchema.safeParse(plan);
   if (!parsed.success)

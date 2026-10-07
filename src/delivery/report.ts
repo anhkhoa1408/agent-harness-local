@@ -1,5 +1,5 @@
 import type { Plan, Review } from "../core/contracts";
-import type { CheckResult } from "../execution/checks";
+import type { CheckResult } from "../core/evidence";
 export function renderReport(
   plan: Plan,
   checks: CheckResult[],

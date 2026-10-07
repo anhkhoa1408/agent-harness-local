@@ -1,3 +1,7 @@
+import {
+  FOLDER_PICKER_TIMEOUT_MS,
+  CLI_STATUS_MAX_BUFFER_BYTES,
+} from "./limits";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -13,8 +17,8 @@ export function createFolderPicker(
   platform: string = process.platform,
   run: () => Promise<{ stdout: string }> = () =>
     exec("/usr/bin/osascript", ["-e", script], {
-      timeout: 120000,
-      maxBuffer: 16384,
+      timeout: FOLDER_PICKER_TIMEOUT_MS,
+      maxBuffer: CLI_STATUS_MAX_BUFFER_BYTES,
     }),
 ) {
   let busy = false;

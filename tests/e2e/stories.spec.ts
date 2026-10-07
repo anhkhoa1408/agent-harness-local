@@ -124,7 +124,7 @@ test("replan after checkpoint keeps selection locked and resumes remaining story
   ).toBeVisible({ timeout: 30000 });
   await page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
   await expect(
-    page.getByText("Repair 0/3 · Plan v2", { exact: true }),
+    page.getByText("Repair 0 · Plan v2", { exact: true }),
   ).toBeVisible({ timeout: 30000 });
   await expect(page.getByLabel("Chọn story A", { exact: true })).toBeChecked();
   await expect(page.getByLabel("Chọn story A", { exact: true })).toBeDisabled();

@@ -21,7 +21,7 @@ Các quyết định sản phẩm đã chốt:
 - Người dùng có thể chọn model theo stage; effort cố định trong code: plan/replan high, các stage AI khác medium. Mặc định plan dùng gpt-6-astra, còn lại gpt-6-luna. Không fallback khi model/effort không khả dụng.
 - Stage AI dùng skill bundle rõ ràng và baseline hành vi từ `AGENTS.md`; runtime lưu nguồn/phiên bản đã nạp.
 - Viết test cho tính năng mới và bug đang sửa; có thể bỏ qua test cũ ngoài phạm vi feature.
-- Tối đa ba vòng sửa tự động sau lần triển khai đầu; hết giới hạn thì cần người dùng quyết định.
+- Theo yêu cầu đã duyệt ngày 2026-10-07, không giới hạn số vòng repair tự động. Giữ bộ đếm để theo dõi lịch sử; vẫn dừng khi cần input/approval, lỗi runtime/môi trường hoặc người dùng pause/cancel.
 - Tạo GitHub PR khi đạt điều kiện; bàn giao local nếu remote không được hỗ trợ hoặc không có remote.
 - Không tự merge task vào base, deploy hoặc xóa worktree. Theo cập nhật 2026-10-05, prepare được phép đồng bộ base remote vào worktree riêng.
 
@@ -81,7 +81,7 @@ Plan có phiên bản, bao gồm:
 3. Khu vực code dự kiến thay đổi, dependencies mới và yêu cầu môi trường.
 4. Branch nguồn, commit nguồn và branch đích PR.
 5. Test plan: từng kiểm tra, loại unit/integration/E2E, command, prerequisites, tiêu chí nghiệm thu được kiểm chứng.
-6. Model/effort dự kiến cho từng stage AI và giới hạn vòng sửa.
+6. Model/effort dự kiến cho từng stage AI; repair không có giới hạn số vòng.
 
 Để model tầm trung có thể implement mà không phải thiết kế lại, plan phải chỉ rõ thứ tự bước và dependency, file/module cần thay đổi, interface và dữ liệu vào/ra khi có, hành vi lỗi liên quan, test cần viết, command kiểm tra và kết quả mong đợi. Bước không áp dụng một mục phải nêu lý do thay vì tạo thêm abstraction. Những quyết định sản phẩm còn mơ hồ phải được làm rõ trước approval.
 
@@ -95,7 +95,7 @@ Stages: `discover`, `analyze`, `plan`, `prepare`, `implement`, `verify`, `review
 
 Statuses: `queued`, `running`, `waiting_input`, `waiting_approval`, `blocked`, `paused`, `interrupted`, `completed`, `cancelled`, `failed`.
 
-Mỗi trạng thái chờ có reason và hành động cần thiết; ví dụ `quota`, `environment`, `model_unavailable`, `repair_limit`, `test_failure`, `delivery_error`.
+Mỗi trạng thái chờ có reason và hành động cần thiết; ví dụ `quota`, `environment`, `model_unavailable`, `test_failure`, `delivery_error`.
 
 | Stage | Đầu ra và điều kiện chuyển tiếp |
 | --- | --- |
@@ -111,7 +111,7 @@ Mỗi trạng thái chờ có reason và hành động cần thiết; ví dụ `
 
 `paused`, `interrupted`, `blocked` giữ stage hiện tại và lần chạy cuối. Resume phải qua bước đối chiếu thực tế trước khi xác định stage tiếp tục. `failed` dành cho lỗi không thể phục hồi của lần chạy, không dùng thay cho chờ hạn mức/môi trường.
 
-Khi quay lại plan giữa vòng sửa, giữ worktree, branch và repair count. Duyệt plan mới không tạo implementation đầu tiên lần thứ hai và không tự cấp thêm vòng sửa.
+Khi quay lại plan giữa vòng sửa, giữ worktree, branch và repair count. Duyệt plan mới không tạo implementation đầu tiên lần thứ hai; repair count chỉ dùng để theo dõi lịch sử.
 
 Mỗi task có nhiều Stage Attempt. Một attempt lưu đầu vào, model/effort thực dùng, phiên Codex, thời điểm, status, revision và output. Sự kiện cũ không được sửa để che một attempt thất bại.
 
@@ -170,7 +170,7 @@ Registry skill đã triển khai trong `src/context/skills.ts`; agent profile đ
 
 `systematic-debugging` cũng kích hoạt ngay khi gặp bug/test failure/unexpected behavior trong analyze hoặc implement. Lỗi có sẵn ngoài phạm vi chỉ được ghi nhận, trừ khi nó chặn kiểm chứng feature. Chưa rõ root cause thì thu thêm bằng chứng hoặc hỏi, không nối tiếp các bản vá phỏng đoán.
 
-Khi dùng TDD, expected failure trong bước red không tự động chuyển pipeline sang repair hoặc tiêu một vòng sửa. Bộ đếm tăng khi worker mở một attempt repair sau một lần verify/review không đạt. Trong repair, các giả thuyết/sửa thử được ghi lại; khi ba lần thử cùng vấn đề đều thất bại thì dừng hỏi lại thay vì lách giới hạn bằng cách giữ nguyên attempt.
+Khi dùng TDD, expected failure trong bước red không tự động chuyển pipeline sang repair hoặc tiêu một vòng sửa. Bộ đếm tăng khi worker mở một attempt repair sau một lần verify/review không đạt. Trong repair, các giả thuyết/sửa thử được ghi lại; agent phải điều tra nguyên nhân thay vì nối tiếp các bản vá phỏng đoán. Không dừng chỉ vì đã chạy ba vòng repair; thiếu quyết định thực sự vẫn phải hỏi lại.
 
 ### 6.2. Phạm vi áp dụng và giải quyết xung đột
 
@@ -229,7 +229,9 @@ Reviewer chỉ yêu cầu sửa các lỗi có căn cứ về requirement, tính
 
 ## 9. Giới hạn, pause và recovery
 
-Sau implementation đầu tiên, tối đa ba vòng repair cho toàn task. Fail verify và finding review dùng chung bộ đếm; đổi model hoặc restart worker không đặt lại số vòng. Hết ba vòng → blocked với diff, finding còn lại và lựa chọn cho người dùng cấp thêm vòng hoặc dừng.
+Theo yêu cầu đã duyệt ngày 2026-10-07, fail verify hoặc finding review tiếp tục đưa task vào repair mà không giới hạn số vòng. Bộ đếm tăng một lần khi worker mở attempt repair mới; đổi model, restart worker, đổi story hoặc replan không đặt lại số vòng. UI hiển thị `Repair N`. Task chỉ dừng theo các điều kiện input/approval, runtime/môi trường, scope change, pause hoặc cancel; không phát sinh `repair_limit` mới. Task cũ đã blocked vẫn cần người dùng bấm Tiếp tục, không tự chạy lại khi cập nhật ứng dụng.
+
+Runtime bổ sung policy repair hiện hành sau nội dung bundle, kể cả bundle đã frozen của task cũ: không dừng hoặc hỏi lại chỉ vì ba lần sửa thất bại. Agent phải xem lại nguyên nhân và tiếp tục chẩn đoán có bằng chứng; quyết định thực sự còn thiếu và các gate của worker vẫn có hiệu lực.
 
 Mặc định đề xuất: timeout 30 phút cho một lượt AI, 15 phút cho một command ngắn hạn; có thể chỉnh trong cấu hình task/plan. Dịch vụ test dài hạn dùng readiness timeout và vòng đời process riêng. Timeout làm task dừng chờ xem xét, không tự tạo chuỗi retry vô hạn. Mất kết nối điều khiển không đồng nghĩa tiến trình đã dừng.
 
@@ -285,14 +287,14 @@ Các lát cắt triển khai dự kiến, mỗi lát có kết quả quan sát �
 1. **Kết nối và discovery:** kiểm chứng Codex auth/model/read-only run; resolve skill/rule; nhập repo; hiển thị profile, prerequisites và model catalog.
 2. **Requirement và approval:** tạo task, hỏi đáp, lưu plan version và ngăn code trước approval.
 3. **Thực thi feature:** branch/worktree, một lượt implement, chạy test theo plan và xem bằng chứng trên dashboard.
-4. **Vòng review/sửa:** reviewer độc lập, finding có cấu trúc, repair limit và evidence bị vô hiệu khi code đổi.
+4. **Vòng review/sửa:** reviewer độc lập, finding có cấu trúc, repair count và evidence bị vô hiệu khi code đổi.
 5. **Phục hồi và bàn giao:** pause/crash/quota/resume, effect reconciliation, GitHub PR không trùng và fallback local.
 
 Đây là thứ tự xây ở mức thiết kế; implementation plan chi tiết sẽ tách thành các việc có file, dependency và cách kiểm chứng sau khi bản spec được review.
 
 Kiểm thử chính harness gồm:
 
-- Unit: transition guards, approval theo version, giới hạn repair, cấu hình model và invalidation evidence.
+- Unit: transition guards, approval theo version, repair sau vòng thứ ba, cấu hình model và invalidation evidence.
 - Model routing: plan dùng planner model, implement dùng implementer model sau approval; task override được ưu tiên; thiếu role mapping/model không khả dụng phải chờ cấu hình; lập lại plan dùng planner model và duyệt lại; cấu hình chung thay đổi không ảnh hưởng task đã tạo.
 - Skill/rule integration: thiếu skill bắt buộc phải blocked; plugin update không đổi bundle giữa lượt; đổi model/resume giữ rule; rule Lighthouse chỉ nạp cho task phù hợp; yêu cầu chạy full suite trong skill không ghi đè chính sách feature-only; expected TDD red không tiêu repair round; skill không tự tạo thêm reviewer/worktree.
 - Integration: SQLite transaction/lease, Codex adapter với event giả lập, Git worktree thật trong repo tạm, process exit/timeout, reconciliation GitHub qua adapter giả lập.
@@ -342,9 +344,9 @@ Trong container, dashboard bind `0.0.0.0` để Docker forward port; cổng host
 
 ## Bổ sung góp ý Plan và Auto mode — 2026-10-04
 
-Theo yêu cầu người dùng: Plan hỗ trợ comment chung hoặc theo step/criterion/check, gắn với version. Người dùng gửi comments rồi yêu cầu sửa; planner nhận Plan trước và feedback, tạo version mới để duyệt. Version cũ và comments giữ nguyên. Khi version hiện tại có comments, phải tạo version mới trước approval. Replan giữ worktree và repair budget.
+Theo yêu cầu người dùng: Plan hỗ trợ comment chung hoặc theo step/criterion/check, gắn với version. Người dùng gửi comments rồi yêu cầu sửa; planner nhận Plan trước và feedback, tạo version mới để duyệt. Version cũ và comments giữ nguyên. Khi version hiện tại có comments, phải tạo version mới trước approval. Replan giữ worktree và repair count.
 
-Settings có chế độ mặc định cho task mới; task có thể đổi chế độ tại stage boundary. Manual giữ `on-request`; Auto dùng `never` với sandbox hiện tại (`read-only` trước implementation và cho reviewer, `workspace-write` cho implement/repair). Auto không tự mở rộng quyền filesystem/network; request quyền bất ngờ bị decline và ghi event. Approval Plan thuộc worker vẫn bắt buộc, độc lập với policy công cụ. Giới hạn repair, test/review gates và quy tắc replan giữ nguyên.
+Settings có chế độ mặc định cho task mới; task có thể đổi chế độ tại stage boundary. Manual giữ `on-request`; Auto dùng `never` với sandbox hiện tại (`read-only` trước implementation và cho reviewer, `workspace-write` cho implement/repair). Auto không tự mở rộng quyền filesystem/network; request quyền bất ngờ bị decline và ghi event. Approval Plan thuộc worker vẫn bắt buộc, độc lập với policy công cụ. Repair không giới hạn số vòng; test/review gates và quy tắc replan giữ nguyên.
 
 
 ## Bổ sung Prepare và UI Verify tiết kiệm token — 2026-10-05
@@ -365,10 +367,10 @@ Theo yêu cầu đã chốt: mở rộng hai stage hiện có, không thêm stag
 - Plan chọn 1–6 ảnh PNG, mỗi ảnh có `id`, `checkId` của required E2E, đường dẫn từ worktree root, `criterionIds`, `viewport` và `referencePath` local nullable. Tiêu chí mô tả rõ layout/nội dung cần đối chiếu. Không có reference thì chỉ đánh giá theo tiêu chí đã duyệt; không tuyên bố khớp thiết kế không tồn tại.
 - E2E command sở hữu server readiness/cleanup, assertion hành vi và capture ảnh viewport-only, `deviceScaleFactor=1`. Runner xóa ảnh cũ trước check, không ghi đè tracked source, kiểm tra kích thước PNG và lưu bản copy/hash trong artifacts. Generated screenshot không thuộc feature diff và không bị commit.
 - Required checks fail → repair hoặc blocked theo policy hiện có, không gọi AI xem ảnh. Checks pass và có selection → một lượt model review, read-only, chỉ tiêu chí được ánh xạ và ảnh đã chọn. Không truyền toàn bộ DOM/diff/plan hoặc để agent tự duyệt website.
-- Mỗi ảnh cần một verdict với evidence cụ thể; verdict thiếu/trùng, ảnh thiếu/sai viewport, nguồn đổi hoặc ảnh đổi đều không thể pass. Visual fail → repair, dùng chung giới hạn ba vòng. Lỗi runtime/evidence → blocked.
+- Mỗi ảnh cần một verdict với evidence cụ thể; verdict thiếu/trùng, ảnh thiếu/sai viewport, nguồn đổi hoặc ảnh đổi đều không thể pass. Visual fail → repair, dùng chung bộ đếm và không giới hạn số vòng. Lỗi runtime/evidence → blocked.
 - Lưu các kết quả `ui:<id>` cùng task/plan/fingerprint và hash ảnh. Review dùng kết quả đã lưu; delivery bắt buộc có verdict pass hiện hành và kiểm tra lại hash ảnh. Dashboard hiển thị selection trong plan và link mở ảnh trong Tests.
 - Repair nhận tối đa 6 check lỗi, tối đa 2.000 ký tự cuối của stdout/report và stderr cho mỗi check, kèm đường dẫn ảnh; đọc thêm evidence chỉ khi cần. Các check pass không gửi lại dưới dạng lỗi. Không gửi toàn bộ report vào prompt.
 
 ### Mở rộng được duyệt ngày 2026-10-06: story picker và delivery
 
-Task có thể bật chia stories, chọn point/dependency và bàn giao PR riêng từng story hoặc chung một PR. Mặc định dừng sau mỗi checkpoint; approval, evidence và repair limits vẫn giữ hiệu lực. Chi tiết trong [story delivery design](2026-10-06-story-delivery-design.md).
+Task có thể bật chia stories, chọn point/dependency và bàn giao PR riêng từng story hoặc chung một PR. Mặc định dừng sau mỗi checkpoint; approval, evidence và repair count vẫn giữ hiệu lực; repair không giới hạn số vòng. Chi tiết trong [story delivery design](2026-10-06-story-delivery-design.md).

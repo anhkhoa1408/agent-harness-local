@@ -80,7 +80,7 @@ Sau test/review pass, commit story rồi chuyển sang story tiếp theo hoặc 
 
 Sau story cuối, verify toàn bộ required checks thuộc stories đã chọn trên cùng snapshot cuối; review toàn diff so với feature baseline. Bất kỳ failure nào đưa vào repair với phạm vi đã duyệt và giữ lịch sử story. Chỉ deliver khi evidence cuối còn hiệu lực. Report chung liệt kê từng story, checkpoint và kết quả tổng hợp; tránh coi report story cũ là bằng chứng pass của snapshot cuối.
 
-Repair count của task gốc không reset khi đổi story hay replan. Task con PR riêng có repair count riêng theo quy tắc ba vòng/task hiện tại. Không tạo task con mới để retry và né repair limit.
+Repair count của task gốc không reset khi đổi story hay replan. Theo cập nhật đã duyệt ngày 2026-10-07, task con PR riêng có repair count riêng và không giới hạn số vòng. Retry dùng lại task con hiện có để giữ lịch sử và tránh chạy trùng.
 
 ## Pause, resume và lỗi
 
