@@ -105,7 +105,9 @@ E2E mô phỏng agent, còn Git, test runner và browser chạy thật. Test nà
 - [Prepare và kiểm chứng UI](docs/verification/2026-10-05-prepare-ui-verify.md): đồng bộ base và kiểm tra ảnh giao diện.
 - [Kiểm chứng MVP/Docker](docs/verification.md): kết quả và phần chưa xác nhận.
 
-Luồng chạy task nằm ở [worker/engine.ts](src/worker/engine.ts) và [worker/stages.ts](src/worker/stages.ts). Code chọn profile và skill nằm ở [context/agents.ts](src/context/agents.ts) và [context/skills.ts](src/context/skills.ts).
+Xem [kiến trúc backend](docs/backend-architecture.md) để theo dõi application services, worker, adapters và giao tiếp cha–con.
+
+Luồng chạy task nằm ở [worker/runtime.ts](src/worker/runtime.ts) và [worker/stages.ts](src/worker/stages.ts). Code chọn profile và skill nằm ở [context/agents.ts](src/context/agents.ts) và [context/skills.ts](src/context/skills.ts).
 
 ## Chia feature thành stories
 

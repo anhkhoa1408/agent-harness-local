@@ -1,3 +1,4 @@
+import { MAX_REPAIR_ROUNDS } from "../core/limits";
 import type { Task, Plan, Review } from "./contracts";
 import { validatePlan } from "./acceptance";
 export function stageAfterPreparation(task: Task): "implement" | "repair" {
@@ -58,7 +59,7 @@ export function nextAfterReview(
       reason: null,
       repairCount: task.repairCount,
     };
-  if (task.repairCount >= 3)
+  if (task.repairCount >= MAX_REPAIR_ROUNDS)
     return {
       stage: "review",
       status: "blocked",

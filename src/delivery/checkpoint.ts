@@ -5,14 +5,9 @@ import { mkdir, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Store } from "../storage/store";
-import type { Task } from "../core/contracts";
+import type { Task, Plan } from "../core/contracts";
 import { contentHash } from "../context/rules";
 import { createDelivery } from "./github";
-import {
-  executionOf,
-  executionPlan,
-  requireStoryEvidence,
-} from "../worker/stories";
 
 export type StoryCheckpoint = {
   commit: string;
@@ -24,13 +19,9 @@ export async function createStoryCheckpoint(
   data: string,
   task: Task,
   signal: AbortSignal,
+  context: { plan: Plan; storyId: string },
 ): Promise<StoryCheckpoint> {
-  requireStoryEvidence(store, task);
-  const e = executionOf(store, task.id);
-  if (e?.selection.mode !== "shared_pr" || e.aggregate || !e.activeStoryId)
-    throw new Error("story_checkpoint_unavailable");
-  const plan = executionPlan(store, task),
-    prefix = `${task.id}:story:${plan.version}:${e.activeStoryId}`;
+  const { plan, storyId } = context, prefix = `${task.id}:story:${plan.version}:${storyId}`;
   const head = await gitText(task.worktree!, ["rev-parse", "HEAD"]);
   if (head !== task.sourceCommit) {
     const fingerprint = await fingerprintWorktree(
@@ -49,23 +40,23 @@ export async function createStoryCheckpoint(
       (await gitText(task.worktree!, ["rev-parse", "HEAD^"])) ===
         effect.parent &&
       (await gitText(task.worktree!, ["show", "-s", "--format=%B", "HEAD"])) ===
-        `feat: ${task.title}\n\nHarness-Task: ${task.id}\nHarness-Story: ${e.activeStoryId}`;
+        `feat: ${task.title}\n\nHarness-Task: ${task.id}\nHarness-Story: ${storyId}`;
     if (!known && !pending) throw new Error("story_head_changed");
   }
   const delivery = await createDelivery(store, data, {
     plan,
     effectPrefix: prefix,
-    commitMessage: `feat: ${task.title}\n\nHarness-Task: ${task.id}\nHarness-Story: ${e.activeStoryId}`,
-    reportName: `story-${plan.version}-${e.activeStoryId}.md`,
+    commitMessage: `feat: ${task.title}\n\nHarness-Task: ${task.id}\nHarness-Story: ${storyId}`,
+    reportName: `story-${plan.version}-${storyId}.md`,
   })({ ...task, deliveryMode: "local" }, signal);
   signal.throwIfAborted();
   const dir = join(data, "artifacts", task.id, "checkpoints");
   await mkdir(dir, { recursive: true });
-  const path = join(dir, `${plan.version}-${e.activeStoryId}.json`),
+  const path = join(dir, `${plan.version}-${storyId}.json`),
     temp = `${path}.${randomUUID()}.tmp`;
   const checkpoint = {
     featureId: task.id,
-    storyId: e.activeStoryId,
+    storyId: storyId,
     planVersion: plan.version,
     planHash: contentHash(JSON.stringify(plan)),
     baselineCommit: task.sourceCommit,
