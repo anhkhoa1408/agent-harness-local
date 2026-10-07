@@ -4,6 +4,7 @@ export async function api<T = any>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   if (method !== "GET" && !csrf) {
     const session = await api<{ csrf: string }>("session");
@@ -17,6 +18,7 @@ export async function api<T = any>(
     },
     body: body === undefined ? undefined : JSON.stringify(body),
     cache: "no-store",
+    signal,
   });
   if (response.status === 403) {
     window.location.assign("/session");

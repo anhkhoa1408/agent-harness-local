@@ -86,6 +86,18 @@ export function createHttpHandler(
           heartbeat: lease?.at ?? null,
         });
       }
+      if (parts[0] === "approvals" && !parts[1] && method === "GET") {
+        const tasks = new Map(store.listTasks().map((task) => [task.id, task]));
+        const pending = store.listRecords("approval") as {
+          id: string; taskId: string; decision: string | null;
+        }[];
+        return json(pending.flatMap((approval) => {
+          const task = tasks.get(approval.taskId);
+          return task?.status === "running" && task.executionMode !== "auto" && !approval.decision
+            ? [{ id: approval.id, taskId: task.id, taskTitle: task.title }]
+            : [];
+        }));
+      }
       if (parts[0] === "models" && method === "GET") {
         try {
           return json({ models: await models(), auth: "connected" });
@@ -241,7 +253,7 @@ export function createHttpHandler(
             runtime: store.getRecord("runtime", task.id),
             approvals: store
               .listRecords("approval")
-              .filter((r: any) => r.taskId === task.id && !r.decision),
+              .filter((r: any) => r.taskId === task.id && !r.decision && task.status === "running" && task.executionMode !== "auto"),
             artifacts: store
               .listRecords("artifact")
               .filter((r: any) => r.taskId === task.id)
