@@ -19,7 +19,7 @@ Mở [http://127.0.0.1:3000](http://127.0.0.1:3000) để dùng dashboard. `npm 
 
 ### Chạy bằng Docker
 
-Cần Docker Desktop đang chạy và Docker Compose từ 2.22.0. Cấu hình nằm trong `docker-compose.yml`:
+Cấu hình `docker-compose.yml` hiện dùng Docker Desktop trên macOS, Docker Compose từ 2.22.0 và SSH agent của Docker Desktop. Cần có file `~/.ssh/known_hosts`; khi dùng remote SSH, agent phải có key được cấp quyền và file này phải chứa host của remote. Thư mục repo mặc định là `~/Documents/Personal`; có thể đổi bằng biến `HARNESS_REPOS_DIR`.
 
 ```sh
 docker compose up -d --build
@@ -41,9 +41,9 @@ Xem log bằng `docker compose logs -f`, dừng bằng `docker compose down`. D�
 
 Chế độ **Duyệt quyền khi cần** yêu cầu xác nhận khi công cụ cần thêm quyền. **Auto sau khi duyệt Plan** không hỏi quyền công cụ; các giới hạn sandbox vẫn áp dụng. Cả hai đều cần duyệt plan trước khi chạy.
 
-Nhấn **Bật thông báo** ở đầu workspace và cho phép trong trình duyệt để nhận thông báo hệ điều hành khi agent cần quyền thực thi. Nhấn thông báo sẽ đưa tab web lên trước, mở đúng task và tập trung vào yêu cầu **Cho phép / Từ chối**. Yêu cầu chỉ thông báo một lần khi polling, tải lại trang hoặc mở nhiều tab cùng origin; yêu cầu đã xử lý sẽ đóng thông báo. Liên kết cũ hiển thị trạng thái đã xử lý/hết hiệu lực.
+Nhấn **Bật thông báo** ở đầu workspace và cho phép trong trình duyệt để nhận thông báo khi agent cần quyền thực thi. Nhấn thông báo để mở đúng task và yêu cầu **Cho phép / Từ chối**.
 
-Bản đầu cần ít nhất một tab Agent Harness còn mở trong trình duyệt desktop hỗ trợ Notifications API và Web Locks. Không nhận yêu cầu mới sau khi đóng hết tab. Nếu thông báo bị chặn, bật lại trong cài đặt trình duyệt; yêu cầu vẫn có thể duyệt trực tiếp trên web. Thông báo này dành cho quyền thực thi, không phải duyệt Plan.
+Cần giữ ít nhất một tab Harness mở trong trình duyệt desktop hỗ trợ Notifications API và Web Locks. Nếu thông báo bị chặn, vẫn có thể duyệt quyền trên dashboard. Thông báo này không dành cho duyệt Plan.
 
 ## Một task chạy thế nào?
 
@@ -61,7 +61,7 @@ flowchart TD
   G -->|Pass| I[Commit và báo cáo local hoặc GitHub PR]
 ```
 
-Nếu yêu cầu, phạm vi hoặc base remote thay đổi, cần duyệt lại plan. Harness tự sửa tối đa **3 lần** sau lần viết code đầu tiên. Hết lượt sửa hoặc thiếu môi trường chạy thì task dừng ở `blocked`; dashboard ghi rõ lý do dừng.
+Nếu yêu cầu, phạm vi hoặc base remote thay đổi, cần duyệt lại plan. Harness tiếp tục sửa khi test hoặc review chưa đạt, **không giới hạn số vòng sửa**. Task vẫn dừng khi cần thông tin/quyền, hết quota, gặp lỗi runtime hoặc thiếu môi trường chạy; dashboard ghi rõ lý do. Có thể pause hoặc cancel trong quá trình chạy.
 
 ## Ai làm từng bước?
 
@@ -86,7 +86,7 @@ Danh sách profile và skill cho từng bước nằm trong [agents/README.md](a
 ## Giới hạn hiện tại
 
 - Chạy local, một task mỗi lần; không tự merge hoặc deploy.
-- Test bắt buộc và review phải pass. Hết quota hoặc thiếu môi trường thì task dừng.
+- Các kiểm tra bắt buộc trong plan và review phải pass trước khi bàn giao. Test cũ ngoài phạm vi có thể được bỏ qua và phải ghi rõ trong báo cáo.
 - Dữ liệu lưu trong `.harness/` khi chạy trực tiếp, hoặc volumes khi dùng Docker.
 
 ## Khi sửa dự án này
