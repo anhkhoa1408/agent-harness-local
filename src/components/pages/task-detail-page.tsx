@@ -6,17 +6,12 @@ import { type Event, type ControlCommand } from "@/core/contracts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "@/components/ui/collapsible";
 import { FormField } from "@/components/molecules/form-field";
 import { SelectField } from "@/components/molecules/select-field";
 import { FeedbackMessage } from "@/components/molecules/feedback-message";
 import { StatusBadge } from "@/components/molecules/status-badge";
 import { TaskDetailLayout } from "@/components/templates/task-detail-layout";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Pipeline } from "@/components/organisms/pipeline";
 import { api } from "@/lib/api";
 import type { TaskDetailData } from "@/components/organisms/task-detail/types";
@@ -163,7 +158,7 @@ export function TaskDetailPage({ id }: { id: string }) {
               : task.reason.includes("skill_")
                 ? "Bộ skill đi kèm ứng dụng đang thiếu. Khôi phục thư mục skills từ repository rồi tiếp tục."
                 : task.reason.includes("model_")
-                  ? "Cập nhật model cho task ở bên dưới rồi tiếp tục."
+                  ? "Kiểm tra cấu hình model và evidence trước khi tiếp tục."
                   : "Xem evidence và cấu hình; giải quyết nguyên nhân trước khi tiếp tục."}
           </p>
           {task.stage === "deliver" && (
@@ -209,44 +204,6 @@ export function TaskDetailPage({ id }: { id: string }) {
         primary={<TaskEvidence detail={detail} busy={busy} command={command} />}
         timeline={<TaskTimeline events={events} />}
       />
-      {!terminal && task.status !== "running" && (
-        <Card className="py-4">
-          <CardContent>
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-auto w-full justify-between whitespace-normal px-0 text-left"
-                >
-                  Đổi model của task tại stage boundary
-                  <ChevronDown aria-hidden="true" />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-4 space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  Lưu Settings trước, sau đó áp dụng vào task này. Approval plan
-                  hiện tại được giữ nguyên nếu scope không đổi.
-                </p>
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={async () => {
-                    try {
-                      const settings = await api("settings");
-                      await command("configure", { models: settings.models });
-                    } catch (error) {
-                      setError(String(error));
-                    }
-                  }}
-                >
-                  Áp dụng model từ Settings
-                </Button>
-              </CollapsibleContent>
-            </Collapsible>
-          </CardContent>
-        </Card>
-      )}
     </>
   );
 }

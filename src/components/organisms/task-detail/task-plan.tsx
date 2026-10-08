@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import type { StorySelection } from "@/core/contracts";
 import { StoryPicker, validStorySelection } from "./task-stories";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,14 @@ import type {
   TaskCommand,
 } from "@/components/organisms/task-detail/types";
 import { UiVerificationPlan } from "./ui-verification";
+
+function planSentences(text: string) {
+  return Array.from(
+    new Intl.Segmenter("vi", { granularity: "sentence" }).segment(text),
+    ({ segment }) => segment.trim(),
+  ).filter(Boolean);
+}
+
 export function TaskPlan({
   task,
   plan,
@@ -27,7 +36,13 @@ export function TaskPlan({
   busy: boolean;
   command: TaskCommand;
 }) {
-  const [selection,setSelection]=useState<StorySelection>({storyIds:[],mode:"separate_pr",continueAutomatically:false,...stories?.execution?.selection,planVersion:plan?.version??1});
+  const [selection, setSelection] = useState<StorySelection>({
+    storyIds: [],
+    mode: "separate_pr",
+    continueAutomatically: false,
+    ...stories?.execution?.selection,
+    planVersion: plan?.version ?? 1,
+  });
   const currentComments = comments.filter((c) => c.version === plan?.version);
   const editable =
     task.stage === "plan" &&
@@ -38,7 +53,17 @@ export function TaskPlan({
       <p className="break-words text-xs text-muted-foreground">
         Source {plan.sourceCommit.slice(0, 12)} · Version {plan.version}
       </p>
-      {task.splitIntoStories && editable && plan.stories && <StoryPicker plan={plan} selection={selection} onChange={setSelection} disabled={busy} locked={stories?.runs.some(r=>r.state!=="pending"||!!r.childTaskId)}/>}
+      {task.splitIntoStories && editable && plan.stories && (
+        <StoryPicker
+          plan={plan}
+          selection={selection}
+          onChange={setSelection}
+          disabled={busy}
+          locked={stories?.runs.some(
+            (r) => r.state !== "pending" || !!r.childTaskId,
+          )}
+        />
+      )}
       <h3>Acceptance criteria</h3>
       {plan.criteria.map((c) => (
         <p key={c.id}>
@@ -48,29 +73,85 @@ export function TaskPlan({
         </p>
       ))}
       <h3>Các bước thực hiện</h3>
-      {plan.steps.map((s) => (
-        <Collapsible key={s.id} defaultOpen className="rounded-lg border p-3">
-          <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-auto w-full justify-start whitespace-normal px-0 text-left"
-            >
-              {s.id} · {s.description}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-2 break-words">
-            <p>{s.files.join(", ")}</p>
-            <p className="break-words text-xs text-muted-foreground">
-              Inputs: {s.inputs}
-              <br />
-              Outputs: {s.outputs}
-              <br />
-              Kiểm tra: {s.verification}
-            </p>
-          </CollapsibleContent>
-        </Collapsible>
-      ))}
+      <ol aria-label="Các bước thực hiện" className="space-y-4">
+        {plan.steps.map((s) => {
+          const [title, ...actions] = planSentences(s.description);
+          return (
+            <li key={s.id} className="min-w-0 rounded-lg border p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 font-semibold text-primary">
+                  {s.id}
+                </span>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Mục tiêu
+                  </p>
+                  <h4 className="text-base font-semibold leading-relaxed">
+                    {title}
+                  </h4>
+                  {s.dependsOn.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Sau bước: {s.dependsOn.join(", ")}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {s.files.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <h5 className="text-sm font-semibold">File liên quan</h5>
+                  <div className="flex flex-wrap gap-2">
+                    {s.files.map((file) => (
+                      <code
+                        key={file}
+                        className="min-w-0 max-w-full rounded-md bg-background px-2 py-1 text-xs leading-relaxed"
+                      >
+                        {file}
+                      </code>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Collapsible className="mt-4 border-t pt-3">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="group h-auto w-full justify-between whitespace-normal text-left"
+                  >
+                    Chi tiết bước {s.id}
+                    <ChevronDown
+                      aria-hidden="true"
+                      className="shrink-0 transition-transform group-data-[state=open]:rotate-180"
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-4 space-y-5">
+                  {(
+                    [
+                      ["Việc cần làm", actions],
+                      ["Đầu vào", planSentences(s.inputs)],
+                      ["Kết quả", planSentences(s.outputs)],
+                      ["Cách kiểm tra", planSentences(s.verification)],
+                    ] as const
+                  ).map(
+                    ([label, items]) =>
+                      items.length > 0 && (
+                        <section key={label} className="space-y-2">
+                          <h5 className="text-sm font-semibold">{label}</h5>
+                          <ul className="list-disc space-y-2 pl-5 text-sm leading-7">
+                            {items.map((item, index) => (
+                              <li key={index}>{item}</li>
+                            ))}
+                          </ul>
+                        </section>
+                      ),
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            </li>
+          );
+        })}
+      </ol>
       <h3>Test plan</h3>
       {plan.checks.map((c) => (
         <pre key={c.id}>
@@ -182,8 +263,17 @@ export function TaskPlan({
       {task.status === "waiting_approval" && (
         <Button
           variant="default"
-          disabled={busy || currentComments.length > 0 || (!!task.splitIntoStories && !validStorySelection(plan,selection))}
-          onClick={() => command("approve", { version: plan.version, ...(task.splitIntoStories ? {selection}: {}) })}
+          disabled={
+            busy ||
+            currentComments.length > 0 ||
+            (!!task.splitIntoStories && !validStorySelection(plan, selection))
+          }
+          onClick={() =>
+            command("approve", {
+              version: plan.version,
+              ...(task.splitIntoStories ? { selection } : {}),
+            })
+          }
         >
           Duyệt plan
         </Button>
