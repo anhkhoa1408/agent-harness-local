@@ -79,13 +79,13 @@ export class WorkerRuntime {
           ))
           await storyService.reconcileFeatureStories(feature.id, signal);
         if (!this.active && !store.listRecords("exclusion").length) {
-          const next = store
-            .listTasks()
-            .reverse()
-            .find((t) => t.status === "queued");
-          if (next) {
+          const claimed = store.atomic(() => {
+            const next = store
+              .listTasks()
+              .reverse()
+              .find((t) => t.status === "queued");
+            if (!next) return null;
             const abort = new AbortController();
-            let task: Task;
             const attempt: Attempt = {
               id: randomUUID(),
               taskId: next.id,
@@ -110,41 +110,43 @@ export class WorkerRuntime {
               turnId: null,
               fingerprint: null,
             };
-            store.atomic(() => {
-              task = store.updateTask(
-                next.id,
-                next.revision,
-                {
-                  status: "running",
-                  repairCount:
-                    next.repairCount + (next.stage === "repair" ? 1 : 0),
-                },
-                event("stage.started", {
-                  attemptId: attempt.id,
-                  stage: next.stage,
-                  model: attempt.model,
-                }),
-              );
-              store.putRecord("attempt", attempt.id, attempt);
-              const run = storyService
-                .listStoryRuns(next.featureId ?? next.id)
-                .find((r) => r.storyId === attempt.storyId);
-              if (
-                run &&
-                !run.childTaskId &&
-                ["implement", "repair", "verify", "review"].includes(next.stage)
-              )
-                store.putRecord("story-run", storyKey(run), {
-                  ...run,
-                  state: "running",
-                  baselineCommit: attempt.baselineCommit,
-                  updatedAt: Date.now(),
-                });
-              store.putRecord("ownership", next.id, {
-                bootId,
-                workerPid: process.pid,
+            const task = store.updateTask(
+              next.id,
+              next.revision,
+              {
+                status: "running",
+                repairCount:
+                  next.repairCount + (next.stage === "repair" ? 1 : 0),
+              },
+              event("stage.started", {
+                attemptId: attempt.id,
+                stage: next.stage,
+                model: attempt.model,
+              }),
+            );
+            store.putRecord("attempt", attempt.id, attempt);
+            const run = storyService
+              .listStoryRuns(next.featureId ?? next.id)
+              .find((r) => r.storyId === attempt.storyId);
+            if (
+              run &&
+              !run.childTaskId &&
+              ["implement", "repair", "verify", "review"].includes(next.stage)
+            )
+              store.putRecord("story-run", storyKey(run), {
+                ...run,
+                state: "running",
+                baselineCommit: attempt.baselineCommit,
+                updatedAt: Date.now(),
               });
+            store.putRecord("ownership", next.id, {
+              bootId,
+              workerPid: process.pid,
             });
+            return { next, task, attempt, abort };
+          });
+          if (claimed) {
+            const { next, task, attempt, abort } = claimed;
             const entry = {
               taskId: next.id,
               abort,
@@ -158,7 +160,7 @@ export class WorkerRuntime {
               bootId,
               next,
               attempt,
-              task!,
+              task,
               entry,
             );
           }

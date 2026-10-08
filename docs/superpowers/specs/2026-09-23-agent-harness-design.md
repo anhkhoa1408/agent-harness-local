@@ -56,6 +56,8 @@ Chọn pipeline cố định vì có thể kiểm tra chính xác khi nào đư�
 
 Người dùng nhập/chọn đường dẫn local đến repo Git, cấu hình base branch và remote. Hệ thống xác thực đường dẫn và branch tồn tại trước khi nhận task.
 
+Bổ sung đã duyệt ngày 2026-10-09: workspace có Quản lý repository và xác nhận Gỡ và xoá lịch sử. Gỡ xoá đăng ký, toàn bộ task (kể cả task con), sự kiện, lệnh điều khiển, profile, plan, attempt và các bản ghi/báo cáo liên quan trong Harness; giữ thư mục Git gốc và worktree. Chặn khi còn task/attempt/lệnh đang xử lý hoặc chưa xác nhận tiến trình cũ đã dừng. Xoá dữ liệu trong database bằng một transaction, đồng bộ lại lựa chọn repository trên UI. Bộ lọc Hoạt động gần đây mặc định là Tất cả trạng thái.
+
 Discovery đọc hướng dẫn repo, manifest, lockfile, cấu trúc source, scripts, CI và cấu hình test. Kết quả là Repo Profile có:
 
 - Repo root, commit đã đọc, các ngôn ngữ và khu vực chức năng.
