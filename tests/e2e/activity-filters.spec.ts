@@ -29,15 +29,11 @@ for (const width of [1440, 390]) {
     const cards = activity.getByRole("link");
     await expect(cards).toHaveCount(3);
     await expect(
-      activity.getByText("3 / 4 task", { exact: true }),
+      activity.getByText("3 / 16 task", { exact: true }),
     ).toBeVisible();
-    await expect(cards.first()).toContainText("Activity 12");
+    await expect(cards.first()).toContainText("Activity 0");
     const status = page.getByRole("combobox", { name: "Lọc theo trạng thái" });
-    await expect(status).toContainText("Đang chạy");
-    await status.click();
-    await page
-      .getByRole("option", { name: "Tất cả trạng thái", exact: true })
-      .click();
+    await expect(status).toContainText("Tất cả trạng thái");
     const count = page.getByRole("combobox", { name: "Số hoạt động hiển thị" });
     await count.click();
     await expect(page.getByRole("option")).toHaveText([

@@ -78,6 +78,7 @@ export function fencedStore(store: Store, lease: Lease, now = Date.now): Store {
     "finishCommand",
     "putRecord",
     "deleteRecord",
+    "removeRepository",
   ]);
   return new Proxy(store, {
     get(target, key) {

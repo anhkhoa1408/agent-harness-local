@@ -3,6 +3,7 @@ import { createTaskRepository } from "./task-repository";
 import { createEventRepository } from "./event-repository";
 import { createCommandQueue } from "./command-queue";
 import { createRecordRepository } from "./record-repository";
+import { createRepositoryRegistry } from "./repository-registry";
 export function openStore(filename: string) {
   const db = openDatabase(filename);
   const events = createEventRepository(db);
@@ -18,6 +19,7 @@ export function openStore(filename: string) {
     ...commands,
     ...records,
     ...events,
+    ...createRepositoryRegistry(db),
     close() {
       db.close();
     },

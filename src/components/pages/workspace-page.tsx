@@ -8,6 +8,7 @@ import { FeedbackMessage } from "@/components/molecules/feedback-message";
 import { api } from "@/lib/api";
 import { NewTaskForm } from "@/components/organisms/workspace/new-task-form";
 import { RepositoryForm } from "@/components/organisms/workspace/repository-form";
+import { RepositoryManager } from "@/components/organisms/workspace/repository-manager";
 import { TaskList } from "@/components/organisms/workspace/task-list";
 import { WorkspaceOverview } from "@/components/organisms/workspace/workspace-overview";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,9 @@ export function WorkspacePage() {
       setTasks(t);
       setHealth(h.worker);
       setConfigured(!!s.models);
-      setRepoId((old) => old || r[0]?.id || "");
+      setRepoId((old) =>
+        r.some((repo) => repo.id === old) ? old : r[0]?.id || "",
+      );
     } catch (e) {
       setError(String(e));
     }
@@ -157,6 +160,14 @@ export function WorkspacePage() {
             />
           </DialogContent>
         </Dialog>
+        <RepositoryManager
+          repos={repos}
+          tasks={tasks}
+          onRemove={async (repo) => {
+            await api(`repositories/${encodeURIComponent(repo.id)}`, "DELETE");
+            await load();
+          }}
+        />
       </div>
       <TaskList tasks={tasks} repos={repos} />
     </>

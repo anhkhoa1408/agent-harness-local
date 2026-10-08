@@ -14,7 +14,7 @@ import type { Store } from "../storage/store";
 import type { StoryRepositoryPort } from "./ports";
 export class TaskService {
   constructor(
-    private readonly store: Pick<Store, "getRecord" | "createTask">,
+    private readonly store: Pick<Store, "getRecord" | "createTask" | "atomic">,
     private readonly repository: Pick<StoryRepositoryPort, "readGit">,
     private readonly listModels: () => Promise<ModelInfo[]>,
   ) {}
@@ -48,6 +48,10 @@ export class TaskService {
     ]);
     const catalog = await this.listModels();
     for (const stage of aiStages) resolveModel(stage, task.models, {}, catalog);
-    return this.store.createTask(task);
+    return this.store.atomic(() => {
+      if (!this.store.getRecord("repository", task.repositoryId))
+        throw new Error("repository_not_found");
+      return this.store.createTask(task);
+    });
   }
 }

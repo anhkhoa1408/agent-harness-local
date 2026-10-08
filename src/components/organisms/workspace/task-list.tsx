@@ -18,11 +18,14 @@ export function TaskList({
   repos: Repository[];
 }) {
   const [filterRepoId, setFilterRepoId] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("running");
+  const [filterStatus, setFilterStatus] = useState("all");
   const [activityLimit, setActivityLimit] = useState("3");
+  const repositoryFilter = repos.some((repo) => repo.id === filterRepoId)
+    ? filterRepoId
+    : "all";
   const filteredTasks = tasks.filter(
     (task) =>
-      (filterRepoId === "all" || task.repositoryId === filterRepoId) &&
+      (repositoryFilter === "all" || task.repositoryId === repositoryFilter) &&
       (filterStatus === "all" || task.status === filterStatus),
   );
   const visibleTasks = filteredTasks.slice(0, Number(activityLimit));
@@ -65,7 +68,7 @@ export function TaskList({
             <SelectField
               id="activity-repository"
               label="Lọc theo repository"
-              value={filterRepoId}
+              value={repositoryFilter}
               onValueChange={setFilterRepoId}
               options={[
                 { value: "all", label: "Tất cả repository" },
@@ -113,14 +116,14 @@ export function TaskList({
           title={
             filterStatus !== "all"
               ? "Không có hoạt động phù hợp"
-              : filterRepoId === "all"
+              : repositoryFilter === "all"
                 ? "Workspace đang sẵn sàng"
                 : "Repository chưa có task"
           }
           description={
             filterStatus !== "all"
               ? "Chọn trạng thái hoặc repository khác để xem hoạt động."
-              : filterRepoId === "all"
+              : repositoryFilter === "all"
                 ? "Thêm repo và tạo task đầu tiên. Mọi tiến trình sẽ xuất hiện ở đây."
                 : "Chọn repository khác hoặc tạo task cho repository này."
           }
