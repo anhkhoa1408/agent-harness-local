@@ -6,7 +6,7 @@ import { openStore } from "../../src/storage/store";
 import { createHttpHandler } from "../../src/server/http";
 import { bootstrapSession } from "../../src/server/local-session";
 import { taskFixture } from "../support/task-fixture";
-import { TaskService } from "../../src/application/task-service";
+import { TaskService } from "../support/services";
 import { inspectRepository, gitText } from "../../src/repositories/inspect";
 import { createTempRepo } from "../support/temp-repo";
 import { runWorker } from "../../src/worker/engine";

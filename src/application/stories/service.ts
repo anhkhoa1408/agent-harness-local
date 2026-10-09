@@ -1,42 +1,44 @@
-import { storyKey } from "../core/story-key";
-export { storyKey } from "../core/story-key";
+import type {ValidationPort} from "../validation";
+import type {RuntimePort} from "../runtime";
+import { storyKey } from "../../domain/story-key";
+export { storyKey } from "../../domain/story-key";
 import {
   prepareSeparateStory,
   reconcileFeatureStories,
   assertSharedHead,
-} from "./story-orchestration";
-import { assertCompletedStoryScopeUnchanged } from "../core/story-replan";
+} from "./orchestration";
+import { assertCompletedStoryScopeUnchanged } from "../../domain/story-replan";
 
-import type { ApplicationStore, StoryRepositoryPort } from "./ports";
+import type { ApplicationStore, StoryRepositoryPort } from "../ports";
 import {
-  PlanSchema,
-  StorySelectionSchema,
   type Task,
   type Plan,
   type StorySelection,
   type StoryExecution,
   type StoryRun,
-} from "../core/contracts";
+} from "../../domain/contracts";
 import {
   selectedStories,
   projectStoryPlan,
   projectSelectedPlan,
-} from "../core/stories";
+} from "../../domain/stories";
 const started = (runs: StoryRun[]) =>
   runs.some((r) => r.state !== "pending" || r.childTaskId);
 export class StoryService {
   constructor(
     private readonly store: ApplicationStore,
     private readonly repository: StoryRepositoryPort,
+    private readonly validation:ValidationPort,
+    private readonly runtime:RuntimePort,
   ) {}
   getExecution(id: string) {
-    return this.store.getRecord("story-execution", id) as StoryExecution | null;
+    return this.store.storyExecutions.get(id) as StoryExecution | null;
   }
   listStoryRuns(id: string): StoryRun[] {
     const store = this.store;
 
     const execution = this.getExecution(id);
-    return (store.listRecords("story-run") as StoryRun[]).filter(
+    return (store.storyRuns.list() as StoryRun[]).filter(
       (r) =>
         r.featureId === id &&
         r.planVersion === execution?.selection.planVersion,
@@ -47,8 +49,8 @@ export class StoryService {
 
     const execution = this.getExecution(task.id);
     if (!execution || !started(this.listStoryRuns(task.id))) return;
-    const previous = PlanSchema.parse(
-      store.getRecord("plan", `${task.id}:${execution.selection.planVersion}`),
+    const previous = this.validation.plan(
+      store.plans.get(`${task.id}:${execution.selection.planVersion}`),
     );
     assertCompletedStoryScopeUnchanged(
       previous,
@@ -64,10 +66,10 @@ export class StoryService {
     const store = this.store;
 
     store.atomic(() => {
-      const plan = PlanSchema.parse(
-        store.getRecord("plan", `${task.id}:${task.planVersion}`),
+      const plan = this.validation.plan(
+        store.plans.get(`${task.id}:${task.planVersion}`),
       );
-      const selection = StorySelectionSchema.parse(raw),
+      const selection = this.validation.storySelection(raw),
         ordered = selectedStories(plan, selection);
       const old = this.getExecution(task.id),
         runs = this.listStoryRuns(task.id);
@@ -92,10 +94,10 @@ export class StoryService {
           state: "pending",
           baselineCommit: task.sourceCommit,
           ...prior,
-          updatedAt: Date.now(),
+          updatedAt: this.runtime.now(),
         };
         run.planVersion = plan.version;
-        store.putRecord("story-run", storyKey(run), run);
+        store.storyRuns.put(storyKey(run), run);
       }
       const active = ordered.find(
         (s) =>
@@ -103,7 +105,7 @@ export class StoryService {
             (r) => retain && r.storyId === s.id && r.state === "completed",
           ),
       );
-      store.putRecord("story-execution", task.id, {
+      store.storyExecutions.put(task.id, {
         selection,
         activeStoryId: active?.id ?? null,
         baselineCommit: retain ? old!.baselineCommit : task.sourceCommit,
@@ -123,8 +125,8 @@ export class StoryService {
   getExecutionPlan(task: Task): Plan {
     const store = this.store;
 
-    const plan = PlanSchema.parse(
-      store.getRecord("plan", `${task.id}:${task.planVersion}`),
+    const plan = this.validation.plan(
+      store.plans.get(`${task.id}:${task.planVersion}`),
     );
     const e = this.getExecution(task.id);
     if (
@@ -148,7 +150,7 @@ export class StoryService {
       baselineCommit: task.sourceCommit,
     };
     if (
-      JSON.stringify(store.getRecord("story-evidence", task.id)) !==
+      JSON.stringify(store.storyEvidence.get(task.id)) !==
       JSON.stringify(expected)
     )
       throw new Error("stale_story_evidence");
@@ -158,7 +160,7 @@ export class StoryService {
 
     const e = this.getExecution(task.id);
     if (e?.selection.mode === "shared_pr")
-      store.putRecord("story-evidence", task.id, {
+      store.storyEvidence.put(task.id, {
         storyId: e.aggregate ? null : e.activeStoryId,
         planVersion: task.planVersion,
         baselineCommit: task.sourceCommit,
@@ -179,14 +181,14 @@ export class StoryService {
       (r) => r.storyId === e.activeStoryId,
     )!;
     return store.atomic(() => {
-      store.putRecord("story-run", storyKey(run), {
+      store.storyRuns.put(storyKey(run), {
         ...run,
         state: "completed",
         ...checkpoint,
-        updatedAt: Date.now(),
+        updatedAt: this.runtime.now(),
       });
-      const plan = PlanSchema.parse(
-        store.getRecord("plan", `${task.id}:${task.planVersion}`),
+      const plan = this.validation.plan(
+        store.plans.get(`${task.id}:${task.planVersion}`),
       );
       const next = selectedStories(plan, e.selection).find(
         (s) =>
@@ -194,17 +196,17 @@ export class StoryService {
             (r) => r.storyId === s.id && r.state === "completed",
           ),
       );
-      store.putRecord("story-execution", task.id, {
+      store.storyExecutions.put(task.id, {
         ...e,
         activeStoryId: next?.id ?? null,
         baselineCommit: checkpoint.commit,
         aggregate: !next,
       });
-      store.deleteRecord("checks", task.id);
-      store.deleteRecord("review", task.id);
-      store.deleteRecord("acceptance", task.id);
-      store.deleteRecord("story-evidence", task.id);
-      store.addEvent(task.id, "story.checkpoint", {
+      store.checks.delete(task.id);
+      store.reviews.delete(task.id);
+      store.acceptance.delete(task.id);
+      store.storyEvidence.delete(task.id);
+      store.events.add(task.id, "story.checkpoint", {
         storyId: run.storyId,
         ...checkpoint,
       });
@@ -216,8 +218,8 @@ export class StoryService {
         reason: e.selection.continueAutomatically ? null : "story_checkpoint",
         output: checkpoint,
       };
-      const current = store.getTask(task.id);
-      store.updateTask(
+      const current = store.tasks.get(task.id);
+      store.tasks.update(
         task.id,
         current.revision,
         {
@@ -239,6 +241,8 @@ export class StoryService {
       this.store,
       this,
       this.repository,
+      this.validation,
+      this.runtime,
       task,
       signal,
     );
@@ -248,6 +252,8 @@ export class StoryService {
       this.store,
       this,
       this.repository,
+      this.validation,
+      this.runtime,
       featureId,
       signal,
     );

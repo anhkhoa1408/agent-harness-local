@@ -1,5 +1,9 @@
-import { PlanService } from "../application/plan-service";
-import { StoryService } from "../application/story-service";
+import {createStoryGit} from "../infrastructure/repositories/story-git";
+import {createRepositories} from "../infrastructure/persistence/repositories";
+import {validation} from "../infrastructure/validation/gateway";
+import {systemRuntime} from "../infrastructure/runtime/system";
+import { PlanService } from "../application/planning";
+import { StoryService } from "../application/stories";
 
 import { join } from "node:path";
 
@@ -13,11 +17,8 @@ import { fingerprintWorktree } from "../repositories/fingerprint";
 import { evidenceExclusions } from "../execution/ui-verification";
 
 export function createStageContext(store: Store, data: string) {
-  const storyService = new StoryService(store, {
-    readGit: gitText,
-    fingerprintWorktree,
-  });
-  const planService = new PlanService(store, storyService);
+  const storyService = new StoryService(createRepositories(store), createStoryGit(),validation,systemRuntime);
+  const planService = new PlanService(createRepositories(store), storyService,validation,systemRuntime);
   const artifacts = (task: Task) => {
     const e = storyService.getExecution(task.id);
     return e?.selection.mode === "shared_pr"

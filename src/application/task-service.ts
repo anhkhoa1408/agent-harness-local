@@ -1,36 +1,26 @@
+import type {ApplicationStore} from "./ports";
+import type {ValidationPort} from "./validation";
+import type {ModelService} from "./models";
 import {
-  ModelMapSchema,
-  NewTaskSchema,
-  RepositorySchema,
-  aiStages,
-} from "../core/contracts";
+} from "../domain/contracts";
 import {
-  resolveModel,
   applyEffortPolicy,
-  type ModelInfo,
-} from "../core/model-policy";
-import { SettingsSchema } from "../core/settings";
-import type { Store } from "../storage/store";
+} from "../domain/model-policy";
 import type { StoryRepositoryPort } from "./ports";
 export class TaskService {
   constructor(
-    private readonly store: Pick<Store, "getRecord" | "createTask" | "atomic">,
-    private readonly repository: Pick<StoryRepositoryPort, "readGit">,
-    private readonly listModels: () => Promise<ModelInfo[]>,
+    private readonly store: ApplicationStore,
+    private readonly repository: Pick<StoryRepositoryPort, "resolveCommit"|"validateBranch">,
+    private readonly models:ModelService,
+    private readonly validation:ValidationPort,
   ) {}
   async createTask(raw: Record<string, unknown>) {
-    const settings = SettingsSchema.parse(
-      this.store.getRecord("settings", "current") ?? {},
+    const settings = this.models.getSettings();
+    const repo = this.validation.repository(
+      this.store.repositories.get(raw.repositoryId as string),
     );
-    const repo = RepositorySchema.parse(
-      this.store.getRecord("repository", raw.repositoryId as string),
-    );
-    const sourceCommit = await this.repository.readGit(repo.root, [
-      "rev-parse",
-      "--verify",
-      `${repo.baseBranch}^{commit}`,
-    ]);
-    const task = NewTaskSchema.parse({
+    const sourceCommit = await this.repository.resolveCommit(repo.root,repo.baseBranch);
+    const task = this.validation.newTask({
       ...raw,
       featureId: undefined,
       storyId: undefined,
@@ -38,20 +28,15 @@ export class TaskService {
       executionMode: raw.executionMode ?? settings.executionMode,
       targetBranch: raw.targetBranch ?? repo.baseBranch,
       models: applyEffortPolicy(
-        ModelMapSchema.parse(raw.models ?? settings.models),
+        this.validation.models(raw.models ?? settings.models),
       ),
     });
-    await this.repository.readGit(repo.root, [
-      "check-ref-format",
-      "--branch",
-      task.targetBranch,
-    ]);
-    const catalog = await this.listModels();
-    for (const stage of aiStages) resolveModel(stage, task.models, {}, catalog);
+    await this.repository.validateBranch(repo.root,task.targetBranch);
+    await this.models.validateModels(task.models);
     return this.store.atomic(() => {
-      if (!this.store.getRecord("repository", task.repositoryId))
+      if (!this.store.repositories.get(task.repositoryId))
         throw new Error("repository_not_found");
-      return this.store.createTask(task);
+      return this.store.tasks.create(task);
     });
   }
 }

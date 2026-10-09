@@ -1,15 +1,15 @@
-import { MAX_TITLE_CHARACTERS } from "../core/limits";
+import type {ValidationPort} from "../validation";
+import type {RuntimePort} from "../runtime";
+import { MAX_TITLE_CHARACTERS } from "../../domain/limits";
 import {
-  PlanSchema,
-  RepositorySchema,
   type Task,
   type StoryRun,
-} from "../core/contracts";
-import { selectedStories, projectStoryPlan } from "../core/stories";
-import { evidenceExclusions } from "../core/evidence";
-import type { StoryService } from "./story-service";
-import { storyKey } from "../core/story-key";
-import type { ApplicationStore, StoryRepositoryPort } from "./ports";
+} from "../../domain/contracts";
+import { selectedStories, projectStoryPlan } from "../../domain/stories";
+import { evidenceExclusions } from "../../domain/evidence";
+import type { StoryService } from "./service";
+import { storyKey } from "../../domain/story-key";
+import type { ApplicationStore, StoryRepositoryPort } from "../ports";
 type StoryStatePort = Pick<
   StoryService,
   "getExecution" | "listStoryRuns" | "getExecutionPlan"
@@ -18,45 +18,28 @@ export async function prepareSeparateStory(
   store: ApplicationStore,
   stories: StoryStatePort,
   repository: StoryRepositoryPort,
+  validation:ValidationPort,
+  runtime:RuntimePort,
   task: Task,
   signal: AbortSignal,
 ): Promise<StoryRun> {
   const e = stories.getExecution(task.id)!;
-  const plan = PlanSchema.parse(
-    store.getRecord("plan", `${task.id}:${e.selection.planVersion}`),
+  const plan = validation.plan(
+    store.plans.get(`${task.id}:${e.selection.planVersion}`),
   );
   const run = selectedStories(plan, e.selection)
     .map((s) => stories.listStoryRuns(task.id).find((r) => r.storyId === s.id)!)
     .find((r) => r.state !== "completed");
   if (!run) throw new Error("stories_complete");
   if (run.childTaskId) return run;
-  const repo = RepositorySchema.parse(
-    store.getRecord("repository", task.repositoryId),
+  const repo = validation.repository(
+    store.repositories.get(task.repositoryId),
   );
   const story = plan.stories!.find((s) => s.id === run.storyId)!;
   let source = task.sourceCommit;
   if (story.dependsOn.length) {
-    if (repo.remote)
-      await repository.readGit(
-        repo.root,
-        [
-          "fetch",
-          "--no-tags",
-          "--",
-          repo.remote,
-          `+refs/heads/${task.targetBranch}:refs/remotes/${repo.remote}/${task.targetBranch}`,
-        ],
-        signal,
-      );
-    source = await repository.readGit(
-      repo.root,
-      [
-        "rev-parse",
-        "--verify",
-        `${repo.remote ? `refs/remotes/${repo.remote}/${task.targetBranch}` : `refs/heads/${task.targetBranch}`}^{commit}`,
-      ],
-      signal,
-    );
+    if (repo.remote) await repository.fetchBranch(repo.root,repo.remote,task.targetBranch,signal);
+    source = await repository.resolveCommit(repo.root, repo.remote ? `refs/remotes/${repo.remote}/${task.targetBranch}` : `refs/heads/${task.targetBranch}`,signal);
     for (const id of story.dependsOn) {
       const previous = stories
         .listStoryRuns(task.id)
@@ -64,11 +47,7 @@ export async function prepareSeparateStory(
       if (previous?.state !== "completed" || !previous.commit)
         throw new Error(`story_dependency_not_integrated:${id}`);
       try {
-        await repository.readGit(
-          repo.root,
-          ["merge-base", "--is-ancestor", previous.commit, source],
-          signal,
-        );
+        await repository.assertAncestor(repo.root,previous.commit,source,signal);
       } catch {
         signal.throwIfAborted();
         throw new Error(`story_dependency_not_integrated:${id}`);
@@ -77,9 +56,9 @@ export async function prepareSeparateStory(
   }
   signal.throwIfAborted();
   return store.atomic(() => {
-    const current = store.getRecord("story-run", storyKey(run)) as StoryRun;
+    const current = store.storyRuns.get(storyKey(run)) as StoryRun;
     if (current.childTaskId) return current;
-    const child = store.createTask({
+    const child = store.tasks.create({
       repositoryId: task.repositoryId,
       title: `${task.title}: ${story.title}`.slice(0, MAX_TITLE_CHARACTERS),
       requirement: `Implement ONLY story ${story.id}: ${story.outcome}. Acceptance: ${plan.criteria
@@ -102,8 +81,8 @@ export async function prepareSeparateStory(
         taskId: child.id,
         version: 1,
       };
-      store.putRecord("plan", `${child.id}:1`, projected);
-      store.updateTask(
+      store.plans.put(`${child.id}:1`, projected);
+      store.tasks.update(
         child.id,
         child.revision,
         { planVersion: 1, approvedPlanVersion: 1, stage: "prepare" },
@@ -116,26 +95,24 @@ export async function prepareSeparateStory(
           },
         },
       );
-      const profile = store.getRecord(
-        "profile",
-        `${task.repositoryId}:${source}`,
+      const profile = store.profiles.get(`${task.repositoryId}:${source}`,
       );
       if (profile)
-        store.putRecord("profile", `${child.repositoryId}:${source}`, profile);
+        store.profiles.put(`${child.repositoryId}:${source}`, profile);
     }
     const updated = {
       ...run,
       state: "running" as const,
       childTaskId: child.id,
       baselineCommit: source,
-      updatedAt: Date.now(),
+      updatedAt: runtime.now(),
     };
-    store.putRecord("story-run", storyKey(updated), updated);
-    store.putRecord("story-execution", task.id, {
+    store.storyRuns.put(storyKey(updated), updated);
+    store.storyExecutions.put(task.id, {
       ...e,
       activeStoryId: story.id,
     });
-    store.addEvent(task.id, "story.child_created", {
+    store.events.add(task.id, "story.child_created", {
       storyId: story.id,
       childTaskId: child.id,
     });
@@ -146,11 +123,13 @@ export async function reconcileFeatureStories(
   store: ApplicationStore,
   stories: StoryStatePort,
   repository: StoryRepositoryPort,
+  validation:ValidationPort,
+  runtime:RuntimePort,
   featureId: string,
   signal: AbortSignal,
 ): Promise<void> {
   signal.throwIfAborted();
-  const task = store.getTask(featureId),
+  const task = store.tasks.get(featureId),
     e = stories.getExecution(featureId);
   if (
     e?.selection.mode !== "separate_pr" ||
@@ -162,22 +141,22 @@ export async function reconcileFeatureStories(
     for (const run of stories
       .listStoryRuns(featureId)
       .filter((r) => r.childTaskId && r.state !== "completed")) {
-      const child = store.getTask(run.childTaskId!),
-        delivery = store.getRecord("delivery", child.id) as {
+      const child = store.tasks.get(run.childTaskId!),
+        delivery = store.deliveries.get(child.id) as {
           commit: string;
           prUrl: string | null;
           reportPath: string;
         } | null;
       if (child.status === "completed" && delivery) {
-        store.putRecord("story-run", storyKey(run), {
+        store.storyRuns.put(storyKey(run), {
           ...run,
           state: "completed",
           commit: delivery.commit,
           prUrl: delivery.prUrl,
           checkpointPath: delivery.reportPath,
-          updatedAt: Date.now(),
+          updatedAt: runtime.now(),
         });
-        store.addEvent(task.id, "story.completed", {
+        store.events.add(task.id, "story.completed", {
           storyId: run.storyId,
           childTaskId: child.id,
           commit: delivery.commit,
@@ -185,7 +164,7 @@ export async function reconcileFeatureStories(
         const all = stories
           .listStoryRuns(featureId)
           .every((r) => r.state === "completed");
-        store.updateTask(
+        store.tasks.update(
           task.id,
           task.revision,
           {
@@ -207,12 +186,12 @@ export async function reconcileFeatureStories(
       if (
         ["blocked", "interrupted", "failed", "cancelled"].includes(child.status)
       ) {
-        store.putRecord("story-run", storyKey(run), {
+        store.storyRuns.put(storyKey(run), {
           ...run,
           state: child.status === "interrupted" ? "interrupted" : "blocked",
-          updatedAt: Date.now(),
+          updatedAt: runtime.now(),
         });
-        store.updateTask(
+        store.tasks.update(
           task.id,
           task.revision,
           { status: "blocked", reason: `story_child_attention:${child.id}` },
@@ -222,7 +201,7 @@ export async function reconcileFeatureStories(
       }
     }
     if (stories.listStoryRuns(featureId).every((r) => r.state === "completed"))
-      store.updateTask(
+      store.tasks.update(
         task.id,
         task.revision,
         { stage: "deliver", status: "completed", reason: null },
@@ -239,7 +218,7 @@ export async function assertSharedHead(
 ) {
   const e = stories.getExecution(task.id);
   if (e?.selection.mode !== "shared_pr" || !task.worktree) return;
-  const head = await repository.readGit(task.worktree, ["rev-parse", "HEAD"]);
+  const head = await repository.head(task.worktree);
   if (head === e.baselineCommit) return;
   if (delivery && e.aggregate) {
     const plan = stories.getExecutionPlan(task),
@@ -248,22 +227,15 @@ export async function assertSharedHead(
         evidenceExclusions(plan),
         task.sourceCommit,
       );
-    const effect = store.getRecord(
-      "effect",
-      `${task.id}:commit:${fingerprint}`,
+    const effect = store.effects.get(`${task.id}:commit:${fingerprint}`,
     ) as { state: string; parent: string; commit?: string } | null;
     if (effect?.state === "confirmed" && effect.commit === head) return;
     if (
       effect?.state === "intent" &&
       effect.parent === e.baselineCommit &&
-      (await repository.readGit(task.worktree, ["rev-parse", "HEAD^"])) ===
+      (await repository.headParent(task.worktree)) ===
         effect.parent &&
-      (await repository.readGit(task.worktree, [
-        "show",
-        "-s",
-        "--format=%B",
-        "HEAD",
-      ])) === `feat: ${task.title}\n\nHarness-Task: ${task.id}`
+      (await repository.headMessage(task.worktree)) === `feat: ${task.title}\n\nHarness-Task: ${task.id}`
     )
       return;
   }

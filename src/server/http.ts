@@ -1,3 +1,7 @@
+import {createStoryGit} from "../infrastructure/repositories/story-git";
+import {createRepositories} from "../infrastructure/persistence/repositories";
+import {validation} from "../infrastructure/validation/gateway";
+import {systemRuntime} from "../infrastructure/runtime/system";
 import { ModelService } from "../application/models";
 import { SettingsSchema } from "../core/settings";
 import { TaskService } from "../application/task-service";
@@ -28,7 +32,7 @@ export function createHttpHandler(
   folderPicker: () => Promise<string | null> = pickFolder,
 ) {
   const { stories: storyService, plans: planService } = createServices(store);
-  const taskService = new TaskService(store, { readGit: gitText }, models);
+  const taskService = new TaskService(createRepositories(store), createStoryGit(), new ModelService({get:()=>validation.settings(store.getRecord("settings","current")??{}),put:value=>store.putRecord("settings","current",value)},{listModels:models}),validation);
   const context = {
     modelService: new ModelService(
       {
