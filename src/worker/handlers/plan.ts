@@ -1,4 +1,3 @@
-import { PlanOutputSchema, parsePlanOutput } from "../../context/plan-output";
 
 import type { StageHandlerContext } from "../handler-context";
 import type { StageHandler } from "../types";
@@ -9,7 +8,7 @@ export function createPlanHandler(context: StageHandlerContext): StageHandler {
     const output = await executor.executeAgentStage(
       task,
       "plan",
-      PlanOutputSchema,
+      context.validation.outputs.plan,
       {
         task: stageTask(task),
         version: (task.planVersion ?? 0) + 1,
@@ -30,7 +29,7 @@ export function createPlanHandler(context: StageHandlerContext): StageHandler {
       },
       signal,
     );
-    const plan = parsePlanOutput(output);
+    const plan = context.validation.planOutput(output);
     const saved = planService.savePlan(task.id, plan);
     return {
       stage: saved.stage,

@@ -44,3 +44,5 @@ export function resolveModel(
     throw new Error(`effort_unavailable: ${choice.effort}`);
   return { ...choice };
 }
+
+export const parentAgentModel = {model:"gpt-6-luna",effort:"medium"};

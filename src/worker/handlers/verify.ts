@@ -1,4 +1,3 @@
-import { VisualReviewSchema } from "../../core/contracts";
 
 import { runChecks } from "../../execution/checks";
 import {
@@ -67,7 +66,7 @@ export function createVerifyHandler(
       const verdict = await executor.executeAgentStage(
         task,
         "review",
-        VisualReviewSchema,
+        context.validation.outputs.visual,
         {
           criteria: plan.criteria.filter((c) =>
             images.some((s) => s.criterionIds.includes(c.id)),

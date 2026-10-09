@@ -27,6 +27,9 @@ export type Attempt = {
   threadId: string | null;
   turnId: string | null;
   fingerprint: string | null;
+  child?:import("../agent-execution").NativeChildResult|{threadId:string;parentThreadId:string;model:Task["models"][keyof Task["models"]]};
+  parentModel?:Task["models"][keyof Task["models"]];
+  usage?:unknown;
 };
 export type ActiveStageAttempt = {
   taskId: string;

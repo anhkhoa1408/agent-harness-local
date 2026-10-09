@@ -1,3 +1,8 @@
+import {createRepositories} from "../infrastructure/persistence/repositories";
+import {contextIO,packetIO,supportsApproval} from "../infrastructure/context/preparation";
+import {systemRuntime} from "../infrastructure/runtime/system";
+import {ModelService} from "../application/models";
+import {validation} from "../infrastructure/validation/gateway";
 import { stages, type Task } from "../core/contracts";
 import type { Store } from "../storage/store";
 import type { AgentClient } from "../codex/types";
@@ -31,7 +36,7 @@ export function createHandlers(
   data: string,
 ): Handlers {
   const base = createStageContext(store, data);
-  const context = { ...base, executor: new StageAgentExecutor(base, client) };
+  const context = { ...base, executor: new StageAgentExecutor({...base,store:createRepositories(store)},client,new ModelService({get:()=>null,put:()=>{}},client),contextIO,packetIO,systemRuntime,supportsApproval) };
   const { storyService } = context;
   const handlers: Handlers = {
     ...unavailableHandlers(),

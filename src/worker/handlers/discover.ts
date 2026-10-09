@@ -1,4 +1,3 @@
-import { RepoProfileSchema } from "../../core/contracts";
 
 import { sourceDocuments } from "../../repositories/inspect";
 
@@ -15,7 +14,7 @@ export function createDiscoverHandler(
     const profile = await executor.executeAgentStage(
       task,
       "discover",
-      RepoProfileSchema,
+      context.validation.outputs.profile,
       `Inspect the committed source snapshot only. Do not run setup or commands. Return languages, areas, candidate argv commands, prerequisites, evidence paths and unknowns. Missing or truncated files are unknowns. repositoryId=${repo.id}; sourceCommit=${repo.head}`,
       signal,
     );

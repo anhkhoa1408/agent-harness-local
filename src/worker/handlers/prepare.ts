@@ -1,4 +1,3 @@
-import { mutationSchema } from "../mutation-schema";
 import { join } from "node:path";
 
 import { PlanSchema } from "../../core/contracts";
@@ -81,7 +80,7 @@ export function createPrepareHandler(
             const result = await executor.executeAgentStage(
               { ...task, worktree: path },
               "repair",
-              mutationSchema,
+              context.validation.outputs.mutation,
               {
                 task: stageTask(task),
                 conflicts,

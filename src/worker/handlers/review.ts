@@ -1,4 +1,3 @@
-import { ReviewSchema } from "../../core/contracts";
 
 import { gitText } from "../../repositories/inspect";
 
@@ -24,7 +23,7 @@ export function createReviewHandler(
     const review = await executor.executeAgentStage(
       task,
       "review",
-      ReviewSchema,
+      context.validation.outputs.review,
       {
         task: stageTask(task),
         plan,
