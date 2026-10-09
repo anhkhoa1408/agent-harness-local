@@ -2,8 +2,8 @@ import { test, expect } from "vitest";
 import { cp, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveBundle } from "../../src/context/skills";
-import { aiStages } from "../../src/core/contracts";
+import { resolveBundle } from "../../src/infrastructure/context/skills";
+import { aiStages } from "../../src/domain/contracts";
 test("copied runtime skills need no installed plugin roots on another machine", async () => {
   const root = await mkdtemp(join(tmpdir(), "portable-skills-"));
   try {

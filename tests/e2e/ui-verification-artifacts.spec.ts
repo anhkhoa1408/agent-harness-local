@@ -7,9 +7,9 @@ import {
   collectScreenshots,
   visualChecks,
   verifyImageEvidence,
-} from "../../src/execution/ui-verification";
-import { fingerprintWorktree } from "../../src/repositories/fingerprint";
-import { gitText } from "../../src/repositories/inspect";
+} from "../../src/infrastructure/execution/ui-verification";
+import { fingerprintWorktree } from "../../src/infrastructure/repositories/fingerprint";
+import { gitText } from "../../src/infrastructure/repositories/inspect";
 import { createTempRepo } from "../support/temp-repo";
 import { planFixture, taskFixture } from "../support/task-fixture";
 function render(

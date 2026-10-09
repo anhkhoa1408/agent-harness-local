@@ -4,8 +4,8 @@ import {
   approvePlan,
   canImplement,
   stageAfterPreparation,
-} from "../../src/core/transitions";
-import { validatePlan } from "../../src/core/acceptance";
+} from "../../src/domain/transitions";
+import { validatePlan } from "../../src/domain/acceptance";
 test("replanning after a repair keeps the repair stage and budget", () => {
   const task = approvePlan(
     taskFixture({ repairCount: 3, resumeStage: "repair" }),

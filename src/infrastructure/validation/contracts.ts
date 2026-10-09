@@ -1,4 +1,9 @@
-import { stages, aiStages, type AiStage } from "../../domain/contracts";
+import {
+  stages,
+  aiStages,
+  statuses,
+  type AiStage,
+} from "../../domain/contracts";
 export * from "../../domain/contracts";
 import {
   MAX_TITLE_CHARACTERS,
@@ -15,18 +20,7 @@ import {
 } from "../../domain/limits";
 import { z } from "zod";
 export const StageSchema = z.enum(stages);
-export const StatusSchema = z.enum([
-  "queued",
-  "running",
-  "waiting_input",
-  "waiting_approval",
-  "blocked",
-  "paused",
-  "interrupted",
-  "completed",
-  "cancelled",
-  "failed",
-]);
+export const StatusSchema = z.enum(statuses);
 export const ModelChoiceSchema = z.object({
   model: z.string().min(1),
   effort: z.string().min(1),

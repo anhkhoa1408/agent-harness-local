@@ -13,6 +13,8 @@ test.each([
   'export type { Store } from "../infrastructure/store";',
   'type Store = import("../infrastructure/store").Store;',
   'const load = () => import("@/infrastructure/store");',
+  'const load = require("../infrastructure/store");',
+  'import type {Store} from "@/infrastructure/store";',
 ])("application rejects infrastructure dependency through %s", (body) => {
   expect(
     audit({

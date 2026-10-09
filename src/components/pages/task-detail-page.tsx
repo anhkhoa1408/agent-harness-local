@@ -2,7 +2,7 @@
 import { TaskStories } from "@/components/organisms/task-detail/task-stories";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import Link from "next/link";
-import { type Event, type ControlCommand } from "@/core/contracts";
+import { type Event, type ControlCommand } from "../../domain/contracts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

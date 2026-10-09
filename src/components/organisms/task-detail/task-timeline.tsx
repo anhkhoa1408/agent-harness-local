@@ -1,4 +1,4 @@
-import type { Event } from "@/core/contracts";
+import type { Event } from "@/presentation/dto";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { FeedbackMessage } from "@/components/molecules/feedback-message";
 export function TaskTimeline({ events }: { events: Event[] }) {

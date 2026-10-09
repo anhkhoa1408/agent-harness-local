@@ -111,7 +111,7 @@ E2E mô phỏng agent, còn Git, test runner và browser chạy thật. Test nà
 
 Xem [kiến trúc backend](docs/backend-architecture.md) để theo dõi application services, worker, adapters và giao tiếp cha–con.
 
-Luồng chạy task nằm ở [worker/runtime.ts](src/worker/runtime.ts) và [worker/stages.ts](src/worker/stages.ts). Code chọn profile và skill nằm ở [context/agents.ts](src/context/agents.ts) và [context/skills.ts](src/context/skills.ts).
+Luồng chạy task nằm ở [pipeline/runtime.ts](src/application/pipeline/runtime.ts) và [pipeline/stages.ts](src/application/pipeline/stages.ts). Code chọn profile và skill nằm ở [context/agents.ts](src/infrastructure/context/agents.ts) và [context/skills.ts](src/infrastructure/context/skills.ts).
 
 ## Chia feature thành stories
 

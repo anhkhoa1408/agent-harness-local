@@ -1,7 +1,7 @@
 import { test, expect } from "vitest";
-import { openStore } from "../../src/storage/store";
-import { createHttpHandler } from "../../src/server/http";
-import { bootstrapSession } from "../../src/server/local-session";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createHttpHandler } from "../../src/bootstrap/http";
+import { bootstrapSession } from "../../src/bootstrap/session";
 
 test("folder picker requires a local session and CSRF; returns selection, cancellation and safe errors", async () => {
   const store = openStore(":memory:");

@@ -26,7 +26,7 @@ const children = [
     ],
     { stdio: "inherit" },
   ),
-  spawn(process.execPath, ["--import", "tsx", "src/worker/main.ts"], {
+  spawn(process.execPath, ["--import", "tsx", "src/bootstrap/worker-main.ts"], {
     stdio: "inherit",
   }),
 ];

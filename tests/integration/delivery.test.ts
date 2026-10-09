@@ -11,11 +11,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { inspectRepository, gitText } from "../../src/repositories/inspect";
-import { prepareWorktree } from "../../src/repositories/worktree";
-import { fingerprintWorktree } from "../../src/repositories/fingerprint";
-import { openStore } from "../../src/storage/store";
-import { createDelivery, type GitHubPort } from "../../src/delivery/github";
+import {
+  inspectRepository,
+  gitText,
+} from "../../src/infrastructure/repositories/inspect";
+import { prepareWorktree } from "../../src/infrastructure/repositories/worktree";
+import { fingerprintWorktree } from "../../src/infrastructure/repositories/fingerprint";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createDelivery, type GitHubPort } from "../../src/bootstrap/delivery";
 test("local delivery commits only owned feature and retry does not duplicate commit", async () => {
   await fixture(false, async ({ deliver, task, path }) => {
     const first = await deliver(task, new AbortController().signal);

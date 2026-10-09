@@ -4,11 +4,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { openStore } from "../../src/storage/store";
-import { inspectRepository } from "../../src/repositories/inspect";
-import { createHandlers } from "../../src/worker/stages";
-import { runWorker } from "../../src/worker/engine";
-import type { AgentClient, AgentInput } from "../../src/codex/client";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { inspectRepository } from "../../src/infrastructure/repositories/inspect";
+import { createHandlers } from "../../src/bootstrap/stages";
+import { runWorker } from "../../src/bootstrap/worker";
+import type {
+  AgentClient,
+  AgentInput,
+} from "../../src/infrastructure/codex/client";
 test.each(["manual", "auto"] as const)(
   "%s mode: feedback, approved isolated implementation, real failure/repair and independent review",
   async (executionMode) => {
@@ -228,13 +231,13 @@ test.each(["manual", "auto"] as const)(
       const frozen = store.getRecord(
         "bundle",
         `${task.id}:implement`,
-      ) as import("../../src/context/skills").Bundle;
+      ) as import("../../src/infrastructure/context/skills").Bundle;
       const optional = frozen.optionalFiles![0];
       // An approved E2E check enables the already-frozen profile, without reloading upstream.
       const savedPlan = store.getRecord(
         "plan",
         `${task.id}:2`,
-      ) as import("../../src/core/contracts").Plan;
+      ) as import("../../src/domain/contracts").Plan;
       savedPlan.checks[0].kind = "e2e";
       store.putRecord("plan", `${task.id}:2`, savedPlan);
       const waiting = store.getTask(task.id);
@@ -297,7 +300,7 @@ test.each(["manual", "auto"] as const)(
       const aiAttempts = (
         store.listRecords(
           "attempt",
-        ) as (import("../../src/worker/types").Attempt & {
+        ) as (import("../../src/application/pipeline-contracts").Attempt & {
           child: { threadId: string };
         })[]
       ).filter((a) =>

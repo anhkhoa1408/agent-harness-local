@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { join } from "node:path";
-import { openStore } from "../../src/storage/store";
-import { inspectRepository } from "../../src/repositories/inspect";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { inspectRepository } from "../../src/infrastructure/repositories/inspect";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture } from "../support/task-fixture";
 import { selectOption } from "../support/select";

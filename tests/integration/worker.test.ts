@@ -2,12 +2,16 @@ import { test, expect } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../src/storage/store";
-import { claimLease, renewLease, fencedStore } from "../../src/storage/lease";
-import { decideRecovery } from "../../src/worker/recovery";
-import { runWorker } from "../../src/worker/engine";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import {
+  claimLease,
+  renewLease,
+  fencedStore,
+} from "../../src/infrastructure/persistence/lease";
+import { decideRecovery } from "../../src/domain/recovery";
+import { runWorker } from "../../src/bootstrap/worker";
 import { taskFixture } from "../support/task-fixture";
-import { stages } from "../../src/core/contracts";
+import { stages } from "../../src/domain/contracts";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 test.each([
@@ -104,7 +108,7 @@ test("SIGKILL and worker restart preserve interrupted attempt without another wr
             return { stage, status: "blocked", reason: null, output: null };
           },
         ]),
-      ) as unknown as import("../../src/worker/types").Handlers,
+      ) as unknown as import("../../src/application/pipeline-contracts").Handlers,
       stop.signal,
     );
     await new Promise((r) => setTimeout(r, 80));
@@ -207,7 +211,7 @@ test("crash recovery excludes every queued writer even if unknown task is cancel
       store,
       Object.fromEntries(
         stages.map((s) => [s, handler]),
-      ) as unknown as import("../../src/worker/types").Handlers,
+      ) as unknown as import("../../src/application/pipeline-contracts").Handlers,
       stop.signal,
     );
     await new Promise((r) => setTimeout(r, 60));

@@ -1,26 +1,53 @@
-import type {Task,AiStage,Stage} from "../../domain/contracts";
-import {parentAgentModel as parentModel,applyEffortPolicy} from "../../domain/model-policy";
-import type {AgentExecutionPort,DelegatedStageInput,OutputCodec} from "./contracts";
-import type {ModelService} from "../models";
-import type {RuntimePort} from "../runtime";
-import type {RuntimeRecord} from "../ports";
-import {ContextPreparation,type AgentContext,type ContextPort,type PacketPort} from "./preparation";
-import {RuntimeRecording} from "./recording";
-import {ApprovalBroker} from "./approval";
-import {composeInstructions,stageEnvelope} from "./packet";
+import type { Task, AiStage, Stage } from "../../domain/contracts";
+import {
+  parentAgentModel as parentModel,
+  applyEffortPolicy,
+} from "../../domain/model-policy";
+import type {
+  AgentExecutionPort,
+  DelegatedStageInput,
+  OutputCodec,
+} from "../execution-contracts";
+import type { ModelService } from "../models";
+import type { RuntimePort } from "../runtime";
+import type { RuntimeRecord } from "../ports";
+import {
+  ContextPreparation,
+  type AgentContext,
+  type ContextPort,
+  type PacketPort,
+} from "./preparation";
+import { RuntimeRecording } from "./recording";
+import { ApprovalBroker } from "./approval";
+import { composeInstructions, stageEnvelope } from "./packet";
 export class StageAgentExecutor {
-  private readonly preparation:ContextPreparation;
-  constructor(private readonly context:AgentContext,private readonly client:Pick<AgentExecutionPort,"runDelegatedStage"|"respondToApproval">,private readonly models:ModelService,io:ContextPort,private readonly packets:PacketPort,private readonly runtime:RuntimePort,private readonly supportsApproval:(method:string)=>boolean){this.preparation=new ContextPreparation(context,io);}
-  freezeTaskBundles(task:Task){return this.preparation.freeze(task);}
+  private readonly preparation: ContextPreparation;
+  constructor(
+    private readonly context: AgentContext,
+    private readonly client: Pick<
+      AgentExecutionPort,
+      "runDelegatedStage" | "respondToApproval"
+    >,
+    private readonly models: ModelService,
+    io: ContextPort,
+    private readonly packets: PacketPort,
+    private readonly runtime: RuntimePort,
+    private readonly supportsApproval: (method: string) => boolean,
+  ) {
+    this.preparation = new ContextPreparation(context, io);
+  }
+  freezeTaskBundles(task: Task) {
+    return this.preparation.freeze(task);
+  }
   async executeAgentStage<T>(
     task: Task,
     stage: AiStage,
-    schema:OutputCodec<T>,
+    schema: OutputCodec<T>,
     context: unknown,
     signal: AbortSignal,
     options: { runtimeStage?: Stage; instructions?: string } = {},
   ): Promise<T> {
-    const { store, artifacts, repository } = this.context;
+    const { store, artifacts } = this.context;
     const client = this.client;
 
     await this.freezeTaskBundles(task);
@@ -36,19 +63,28 @@ export class StageAgentExecutor {
         ),
       );
     task = { ...task, models: applyEffortPolicy(task.models) };
-    const model=await this.models.resolveAttempt(stage,task.models,parentModel);
-    const runtimeStage=options.runtimeStage??stage;
-    const bundle=await this.preparation.bundle(task,stage,runtimeStage,options.instructions);
-    const attempt = (
-      store.attempts.list() 
-    ).find(
-      (a) =>
-        a.taskId === task.id &&
-        a.stage === runtimeStage &&
-        a.status === "running",
-    ) as { id: string } | undefined;
-    const attemptId=attempt?.id??this.runtime.id();
-    const parent=store.parents.get(task.id);
+    const model = await this.models.resolveAttempt(
+      stage,
+      task.models,
+      parentModel,
+    );
+    const runtimeStage = options.runtimeStage ?? stage;
+    const bundle = await this.preparation.bundle(
+      task,
+      stage,
+      runtimeStage,
+      options.instructions,
+    );
+    const attempt = store.attempts
+      .list()
+      .find(
+        (a) =>
+          a.taskId === task.id &&
+          a.stage === runtimeStage &&
+          a.status === "running",
+      ) as { id: string } | undefined;
+    const attemptId = attempt?.id ?? this.runtime.id();
+    const parent = store.parents.get(task.id);
     const input: DelegatedStageInput = {
       cwd: task.worktree!,
       model,
@@ -61,18 +97,30 @@ export class StageAgentExecutor {
       delegation: {
         stage: runtimeStage,
         attemptId,
-        packetPath: this.packets.path(artifacts(task),attemptId),
+        packetPath: this.packets.path(artifacts(task), attemptId),
       },
     };
-    await this.packets.write(input.delegation.packetPath,{instructions:input.instructions,input:context,outputSchema:stageEnvelope(input)});
+    await this.packets.write(input.delegation.packetPath, {
+      instructions: input.instructions,
+      input: context,
+      outputSchema: stageEnvelope(input),
+    });
     store.artifacts.put(attemptId, {
       id: attemptId,
       taskId: task.id,
       path: input.delegation!.packetPath,
       type: "context",
     });
-    const recorder=new RuntimeRecording(store,task.id,attemptId,bundle.hash,model,parentModel,!!attempt);
-    const runtime=(update:Partial<RuntimeRecord>)=>recorder.update(update);
+    const recorder = new RuntimeRecording(
+      store,
+      task.id,
+      attemptId,
+      bundle.hash,
+      model,
+      parentModel,
+      !!attempt,
+    );
+    const runtime = (update: Partial<RuntimeRecord>) => recorder.update(update);
     store.runtimes.put(task.id, {
       stage: runtimeStage,
       model,
@@ -81,7 +129,13 @@ export class StageAgentExecutor {
       state: "preparing",
       threadId: parent?.threadId ?? null,
     });
-    const approvals = new ApprovalBroker(store, client, task,this.runtime,this.supportsApproval);
+    const approvals = new ApprovalBroker(
+      store,
+      client,
+      task,
+      this.runtime,
+      this.supportsApproval,
+    );
     try {
       approvals.start();
       const run = await client.runDelegatedStage(

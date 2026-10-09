@@ -1,5 +1,5 @@
-import type { AiStage } from "@/core/contracts";
-import type { ModelInfo } from "@/core/model-policy";
+import type { AiStage } from "@/presentation/dto";
+import type { ModelInfo } from "@/domain/model-policy";
 import { stageLabel } from "@/lib/api";
 import { FormField } from "@/components/molecules/form-field";
 import { ModelSelector } from "@/components/molecules/model-selector";

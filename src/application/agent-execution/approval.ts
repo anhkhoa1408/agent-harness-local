@@ -1,21 +1,21 @@
-import type {ApplicationStore} from "../ports";
-import type {RuntimePort} from "../runtime";
+import type { ApplicationStore } from "../ports";
+import type { RuntimePort } from "../runtime";
 import type { Task } from "../../domain/contracts";
-import type { AgentExecutionPort, AgentEvent } from "./contracts";
-import { APPROVAL_POLL_INTERVAL_MS } from "../pipeline/limits";
+import type { AgentExecutionPort, AgentEvent } from "../execution-contracts";
+import { APPROVAL_POLL_INTERVAL_MS } from "../limits";
 export class ApprovalBroker {
-  private poll?:()=>void;
+  private poll?: () => void;
   private readonly pending = new Set<string>();
   constructor(
-    private readonly store:ApplicationStore,
+    private readonly store: Pick<ApplicationStore, "approvals" | "events">,
     private readonly client: Pick<AgentExecutionPort, "respondToApproval">,
     private readonly task: Task,
-    private readonly runtime:RuntimePort,
-    private readonly supports:(method:string)=>boolean,
+    private readonly runtime: RuntimePort,
+    private readonly supports: (method: string) => boolean,
   ) {}
   start() {
     const { store, client } = this;
-    this.poll = this.runtime.every(APPROVAL_POLL_INTERVAL_MS,() => {
+    this.poll = this.runtime.every(APPROVAL_POLL_INTERVAL_MS, () => {
       for (const key of this.pending) {
         const grant = store.approvals.get(key);
         if (grant?.decision) {

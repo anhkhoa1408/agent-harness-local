@@ -1,12 +1,12 @@
 import { test, expect } from "vitest";
 import { PassThrough } from "node:stream";
-import { CodexClient } from "../../src/codex/client";
-import type { DelegatedStageInput } from "../../src/codex/types";
-import { JsonRpc, type RpcMessage } from "../../src/codex/rpc";
+import { CodexClient } from "../../src/infrastructure/codex/client";
+import type { DelegatedStageInput } from "../../src/infrastructure/codex/types";
+import { JsonRpc, type RpcMessage } from "../../src/infrastructure/codex/rpc";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { durableSpawnEvidence } from "../../src/codex/spawn-evidence";
+import { durableSpawnEvidence } from "../../src/infrastructure/codex/spawn-evidence";
 
 function fixture(
   options: {
@@ -344,7 +344,8 @@ test("retains the actual parent runtime failure instead of hiding it as agent_fa
 test("native stage uses a persistent parent and verified clean-context child evidence", async () => {
   const f = fixture();
   try {
-    const events: import("../../src/codex/types").AgentEvent[] = [];
+    const events: import("../../src/infrastructure/codex/types").AgentEvent[] =
+      [];
     const run = await f.client.runDelegatedStage(
       f.agentInput,
       (e) => events.push(e),

@@ -10,7 +10,10 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveBundle, snapshotBundle } from "../../src/context/skills";
+import {
+  resolveBundle,
+  snapshotBundle,
+} from "../../src/infrastructure/context/skills";
 test("snapshots remain unchanged after bundled skill edits and include scoped nested rules", async () => {
   const root = await mkdtemp(join(tmpdir(), "harness-skills-"));
   try {

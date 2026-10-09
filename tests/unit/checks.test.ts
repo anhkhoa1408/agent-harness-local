@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { evaluateCheck, parseEvidence } from "../../src/execution/checks";
+import { evaluateCheck, parseEvidence } from "../../src/bootstrap/verification";
 import { planFixture } from "../support/task-fixture";
 test("nested skipped or empty TAP suites do not count as executed feature tests", async () => {
   for (const content of [

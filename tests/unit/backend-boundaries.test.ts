@@ -11,10 +11,12 @@ function files(dir: string): string[] {
         : [],
   );
 }
-test("domain is independent of validation, persistence, runtime and transport", () => {
+test("all backend layers obey inward dependency and public-module rules without exceptions", () => {
   const root = resolve("src");
   const sources = Object.fromEntries(
-    files(resolve(root, "domain")).map((p) => [p, readFileSync(p, "utf8")]),
+    ["domain", "application", "infrastructure", "presentation", "bootstrap"]
+      .flatMap((layer) => files(resolve(root, layer)))
+      .map((p) => [p, readFileSync(p, "utf8")]),
   );
   expect(dependencyViolations(sources, root)).toEqual([]);
 });

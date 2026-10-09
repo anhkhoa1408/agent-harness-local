@@ -1,7 +1,7 @@
 import { test, expect, vi } from "vitest";
 import { PassThrough } from "node:stream";
-import { JsonRpc, type RpcMessage } from "../../src/codex/rpc";
-import { CodexClient } from "../../src/codex/client";
+import { JsonRpc, type RpcMessage } from "../../src/infrastructure/codex/rpc";
+import { CodexClient } from "../../src/infrastructure/codex/client";
 function fixture() {
   const input = new PassThrough(),
     output = new PassThrough();

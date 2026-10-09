@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import type { Repository } from "@/core/contracts";
+import type { Repository } from "@/presentation/dto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

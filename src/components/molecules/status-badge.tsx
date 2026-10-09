@@ -1,4 +1,4 @@
-import type { Status } from "@/core/contracts";
+import type { Status } from "@/presentation/dto";
 import { statusLabel } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";

@@ -1,10 +1,10 @@
 import { test, expect } from "vitest";
 import { z } from "zod";
-import { PlanSchema } from "../../src/core/contracts";
+import { PlanSchema } from "../../src/infrastructure/validation/contracts";
 import {
   PlanOutputSchema,
   parsePlanOutput,
-} from "../../src/context/plan-output";
+} from "../../src/infrastructure/context/plan-output";
 import { planFixture } from "../support/task-fixture";
 
 test("Plan Structured Outputs requires every property, including optional stories and UI evidence", () => {

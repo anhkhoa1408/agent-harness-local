@@ -2,9 +2,9 @@ import { test, expect } from "vitest";
 import {
   pipelineProgress,
   type ProgressAttempt,
-} from "../../src/core/pipeline-progress";
+} from "../../src/domain/pipeline-progress";
 import { taskFixture } from "../support/task-fixture";
-import type { Stage, Status } from "../../src/core/contracts";
+import type { Stage, Status } from "../../src/domain/contracts";
 const task = (stage: Stage, status: Status = "running") =>
   taskFixture({ stage, status });
 const done = (

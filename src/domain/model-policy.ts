@@ -45,4 +45,4 @@ export function resolveModel(
   return { ...choice };
 }
 
-export const parentAgentModel = {model:"gpt-6-luna",effort:"medium"};
+export const parentAgentModel = { model: "gpt-6-luna", effort: "medium" };

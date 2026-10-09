@@ -1,6 +1,6 @@
-import { openStore } from "../../src/storage/store";
-import { runWorker, type Handlers } from "../../src/worker/engine";
-import { stages } from "../../src/core/contracts";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { runWorker, type Handlers } from "../../src/bootstrap/worker";
+import { stages } from "../../src/domain/contracts";
 const store = openStore(process.argv[2]);
 await runWorker(
   store,

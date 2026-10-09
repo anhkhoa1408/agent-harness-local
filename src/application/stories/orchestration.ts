@@ -1,25 +1,24 @@
-import type {ValidationPort} from "../validation";
-import type {RuntimePort} from "../runtime";
+import type { ValidationPort } from "../validation";
+import type { RuntimePort } from "../runtime";
 import { MAX_TITLE_CHARACTERS } from "../../domain/limits";
-import {
-  type Task,
-  type StoryRun,
-} from "../../domain/contracts";
+import { type Task, type StoryRun } from "../../domain/contracts";
 import { selectedStories, projectStoryPlan } from "../../domain/stories";
 import { evidenceExclusions } from "../../domain/evidence";
-import type { StoryService } from "./service";
 import { storyKey } from "../../domain/story-key";
 import type { ApplicationStore, StoryRepositoryPort } from "../ports";
-type StoryStatePort = Pick<
-  StoryService,
-  "getExecution" | "listStoryRuns" | "getExecutionPlan"
->;
+type StoryStatePort = {
+  getExecution(
+    id: string,
+  ): import("../../domain/contracts").StoryExecution | null;
+  listStoryRuns(id: string): StoryRun[];
+  getExecutionPlan(task: Task): import("../../domain/contracts").Plan;
+};
 export async function prepareSeparateStory(
   store: ApplicationStore,
   stories: StoryStatePort,
   repository: StoryRepositoryPort,
-  validation:ValidationPort,
-  runtime:RuntimePort,
+  validation: ValidationPort,
+  runtime: RuntimePort,
   task: Task,
   signal: AbortSignal,
 ): Promise<StoryRun> {
@@ -32,14 +31,24 @@ export async function prepareSeparateStory(
     .find((r) => r.state !== "completed");
   if (!run) throw new Error("stories_complete");
   if (run.childTaskId) return run;
-  const repo = validation.repository(
-    store.repositories.get(task.repositoryId),
-  );
+  const repo = validation.repository(store.repositories.get(task.repositoryId));
   const story = plan.stories!.find((s) => s.id === run.storyId)!;
   let source = task.sourceCommit;
   if (story.dependsOn.length) {
-    if (repo.remote) await repository.fetchBranch(repo.root,repo.remote,task.targetBranch,signal);
-    source = await repository.resolveCommit(repo.root, repo.remote ? `refs/remotes/${repo.remote}/${task.targetBranch}` : `refs/heads/${task.targetBranch}`,signal);
+    if (repo.remote)
+      await repository.fetchBranch(
+        repo.root,
+        repo.remote,
+        task.targetBranch,
+        signal,
+      );
+    source = await repository.resolveCommit(
+      repo.root,
+      repo.remote
+        ? `refs/remotes/${repo.remote}/${task.targetBranch}`
+        : `refs/heads/${task.targetBranch}`,
+      signal,
+    );
     for (const id of story.dependsOn) {
       const previous = stories
         .listStoryRuns(task.id)
@@ -47,7 +56,12 @@ export async function prepareSeparateStory(
       if (previous?.state !== "completed" || !previous.commit)
         throw new Error(`story_dependency_not_integrated:${id}`);
       try {
-        await repository.assertAncestor(repo.root,previous.commit,source,signal);
+        await repository.assertAncestor(
+          repo.root,
+          previous.commit,
+          source,
+          signal,
+        );
       } catch {
         signal.throwIfAborted();
         throw new Error(`story_dependency_not_integrated:${id}`);
@@ -95,8 +109,7 @@ export async function prepareSeparateStory(
           },
         },
       );
-      const profile = store.profiles.get(`${task.repositoryId}:${source}`,
-      );
+      const profile = store.profiles.get(`${task.repositoryId}:${source}`);
       if (profile)
         store.profiles.put(`${child.repositoryId}:${source}`, profile);
     }
@@ -123,8 +136,8 @@ export async function reconcileFeatureStories(
   store: ApplicationStore,
   stories: StoryStatePort,
   repository: StoryRepositoryPort,
-  validation:ValidationPort,
-  runtime:RuntimePort,
+  validation: ValidationPort,
+  runtime: RuntimePort,
   featureId: string,
   signal: AbortSignal,
 ): Promise<void> {
@@ -227,15 +240,18 @@ export async function assertSharedHead(
         evidenceExclusions(plan),
         task.sourceCommit,
       );
-    const effect = store.effects.get(`${task.id}:commit:${fingerprint}`,
-    ) as { state: string; parent: string; commit?: string } | null;
+    const effect = store.effects.get(`${task.id}:commit:${fingerprint}`) as {
+      state: string;
+      parent: string;
+      commit?: string;
+    } | null;
     if (effect?.state === "confirmed" && effect.commit === head) return;
     if (
       effect?.state === "intent" &&
       effect.parent === e.baselineCommit &&
-      (await repository.headParent(task.worktree)) ===
-        effect.parent &&
-      (await repository.headMessage(task.worktree)) === `feat: ${task.title}\n\nHarness-Task: ${task.id}`
+      (await repository.headParent(task.worktree)) === effect.parent &&
+      (await repository.headMessage(task.worktree)) ===
+        `feat: ${task.title}\n\nHarness-Task: ${task.id}`
     )
       return;
   }

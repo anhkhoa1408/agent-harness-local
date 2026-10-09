@@ -7,7 +7,7 @@ test("loading web modules during build does not open the runtime database", asyn
     previous = process.env.HARNESS_DATA_DIR;
   process.env.HARNESS_DATA_DIR = dir;
   try {
-    await import("../../src/server/runtime");
+    await import("../../src/bootstrap/web-runtime");
     await expect(stat(join(dir, "harness.db"))).rejects.toThrow();
   } finally {
     if (previous === undefined) delete process.env.HARNESS_DATA_DIR;
