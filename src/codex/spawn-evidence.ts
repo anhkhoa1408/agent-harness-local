@@ -1,4 +1,7 @@
-import { ROLLOUT_INITIAL_RETRY_DELAY_MS, ROLLOUT_MAX_RETRY_DELAY_MS } from "./limits";
+import {
+  ROLLOUT_INITIAL_RETRY_DELAY_MS,
+  ROLLOUT_MAX_RETRY_DELAY_MS,
+} from "./limits";
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 
@@ -9,12 +12,12 @@ export async function durableSpawnEvidence(
   turnId: string,
   callId: string,
   timeoutMs: number,
-): Promise<Map<string, any>> {
+): Promise<Map<string, unknown>> {
   if (!path) throw new Error("subagent_capability_unavailable");
   const deadline = Date.now() + timeoutMs;
   let delay = ROLLOUT_INITIAL_RETRY_DELAY_MS;
   for (;;) {
-    const calls = new Map<string, any>();
+    const calls = new Map<string, unknown>();
     const stream = createReadStream(path, { encoding: "utf8" }),
       lines = createInterface({ input: stream, crlfDelay: Infinity });
     try {

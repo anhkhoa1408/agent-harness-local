@@ -1,3 +1,13 @@
+type Notice = {
+  closed: boolean;
+  onclick: () => void;
+  onerror: () => void;
+  options: NotificationOptions;
+};
+type NotificationWindow = Window & {
+  notices: Notice[];
+  nativeNotifications: { shown: number; errors: number; body: string };
+};
 import { test, expect, type BrowserContext } from "@playwright/test";
 import { taskFixture } from "../support/task-fixture";
 test.use({ headless: false });
@@ -14,8 +24,8 @@ async function setup(
 ) {
   if (!native)
     await context.addInitScript((permission) => {
-      const notices: unknown[] = [];
-      (window as any).notices = notices;
+      const notices: DesktopNotification[] = [];
+      (window as unknown as NotificationWindow).notices = notices as Notice[];
       class DesktopNotification {
         static permission = permission;
         static requests = 0;
@@ -26,9 +36,10 @@ async function setup(
         }
         closed = false;
         onclick: (() => void) | null = null;
+        onerror: (() => void) | null = null;
         constructor(
           public title: string,
-          public options: unknown,
+          public options: NotificationOptions,
         ) {
           notices.push(this);
         }
@@ -115,15 +126,26 @@ test("enabling notifications publishes pending permission and clicking opens and
     exact: true,
   });
   await expect(enable).toBeEnabled();
-  expect(await page.evaluate(() => (Notification as any).requests)).toBe(0);
+  expect(
+    await page.evaluate(
+      () =>
+        (Notification as typeof Notification & { requests: number }).requests,
+    ),
+  ).toBe(0);
   await enable.click();
   await expect
-    .poll(() => page.evaluate(() => (window as any).notices.length))
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      ),
+    )
     .toBe(1);
   const sibling = await context.newPage();
   await sibling.goto("/");
   await expect(sibling.getByRole("navigation")).toBeVisible();
-  await page.evaluate(() => (window as any).notices[0].onclick());
+  await page.evaluate(() =>
+    (window as unknown as NotificationWindow).notices[0].onclick(),
+  );
   await expect(page).toHaveURL(
     /\/tasks\/notification-task#approval=notification-task%3A12$/,
   );
@@ -145,25 +167,43 @@ test("multiple background tabs and reloads publish once, then resolution closes 
   await expect
     .poll(
       async () =>
-        (await page.evaluate(() => (window as any).notices.length)) +
-        (await second.evaluate(() => (window as any).notices.length)),
+        (await page.evaluate(
+          () => (window as unknown as NotificationWindow).notices.length,
+        )) +
+        (await second.evaluate(
+          () => (window as unknown as NotificationWindow).notices.length,
+        )),
     )
     .toBe(1);
   await page.waitForTimeout(3500);
   expect(
-    (await page.evaluate(() => (window as any).notices.length)) +
-      (await second.evaluate(() => (window as any).notices.length)),
+    (await page.evaluate(
+      () => (window as unknown as NotificationWindow).notices.length,
+    )) +
+      (await second.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      )),
   ).toBe(1);
-  const owner = (await page.evaluate(() => (window as any).notices.length))
+  const owner = (await page.evaluate(
+    () => (window as unknown as NotificationWindow).notices.length,
+  ))
     ? page
     : second;
   const other = owner === page ? second : page;
   await other.reload();
   await expect(other.getByRole("navigation")).toBeVisible();
-  expect(await other.evaluate(() => (window as any).notices.length)).toBe(0);
+  expect(
+    await other.evaluate(
+      () => (window as unknown as NotificationWindow).notices.length,
+    ),
+  ).toBe(0);
   fixture.resolve();
   await expect
-    .poll(() => owner.evaluate(() => (window as any).notices[0].closed))
+    .poll(() =>
+      owner.evaluate(
+        () => (window as unknown as NotificationWindow).notices[0].closed,
+      ),
+    )
     .toBe(true);
 });
 
@@ -174,10 +214,16 @@ test("expired deep link explains the request was already handled", async ({
   const fixture = await setup(context, "granted");
   await page.goto("/");
   await expect
-    .poll(() => page.evaluate(() => (window as any).notices.length))
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      ),
+    )
     .toBe(1);
   fixture.resolve();
-  await page.evaluate(() => (window as any).notices[0].onclick());
+  await page.evaluate(() =>
+    (window as unknown as NotificationWindow).notices[0].onclick(),
+  );
   await expect(
     page.getByText("Yêu cầu quyền này đã được xử lý hoặc hết hiệu lực.", {
       exact: true,
@@ -202,7 +248,11 @@ test("denied notification permission explains browser settings and keeps the app
   await expect(
     page.getByRole("button", { name: "Cho phép", exact: true }),
   ).toBeEnabled();
-  expect(await page.evaluate(() => (window as any).notices.length)).toBe(0);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as NotificationWindow).notices.length,
+    ),
+  ).toBe(0);
 });
 
 test.describe("Native desktop notifications", () => {
@@ -214,19 +264,28 @@ test.describe("Native desktop notifications", () => {
     await setup(context, "granted", true);
     await context.grantPermissions(["notifications"], { origin: baseURL });
     await context.addInitScript(() => {
-      (window as any).nativeNotifications = { shown: 0, errors: 0, body: "" };
+      (window as unknown as NotificationWindow).nativeNotifications = {
+        shown: 0,
+        errors: 0,
+        body: "",
+      };
       const NativeNotification = window.Notification;
       window.Notification = new Proxy(NativeNotification, {
         construct(target, args) {
           const notice = Reflect.construct(target, args) as Notification;
-          (window as any).nativeNotifications.body = notice.body;
+          (window as unknown as NotificationWindow).nativeNotifications.body =
+            notice.body;
           notice.addEventListener(
             "show",
-            () => (window as any).nativeNotifications.shown++,
+            () =>
+              (window as unknown as NotificationWindow).nativeNotifications
+                .shown++,
           );
           notice.addEventListener(
             "error",
-            () => (window as any).nativeNotifications.errors++,
+            () =>
+              (window as unknown as NotificationWindow).nativeNotifications
+                .errors++,
           );
           return notice;
         },
@@ -235,14 +294,23 @@ test.describe("Native desktop notifications", () => {
     await page.goto("/");
     await expect
       .poll(() =>
-        page.evaluate(() => (window as any).nativeNotifications.shown),
+        page.evaluate(
+          () =>
+            (window as unknown as NotificationWindow).nativeNotifications.shown,
+        ),
       )
       .toBe(1);
     expect(
-      await page.evaluate(() => (window as any).nativeNotifications.errors),
+      await page.evaluate(
+        () =>
+          (window as unknown as NotificationWindow).nativeNotifications.errors,
+      ),
     ).toBe(0);
     expect(
-      await page.evaluate(() => (window as any).nativeNotifications.body),
+      await page.evaluate(
+        () =>
+          (window as unknown as NotificationWindow).nativeNotifications.body,
+      ),
     ).toContain("Permission feature");
   });
 });
@@ -254,19 +322,33 @@ test("reloading the notification owner suppresses the old request and receives a
   const fixture = await setup(context, "granted");
   await page.goto("/");
   await expect
-    .poll(() => page.evaluate(() => (window as any).notices.length))
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      ),
+    )
     .toBe(1);
   await page.reload();
   await expect(
     page.getByText("Thông báo đã bật", { exact: true }),
   ).toBeVisible();
-  expect(await page.evaluate(() => (window as any).notices.length)).toBe(0);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as NotificationWindow).notices.length,
+    ),
+  ).toBe(0);
   fixture.requestNext();
   await expect
-    .poll(() => page.evaluate(() => (window as any).notices.length))
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      ),
+    )
     .toBe(1);
   expect(
-    await page.evaluate(() => (window as any).notices[0].options.tag),
+    await page.evaluate(
+      () => (window as unknown as NotificationWindow).notices[0].options.tag,
+    ),
   ).toBe("approval:notification-task:13");
 });
 
@@ -277,10 +359,20 @@ test("asynchronous notification errors release the shared claim for the next pol
   await setup(context, "granted");
   await page.goto("/");
   await expect
-    .poll(() => page.evaluate(() => (window as any).notices.length))
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      ),
+    )
     .toBe(1);
-  await page.evaluate(() => (window as any).notices[0].onerror());
+  await page.evaluate(() =>
+    (window as unknown as NotificationWindow).notices[0].onerror(),
+  );
   await expect
-    .poll(() => page.evaluate(() => (window as any).notices.length))
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as NotificationWindow).notices.length,
+      ),
+    )
     .toBe(2);
 });

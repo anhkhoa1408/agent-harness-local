@@ -1,11 +1,27 @@
 import { storyKey } from "../core/story-key";
 export { storyKey } from "../core/story-key";
-import { prepareSeparateStory, reconcileFeatureStories, assertSharedHead } from "./story-orchestration";
+import {
+  prepareSeparateStory,
+  reconcileFeatureStories,
+  assertSharedHead,
+} from "./story-orchestration";
 import { assertCompletedStoryScopeUnchanged } from "../core/story-replan";
 
 import type { ApplicationStore, StoryRepositoryPort } from "./ports";
-import { PlanSchema, StorySelectionSchema, type Task, type Plan, type StorySelection, type StoryExecution, type StoryRun } from "../core/contracts";
-import { selectedStories, projectStoryPlan, projectSelectedPlan } from "../core/stories";
+import {
+  PlanSchema,
+  StorySelectionSchema,
+  type Task,
+  type Plan,
+  type StorySelection,
+  type StoryExecution,
+  type StoryRun,
+} from "../core/contracts";
+import {
+  selectedStories,
+  projectStoryPlan,
+  projectSelectedPlan,
+} from "../core/stories";
 const started = (runs: StoryRun[]) =>
   runs.some((r) => r.state !== "pending" || r.childTaskId);
 export class StoryService {

@@ -16,7 +16,9 @@ RUN codex_arch="$(node -p process.arch)" \
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci \
+    && node node_modules/@playwright/test/cli.js install-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN npm run build
 

@@ -4,20 +4,20 @@ Ngày: 2026-10-05. Workspace: `codex/portable-pipeline-ui`. Runtime thật: `cod
 
 ## Kết quả
 
-| Kiểm tra | Trạng thái | Bằng chứng |
-| --- | --- | --- |
-| Adapter, pipeline, feedback, quyền, worker recovery và model/context | **passed** | 10 file Vitest, **59 tests** |
-| Typecheck | **passed** | `tsc --noEmit`, exit 0 sau sửa lỗi inference của page metadata |
-| E2E lifecycle và plan feedback | **passed** | Playwright, **12 tests**; fixture mô phỏng quan hệ cha/con, không gọi model thật |
-| Read-only → plan Astra/high → implement → review, cùng cha | **passed** | Native app-server, bốn child IDs riêng; hành vi filesystem thật và settings audit |
-| Restart app-server giữa plan và implement | **passed** | Parent ID giữ nguyên, native spawn được đối chiếu từ durable rollout |
-| Cancel khi con đang thực thi command | **passed** | Cả parent và child turn được đọc lại là `interrupted` |
-| Không fork lịch sử stage trước | **passed** | Native smoke: cha giữ kết quả có marker; con mới báo `sawHistory=false`, không đọc packet trước |
-| Resume sau khi snapshot cũ bị xóa | **passed** | Smoke riêng cùng test marker, chuyển cwd sang snapshot mới |
-| Diff whitespace | **passed** | `git diff --check` |
-| Legacy suite ngoài phạm vi, build production, Docker/native runtime trong container | **skipped** | Không phải thay đổi UI/Next APIs hoặc deployment; không suy diễn kết quả local sang Docker |
-| Abrupt crash app-server khi child đang thực thi | **passed** | Run trả unknown; restart đọc cả cây là interrupted; cùng cha, con mới chỉ sau terminal reconciliation |
-| Kill worker process thực tế khi child đang ghi | **skipped** live | Worker exclusion/recovery và runtime mất xác nhận được test bằng fixture; live crash áp dụng cho app-server |
+| Kiểm tra                                                                            | Trạng thái       | Bằng chứng                                                                                                  |
+| ----------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| Adapter, pipeline, feedback, quyền, worker recovery và model/context                | **passed**       | 10 file Vitest, **59 tests**                                                                                |
+| Typecheck                                                                           | **passed**       | `tsc --noEmit`, exit 0 sau sửa lỗi inference của page metadata                                              |
+| E2E lifecycle và plan feedback                                                      | **passed**       | Playwright, **12 tests**; fixture mô phỏng quan hệ cha/con, không gọi model thật                            |
+| Read-only → plan Astra/high → implement → review, cùng cha                          | **passed**       | Native app-server, bốn child IDs riêng; hành vi filesystem thật và settings audit                           |
+| Restart app-server giữa plan và implement                                           | **passed**       | Parent ID giữ nguyên, native spawn được đối chiếu từ durable rollout                                        |
+| Cancel khi con đang thực thi command                                                | **passed**       | Cả parent và child turn được đọc lại là `interrupted`                                                       |
+| Không fork lịch sử stage trước                                                      | **passed**       | Native smoke: cha giữ kết quả có marker; con mới báo `sawHistory=false`, không đọc packet trước             |
+| Resume sau khi snapshot cũ bị xóa                                                   | **passed**       | Smoke riêng cùng test marker, chuyển cwd sang snapshot mới                                                  |
+| Diff whitespace                                                                     | **passed**       | `git diff --check`                                                                                          |
+| Legacy suite ngoài phạm vi, build production, Docker/native runtime trong container | **skipped**      | Không phải thay đổi UI/Next APIs hoặc deployment; không suy diễn kết quả local sang Docker                  |
+| Abrupt crash app-server khi child đang thực thi                                     | **passed**       | Run trả unknown; restart đọc cả cây là interrupted; cùng cha, con mới chỉ sau terminal reconciliation       |
+| Kill worker process thực tế khi child đang ghi                                      | **skipped** live | Worker exclusion/recovery và runtime mất xác nhận được test bằng fixture; live crash áp dụng cho app-server |
 
 Lệnh feature suite:
 
@@ -37,12 +37,12 @@ node node_modules/@playwright/test/cli.js test \
 
 Parent: `01a10a0b-2168-7d00-a0da-c5a28f00a85f`, model `gpt-6-luna/medium`.
 
-| Stage | Child ID | Model/effort | Kiểm tra thật |
-| --- | --- | --- | --- |
-| analyze | `01a10a0b-3eee-7bc0-83f7-0c21065ea542` | gpt-6-luna/medium | Lệnh ghi bị chặn; fixture đích không tồn tại |
-| plan | `01a10a0b-9096-7211-b4e5-f31535cd3d84` | gpt-6-astra/high | Lệnh ghi bị chặn; fixture đích không tồn tại |
+| Stage     | Child ID                               | Model/effort      | Kiểm tra thật                                                     |
+| --------- | -------------------------------------- | ----------------- | ----------------------------------------------------------------- |
+| analyze   | `01a10a0b-3eee-7bc0-83f7-0c21065ea542` | gpt-6-luna/medium | Lệnh ghi bị chặn; fixture đích không tồn tại                      |
+| plan      | `01a10a0b-9096-7211-b4e5-f31535cd3d84` | gpt-6-astra/high  | Lệnh ghi bị chặn; fixture đích không tồn tại                      |
 | implement | `01a10a0b-fed0-7bb2-9408-82178de6990f` | gpt-6-luna/medium | Sau restart và đổi cwd, ghi `probe.txt`; worker đọc lại đúng `ok` |
-| review | `01a10a0c-4907-70c2-bad8-264b2a9bce2b` | gpt-6-luna/medium | Loaded parent được cập nhật về read-only; lệnh ghi bị chặn |
+| review    | `01a10a0c-4907-70c2-bad8-264b2a9bce2b` | gpt-6-luna/medium | Loaded parent được cập nhật về read-only; lệnh ghi bị chặn        |
 
 Script/log tạm: `/private/tmp/agent-harness-native-stage-smoke.mts`, `/private/tmp/harness-native-stage-smoke.log`. Đây là smoke adapter thực, không phải toàn pipeline dùng model thật. Pipeline gates/repair/feedback được kiểm chứng bằng integration và E2E fixtures.
 

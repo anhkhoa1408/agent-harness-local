@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Repository } from "@/core/contracts";
@@ -35,28 +35,30 @@ export function WorkspacePage() {
       base: "main",
       remote: "",
     });
-  async function load() {
-    try {
-      const [r, t, h, s] = await Promise.all([
-        api<Repository[]>("repositories"),
-        api<TaskWithProgress[]>("tasks"),
-        api("health"),
-        api("settings"),
-      ]);
-      setRepos(r);
-      setTasks(t);
-      setHealth(h.worker);
-      setConfigured(!!s.models);
-      setRepoId((old) =>
-        r.some((repo) => repo.id === old) ? old : r[0]?.id || "",
-      );
-    } catch (e) {
-      setError(String(e));
-    }
+  function load() {
+    return Promise.all([
+      api<Repository[]>("repositories"),
+      api<TaskWithProgress[]>("tasks"),
+      api<{ worker: string }>("health"),
+      api<{ models?: unknown }>("settings"),
+    ])
+      .then(([r, t, h, s]) => {
+        setRepos(r);
+        setTasks(t);
+        setHealth(h.worker);
+        setConfigured(!!s.models);
+        setRepoId((old) =>
+          r.some((repo) => repo.id === old) ? old : r[0]?.id || "",
+        );
+      })
+      .catch((e: unknown) => {
+        setError(String(e));
+      });
   }
+  const poll = useEffectEvent(load);
   useEffect(() => {
-    void load();
-    const timer = setInterval(load, 3000);
+    void poll();
+    const timer = setInterval(() => void poll(), 3000);
     return () => clearInterval(timer);
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {

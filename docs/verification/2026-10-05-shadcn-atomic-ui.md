@@ -12,20 +12,20 @@ Ngày: 2026-10-05. Phạm vi: toàn bộ Login, Tổng quan, Settings và Task d
 
 ## Bằng chứng
 
-| Kiểm tra | Kết quả |
-| --- | --- |
-| Typecheck | PASS |
-| Production build Next.js | PASS: compile, TypeScript và page generation exit 0 |
-| E2E đầy đủ cho 6 file UI | PASS: 29/29, trước bổ sung kiểm chứng mô tả form |
-| E2E `ui.spec.ts` sau accessibility fix cuối | PASS: 8/8; mô tả form đã có RED → GREEN |
-| Unit hiển thị UI Verify và screenshot links | PASS: 2/2 |
-| Whitespace diff | PASS |
-| Responsive | PASS: scrollWidth không vượt viewport 390px/1280px trên cả bốn màn, kể cả title/branch/evidence dài |
-| Timeline | PASS: giữ 40 sự kiện mới nhất; cuộn riêng, tối đa 480px desktop/350px dưới 1100px; End không di chuyển heading |
-| Review độc lập cuối | 2 finding P2 đã sửa; cả hai có E2E RED → GREEN; đang chạy suite đầy đủ với output riêng |
-| Test backend cũ ngoài phạm vi | SKIPPED |
-| OAuth/tài khoản Codex thật | SKIPPED: dùng fixture/test mode |
-| Rebuild và restart Docker hiện có | SKIPPED: image hiện tại chưa chứa migration; dùng `docker compose up -d --build` để cập nhật khi sẵn sàng |
+| Kiểm tra                                    | Kết quả                                                                                                        |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Typecheck                                   | PASS                                                                                                           |
+| Production build Next.js                    | PASS: compile, TypeScript và page generation exit 0                                                            |
+| E2E đầy đủ cho 6 file UI                    | PASS: 29/29, trước bổ sung kiểm chứng mô tả form                                                               |
+| E2E `ui.spec.ts` sau accessibility fix cuối | PASS: 8/8; mô tả form đã có RED → GREEN                                                                        |
+| Unit hiển thị UI Verify và screenshot links | PASS: 2/2                                                                                                      |
+| Whitespace diff                             | PASS                                                                                                           |
+| Responsive                                  | PASS: scrollWidth không vượt viewport 390px/1280px trên cả bốn màn, kể cả title/branch/evidence dài            |
+| Timeline                                    | PASS: giữ 40 sự kiện mới nhất; cuộn riêng, tối đa 480px desktop/350px dưới 1100px; End không di chuyển heading |
+| Review độc lập cuối                         | 2 finding P2 đã sửa; cả hai có E2E RED → GREEN; đang chạy suite đầy đủ với output riêng                        |
+| Test backend cũ ngoài phạm vi               | SKIPPED                                                                                                        |
+| OAuth/tài khoản Codex thật                  | SKIPPED: dùng fixture/test mode                                                                                |
+| Rebuild và restart Docker hiện có           | SKIPPED: image hiện tại chưa chứa migration; dùng `docker compose up -d --build` để cập nhật khi sẵn sàng      |
 
 Lệnh kiểm chứng chính:
 

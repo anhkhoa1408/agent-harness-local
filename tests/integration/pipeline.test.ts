@@ -40,14 +40,23 @@ test.each(["manual", "auto"] as const)(
         ],
         respondToApproval: vi.fn(async () => {}),
         interruptTurn: async () => {},
-        runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
-    close: async () => {},
+        runDirectTurn: async () => {
+          throw new Error("fixture_direct_turn_unavailable");
+        },
+        close: async () => {},
         runDelegatedStage: async (input, onEvent) => {
           calls.push(input);
           const stage = /stage: (\w+)/.exec(input.instructions)![1];
           const parentId = input.threadId ?? "parent-pipeline";
           onEvent({ type: "parent", data: { threadId: parentId } });
-          onEvent({ type: "child", data: { threadId: `child-${calls.length}`, parentThreadId: parentId, model: input.model } });
+          onEvent({
+            type: "child",
+            data: {
+              threadId: `child-${calls.length}`,
+              parentThreadId: parentId,
+              model: input.model,
+            },
+          });
           onEvent({
             type: "started",
             data: { threadId: parentId, turnId: `turn-${calls.length}` },
@@ -77,9 +86,15 @@ test.each(["manual", "auto"] as const)(
           else if (stage === "analyze")
             result = { requirement: task.requirement, questions: [] };
           else if (stage === "plan") {
-            expect(input.outputSchema.required).toEqual(Object.keys(input.outputSchema.properties as object));
-            const packet = JSON.parse(await readFile(input.delegation!.packetPath, "utf8"));
-            expect(packet.outputSchema.properties.result).toEqual(input.outputSchema);
+            expect(input.outputSchema.required).toEqual(
+              Object.keys(input.outputSchema.properties as object),
+            );
+            const packet = JSON.parse(
+              await readFile(input.delegation!.packetPath, "utf8"),
+            );
+            expect(packet.outputSchema.properties.result).toEqual(
+              input.outputSchema,
+            );
             const context = JSON.parse(input.prompt);
             if (context.version === 2) {
               expect(context.previousPlan.version).toBe(1);
@@ -101,7 +116,7 @@ test.each(["manual", "auto"] as const)(
                 },
               ],
             });
-            result = { ...result as object, stories: null };
+            result = { ...(result as object), stories: null };
           } else if (stage === "implement" || stage === "repair") {
             if (executionMode === "auto") {
               onEvent({
@@ -138,7 +153,12 @@ test.each(["manual", "auto"] as const)(
           return {
             threadId: parentId,
             turnId: "turn",
-            child: { threadId: `child-${calls.length}`, turnId: "child-turn", model: input.model, usage: null },
+            child: {
+              threadId: `child-${calls.length}`,
+              turnId: "child-turn",
+              model: input.model,
+              usage: null,
+            },
             result,
             usage: null,
           };
@@ -157,9 +177,12 @@ test.each(["manual", "auto"] as const)(
       await wait(() => store.getTask(task.id).status === "waiting_approval");
       expect(calls.some((c) => c.write)).toBe(false);
       if (executionMode === "auto") {
-        expect(fake.respondToApproval).toHaveBeenCalledWith("discovery-approval", {
-          decision: "decline",
-        });
+        expect(fake.respondToApproval).toHaveBeenCalledWith(
+          "discovery-approval",
+          {
+            decision: "decline",
+          },
+        );
         expect(
           store
             .events(task.id, 0)
@@ -202,10 +225,16 @@ test.each(["manual", "auto"] as const)(
       expect(store.getTask(task.id).status).toBe("waiting_approval");
       expect(calls.some((c) => c.write)).toBe(false);
 
-      const frozen = store.getRecord("bundle", `${task.id}:implement`) as any;
-      const optional = frozen.optionalFiles[0];
+      const frozen = store.getRecord(
+        "bundle",
+        `${task.id}:implement`,
+      ) as import("../../src/context/skills").Bundle;
+      const optional = frozen.optionalFiles![0];
       // An approved E2E check enables the already-frozen profile, without reloading upstream.
-      const savedPlan = store.getRecord("plan", `${task.id}:2`) as any;
+      const savedPlan = store.getRecord(
+        "plan",
+        `${task.id}:2`,
+      ) as import("../../src/core/contracts").Plan;
       savedPlan.checks[0].kind = "e2e";
       store.putRecord("plan", `${task.id}:2`, savedPlan);
       const waiting = store.getTask(task.id);
@@ -235,18 +264,63 @@ test.each(["manual", "auto"] as const)(
       const implementation = calls.find((c) =>
         c.instructions.includes("stage: implement"),
       )!;
-      expect(calls.every(c => c.delegation?.stage && c.delegation.attemptId && c.delegation.packetPath)).toBe(true);
-      expect(new Set(calls.map(c => c.delegation!.attemptId)).size).toBe(calls.length);
-      expect(store.getRecord("parent", task.id)).toMatchObject({ threadId: expect.any(String) });
-      expect(JSON.parse(implementation.prompt).task).not.toHaveProperty("models");
-      expect(JSON.parse(implementation.prompt).task).not.toHaveProperty("executionMode");
-      expect(JSON.parse(implementation.prompt).task).not.toHaveProperty("branch");
-      const packet = JSON.parse(await readFile(implementation.delegation!.packetPath, "utf8"));
+      expect(
+        calls.every(
+          (c) =>
+            c.delegation?.stage &&
+            c.delegation.attemptId &&
+            c.delegation.packetPath,
+        ),
+      ).toBe(true);
+      expect(new Set(calls.map((c) => c.delegation!.attemptId)).size).toBe(
+        calls.length,
+      );
+      expect(store.getRecord("parent", task.id)).toMatchObject({
+        threadId: expect.any(String),
+      });
+      expect(JSON.parse(implementation.prompt).task).not.toHaveProperty(
+        "models",
+      );
+      expect(JSON.parse(implementation.prompt).task).not.toHaveProperty(
+        "executionMode",
+      );
+      expect(JSON.parse(implementation.prompt).task).not.toHaveProperty(
+        "branch",
+      );
+      const packet = JSON.parse(
+        await readFile(implementation.delegation!.packetPath, "utf8"),
+      );
       expect(packet.input.task).toEqual(JSON.parse(implementation.prompt).task);
-      expect(packet.outputSchema.properties.attemptId.const).toBe(implementation.delegation!.attemptId);
-      const aiAttempts = store.listRecords("attempt").filter((a: any) => ["discover", "analyze", "plan", "implement", "repair", "review"].includes(a.stage)) as any[];
-      expect(aiAttempts.every(a => a.threadId === "parent-pipeline" && a.child?.threadId && a.bundleHash)).toBe(true);
-      expect(new Set(aiAttempts.map(a => a.child.threadId)).size).toBe(aiAttempts.length);
+      expect(packet.outputSchema.properties.attemptId.const).toBe(
+        implementation.delegation!.attemptId,
+      );
+      const aiAttempts = (
+        store.listRecords(
+          "attempt",
+        ) as (import("../../src/worker/types").Attempt & {
+          child: { threadId: string };
+        })[]
+      ).filter((a) =>
+        [
+          "discover",
+          "analyze",
+          "plan",
+          "implement",
+          "repair",
+          "review",
+        ].includes(a.stage),
+      );
+      expect(
+        aiAttempts.every(
+          (a) =>
+            a.threadId === "parent-pipeline" &&
+            a.child?.threadId &&
+            a.bundleHash,
+        ),
+      ).toBe(true);
+      expect(new Set(aiAttempts.map((a) => a.child.threadId)).size).toBe(
+        aiAttempts.length,
+      );
       expect(implementation.instructions).toContain(
         "SOURCE agent:ecc/tdd-guide",
       );

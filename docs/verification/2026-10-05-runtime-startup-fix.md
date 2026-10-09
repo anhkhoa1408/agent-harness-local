@@ -10,16 +10,16 @@ Ngày 2026-10-05, Codex CLI `0.159.0-alpha.12.1`, Node `24.18.0`.
 
 ## Kiểm chứng
 
-| Kiểm tra | Kết quả |
-| --- | --- |
-| Regression race child startup | RED trước sửa, GREEN sau sửa |
-| Persistent startup failure, không xác nhận được stop | Giữ `runtime_state_unknown` |
-| Subagents, Codex adapter, worker, pipeline | **42 tests passed**, 4 files |
-| Docker sandbox trên image đã build | **1 test passed**: đọc thành công; ghi bị chặn; network socket bị chặn |
-| Typecheck | **passed** |
-| Production build trong Docker | **passed** |
-| Task thật `07c71270-1d6a-4529-9535-56c347ebdcc2` | `discover` hoàn tất; chuyển `analyze`, cùng parent, child đã xác minh |
-| Toàn pipeline thật / UI E2E / legacy suite | **skipped**; không suy diễn từ kiểm chứng startup |
+| Kiểm tra                                             | Kết quả                                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------- |
+| Regression race child startup                        | RED trước sửa, GREEN sau sửa                                           |
+| Persistent startup failure, không xác nhận được stop | Giữ `runtime_state_unknown`                                            |
+| Subagents, Codex adapter, worker, pipeline           | **42 tests passed**, 4 files                                           |
+| Docker sandbox trên image đã build                   | **1 test passed**: đọc thành công; ghi bị chặn; network socket bị chặn |
+| Typecheck                                            | **passed**                                                             |
+| Production build trong Docker                        | **passed**                                                             |
+| Task thật `07c71270-1d6a-4529-9535-56c347ebdcc2`     | `discover` hoàn tất; chuyển `analyze`, cùng parent, child đã xác minh  |
+| Toàn pipeline thật / UI E2E / legacy suite           | **skipped**; không suy diễn từ kiểm chứng startup                      |
 
 Parent task thật: `01a10b8d-343b-7322-b4a0-99a70e957cdf`. Child discover: `01a10b8d-7189-70c3-b8b6-708aefd8c66a`. Runtime read-back và database event xác nhận stage hoàn tất, không chỉ dựa vào lời của model.
 

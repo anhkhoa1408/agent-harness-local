@@ -1,3 +1,10 @@
+type Delivery = ReturnType<typeof createDelivery>;
+type FixtureContext<T extends boolean> = {
+  deliver: T extends true ? (github: GitHubPort) => Delivery : Delivery;
+  task: ReturnType<typeof taskFixture>;
+  path: string;
+  remote: string;
+};
 import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -58,9 +65,9 @@ test("lost PR response reconciles existing PR; external remote changes block", a
     );
   });
 });
-async function fixture(
-  remoteMode: boolean,
-  work: (context: any) => Promise<void>,
+async function fixture<T extends boolean>(
+  remoteMode: T,
+  work: (context: FixtureContext<T>) => Promise<void>,
   operation: "modify" | "delete" | "rename" = "modify",
 ) {
   const f = await createTempRepo({ "app.js": "original" }),
@@ -127,7 +134,7 @@ async function fixture(
             repositoryName: () => "test/repo",
           })
       : createDelivery(store, dir);
-    await work({ deliver, task, path, remote });
+    await work({ deliver, task, path, remote } as FixtureContext<T>);
   } finally {
     store.close();
     await f.dispose();

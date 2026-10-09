@@ -73,16 +73,19 @@ test("delivery requires current evidence and rejects skipped, stale, disputed or
     ),
   ).toBe(true);
 });
-test.each([3, 8])("review requests another repair after %i rounds without resetting the count", (repairCount) => {
-  expect(
-    nextAfterReview(
-      { ...task, repairCount },
-      { ...review, verdict: "changes_requested" },
-    ),
-  ).toMatchObject({
-    stage: "repair",
-    status: "queued",
-    reason: null,
-    repairCount,
-  });
-});
+test.each([3, 8])(
+  "review requests another repair after %i rounds without resetting the count",
+  (repairCount) => {
+    expect(
+      nextAfterReview(
+        { ...task, repairCount },
+        { ...review, verdict: "changes_requested" },
+      ),
+    ).toMatchObject({
+      stage: "repair",
+      status: "queued",
+      reason: null,
+      repairCount,
+    });
+  },
+);

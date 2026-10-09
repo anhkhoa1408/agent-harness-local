@@ -13,47 +13,68 @@ import { once } from "node:events";
 test.each([
   { repairCount: 3, status: "queued" as const, reason: null },
   { repairCount: 8, status: "blocked" as const, reason: "repair_limit" },
-])("worker continues $status repair after $repairCount persisted rounds", async ({ repairCount, status, reason }) => {
-  const dir = await mkdtemp(join(tmpdir(), "worker-repair-")),
-    store = openStore(join(dir, "db")),
-    stop = new AbortController();
-  let running: Promise<void> | undefined;
-  try {
-    const initial = store.createTask(taskFixture());
-    const task = store.updateTask(
-      initial.id,
-      initial.revision,
-      { stage: "repair", status, reason, repairCount },
-      { type: "fixture", data: {} },
-    );
-    if (status === "blocked")
-      store.enqueue({
-        id: "resume-repair",
-        taskId: task.id,
-        kind: "resume",
-        expectedRevision: task.revision,
-        payload: {},
+])(
+  "worker continues $status repair after $repairCount persisted rounds",
+  async ({ repairCount, status, reason }) => {
+    const dir = await mkdtemp(join(tmpdir(), "worker-repair-")),
+      store = openStore(join(dir, "db")),
+      stop = new AbortController();
+    let running: Promise<void> | undefined;
+    try {
+      const initial = store.createTask(taskFixture());
+      const task = store.updateTask(
+        initial.id,
+        initial.revision,
+        { stage: "repair", status, reason, repairCount },
+        { type: "fixture", data: {} },
+      );
+      if (status === "blocked")
+        store.enqueue({
+          id: "resume-repair",
+          taskId: task.id,
+          kind: "resume",
+          expectedRevision: task.revision,
+          payload: {},
+        });
+      running = runWorker(
+        store,
+        Object.fromEntries(
+          stages.map((stage) => [
+            stage,
+            async () => ({
+              stage: "verify",
+              status: "waiting_input",
+              reason: "fixture_done",
+              output: null,
+            }),
+          ]),
+        ) as unknown as Parameters<typeof runWorker>[1],
+        stop.signal,
+      );
+      for (
+        let i = 0;
+        i < 100 && store.getTask(task.id).status !== "waiting_input";
+        i++
+      )
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      stop.abort();
+      await running;
+      expect(store.getTask(task.id)).toMatchObject({
+        stage: "verify",
+        status: "waiting_input",
+        repairCount: repairCount + 1,
       });
-    running = runWorker(store, Object.fromEntries(stages.map((stage) => [stage,
-      async () => ({ stage: "verify", status: "waiting_input", reason: "fixture_done", output: null }),
-    ])) as unknown as Parameters<typeof runWorker>[1], stop.signal);
-    for (let i = 0; i < 100 && store.getTask(task.id).status !== "waiting_input"; i++)
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    stop.abort();
-    await running;
-    expect(store.getTask(task.id)).toMatchObject({
-      stage: "verify", status: "waiting_input", repairCount: repairCount + 1,
-    });
-    expect(store.listRecords("attempt")).toMatchObject([
-      { stage: "repair", status: "completed" },
-    ]);
-  } finally {
-    stop.abort();
-    await running;
-    store.close();
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+      expect(store.listRecords("attempt")).toMatchObject([
+        { stage: "repair", status: "completed" },
+      ]);
+    } finally {
+      stop.abort();
+      await running;
+      store.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);
 test("SIGKILL and worker restart preserve interrupted attempt without another writer", async () => {
   const dir = await mkdtemp(join(tmpdir(), "crash-worker")),
     db = join(dir, "db"),
@@ -83,7 +104,7 @@ test("SIGKILL and worker restart preserve interrupted attempt without another wr
             return { stage, status: "blocked", reason: null, output: null };
           },
         ]),
-      ) as any,
+      ) as unknown as import("../../src/worker/types").Handlers,
       stop.signal,
     );
     await new Promise((r) => setTimeout(r, 80));
@@ -184,7 +205,9 @@ test("crash recovery excludes every queued writer even if unknown task is cancel
     };
     const running = runWorker(
       store,
-      Object.fromEntries(stages.map((s) => [s, handler])) as any,
+      Object.fromEntries(
+        stages.map((s) => [s, handler]),
+      ) as unknown as import("../../src/worker/types").Handlers,
       stop.signal,
     );
     await new Promise((r) => setTimeout(r, 60));

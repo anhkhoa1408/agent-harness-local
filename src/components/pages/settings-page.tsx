@@ -17,7 +17,10 @@ export function SettingsPage() {
     [tone, setTone] = useState<"error" | "success">("success"),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    Promise.all([api("models"), api("settings")])
+    Promise.all([
+      api<{ models: ModelInfo[] }>("models"),
+      api<{ models?: ModelMap; executionMode?: "manual" | "auto" }>("settings"),
+    ])
       .then(([c, s]) => {
         setCatalog(c.models);
         setModels(s.models ?? {});
@@ -66,10 +69,7 @@ export function SettingsPage() {
             <h2>Chế độ thực thi</h2>
           </CardHeader>
           <CardContent>
-            <FormField
-              id="default-execution-mode"
-              label="Chế độ mặc định"
-            >
+            <FormField id="default-execution-mode" label="Chế độ mặc định">
               <SelectField
                 id="default-execution-mode"
                 label="Chế độ mặc định"

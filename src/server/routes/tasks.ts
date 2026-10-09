@@ -83,19 +83,27 @@ export function createTasksRoute(context: HttpRouteContext): HttpResourceRoute {
           acceptance: store.getRecord("acceptance", task.id),
           delivery: store.getRecord("delivery", task.id),
           runtime: store.getRecord("runtime", task.id),
-          approvals: store
-            .listRecords("approval")
-            .filter(
-              (r: any) =>
-                r.taskId === task.id &&
-                !r.decision &&
-                task.status === "running" &&
-                task.executionMode !== "auto",
-            ),
-          artifacts: store
-            .listRecords("artifact")
-            .filter((r: any) => r.taskId === task.id)
-            .map((r: any) => ({ id: r.id, type: r.type })),
+          approvals: (
+            store.listRecords("approval") as Array<{
+              taskId: string;
+              decision?: unknown;
+            }>
+          ).filter(
+            (r) =>
+              r.taskId === task.id &&
+              !r.decision &&
+              task.status === "running" &&
+              task.executionMode !== "auto",
+          ),
+          artifacts: (
+            store.listRecords("artifact") as Array<{
+              taskId: string;
+              id: string;
+              type: string;
+            }>
+          )
+            .filter((r) => r.taskId === task.id)
+            .map((r) => ({ id: r.id, type: r.type })),
           diff,
         });
       }

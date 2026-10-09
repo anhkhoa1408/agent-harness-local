@@ -21,6 +21,7 @@ services:
             - "*.tsbuildinfo"
     init: true
     environment:
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/playwright
       SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
       GIT_SSH_COMMAND: ssh -o BatchMode=yes -o StrictHostKeyChecking=yes
     security_opt:
@@ -31,6 +32,7 @@ services:
     volumes:
       - harness-data:/data
       - codex-login:/codex
+      - playwright-cache:/tmp/playwright
       - type: bind
         source: /run/host-services/ssh-auth.sock
         target: /run/host-services/ssh-auth.sock
@@ -50,3 +52,4 @@ services:
 volumes:
   harness-data:
   codex-login:
+  playwright-cache:

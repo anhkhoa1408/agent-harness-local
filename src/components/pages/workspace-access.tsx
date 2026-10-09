@@ -11,20 +11,27 @@ export function WorkspaceAccess({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [verifiedPath, setVerifiedPath] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [failure, setFailure] = useState<{
+    path: string;
+    message: string;
+  } | null>(null);
+  const error = failure?.path === pathname ? failure.message : "";
   useEffect(() => {
     if (pathname === "/login") return;
     let active = true;
-    setError("");
     void api<LoginState>("codex-auth")
       .then((login) => {
         if (!active) return;
+        setFailure(null);
         if (login.status === "authenticated") setVerifiedPath(pathname);
         else router.replace("/login");
       })
       .catch(() => {
         if (active)
-          setError("Không thể kiểm tra đăng nhập. Thử tải lại trang.");
+          setFailure({
+            path: pathname,
+            message: "Không thể kiểm tra đăng nhập. Thử tải lại trang.",
+          });
       });
     return () => {
       active = false;

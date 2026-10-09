@@ -49,6 +49,8 @@ export async function pollApprovalNotifications(
         notification.onclick = () => {
           window.focus();
           notification.close();
+          // This callback survives route changes and has no mounted Next router.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
           window.location.assign(
             `/tasks/${encodeURIComponent(approval.taskId)}#approval=${encodeURIComponent(approval.id)}`,
           );

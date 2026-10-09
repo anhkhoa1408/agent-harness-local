@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { mkdtemp, writeFile, readFile, rm, mkdir } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
@@ -12,6 +12,9 @@ import {
   verifyImageEvidence,
 } from "../../src/execution/ui-verification";
 import { acceptanceErrors, validatePlan } from "../../src/core/acceptance";
+import { createVerifyHandler } from "../../src/worker/handlers/verify";
+import type { StageHandlerContext } from "../../src/worker/handler-context";
+import { openStore } from "../../src/storage/store";
 
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=";
@@ -28,6 +31,81 @@ const plan = () =>
     checks: [{ ...planFixture().checks[0], kind: "e2e" }],
     uiVerification: { screenshots: [selection] },
   });
+
+test("visual reviewer receives an explicit boundary for behavior that static images cannot prove", async () => {
+  const f = await createTempRepo({ "app.js": "source" });
+  const dir = await mkdtemp(join(tmpdir(), "ui-review-scope-"));
+  const store = openStore(":memory:");
+  try {
+    const sourceCommit = await gitText(f.root, ["rev-parse", "HEAD"]);
+    const task = taskFixture({
+      worktree: f.root,
+      sourceCommit,
+      approvedPlanVersion: 1,
+    });
+    const p = {
+      ...plan(),
+      sourceCommit,
+      criteria: [
+        {
+          id: "AC-1",
+          description: "Canvas is visible and animates",
+          checkIds: ["feature-unit"],
+        },
+      ],
+      checks: [
+        {
+          ...plan().checks[0],
+          executable: process.execPath,
+          args: [
+            "-e",
+            `require('fs').mkdirSync('evidence'); require('fs').writeFileSync('${selection.path}', Buffer.from('${png}', 'base64')); console.log('TAP version 13\\n1..1\\nok 1 - animation')`,
+          ],
+        },
+      ],
+    };
+    let instruction = "";
+    const handler = createVerifyHandler({
+      store,
+      artifacts: () => dir,
+      planOf: () => p,
+      fingerprint: async () =>
+        (store.getRecord("checks", task.id) as { fingerprint: string }[])[0]
+          .fingerprint,
+      storyService: { recordEvidence() {} },
+      executor: {
+        async executeAgentStage(
+          _task: unknown,
+          _stage: unknown,
+          _schema: unknown,
+          context: { instruction: string },
+        ) {
+          instruction = context.instruction;
+          return {
+            screenshots: [
+              {
+                id: "desktop",
+                passed: true,
+                evidence:
+                  "Visible canvas matches layout; animation is covered separately by tests",
+              },
+            ],
+          };
+        },
+      },
+    } as unknown as StageHandlerContext);
+    const result = await handler(task, new AbortController().signal);
+    expect(result).toMatchObject({ stage: "review", status: "queued" });
+    expect(instruction).toContain("Do not fail a screenshot solely because");
+    expect(instruction).toContain(
+      "remain the responsibility of automated checks and the independent code review",
+    );
+  } finally {
+    store.close();
+    await f.dispose();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test("UI plan requires a mandatory E2E producer, valid criteria and distinct bounded screenshot paths", () => {
   expect(validatePlan(plan())).toEqual([]);

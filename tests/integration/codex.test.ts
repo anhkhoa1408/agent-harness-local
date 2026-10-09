@@ -1,11 +1,11 @@
 import { test, expect, vi } from "vitest";
 import { PassThrough } from "node:stream";
-import { JsonRpc } from "../../src/codex/rpc";
+import { JsonRpc, type RpcMessage } from "../../src/codex/rpc";
 import { CodexClient } from "../../src/codex/client";
 function fixture() {
   const input = new PassThrough(),
     output = new PassThrough();
-  const sent: any[] = [];
+  const sent: RpcMessage[] = [];
   input.on("data", (chunk) =>
     sent.push(
       ...String(chunk)
@@ -54,7 +54,7 @@ test("lost turn-start response retains unknown writer exclusion", async () => {
 });
 test("correlates out-of-order fragmented replies and separates server approvals", async () => {
   const f = fixture();
-  const requests: any[] = [];
+  const requests: RpcMessage[] = [];
   f.rpc.onMessage((m) => requests.push(m));
   const one = f.rpc.request("first", {}),
     two = f.rpc.request("second", {});
@@ -82,7 +82,7 @@ test("loads every catalog page and passes explicit model and effort to turns", a
   f.input.on("data", (chunk) => {
     const m = JSON.parse(String(chunk));
     if (!m.id) return;
-    let result: any = {};
+    let result: unknown = {};
     if (m.method === "model/list")
       result = m.params.cursor
         ? {
@@ -149,7 +149,7 @@ test("loads every catalog page and passes explicit model and effort to turns", a
     new AbortController().signal,
   );
   expect(result.result).toEqual({ ok: true });
-  expect(f.sent.find((m) => m.method === "turn/start").params).toMatchObject({
+  expect(f.sent.find((m) => m.method === "turn/start")!.params).toMatchObject({
     model: "strong",
     effort: "high",
   });
@@ -245,9 +245,9 @@ test.each(["manual", "auto"] as const)(
           expect(
             f.sent
               .filter((m) =>
-                ["thread/start", "thread/resume"].includes(m.method),
+                ["thread/start", "thread/resume"].includes(m.method ?? ""),
               )
-              .at(-1).params,
+              .at(-1)!.params,
           ).toMatchObject({
             sandbox: write ? "workspace-write" : "read-only",
             approvalPolicy: executionMode === "auto" ? "never" : "on-request",

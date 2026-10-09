@@ -6,12 +6,23 @@ test("repair receives the current no-limit policy after frozen skill instruction
     stage: "repair",
     hash: "old-frozen-bundle",
     adaptations: "Follow the approved scope.",
-    files: [{ id: "debugging", path: "/fixture/SKILL.md", sha256: "old", content: oldPolicy }],
+    files: [
+      {
+        id: "debugging",
+        path: "/fixture/SKILL.md",
+        sha256: "old",
+        content: oldPolicy,
+      },
+    ],
   });
   expect(text).toContain(oldPolicy);
   expect(text).toContain("Repair has no fixed round or fix-count limit");
-  expect(text.indexOf("Repair has no fixed round or fix-count limit")).toBeGreaterThan(text.indexOf(oldPolicy));
-  expect(text).toContain("Never stop or request input/replan solely because three fixes or repair rounds failed");
+  expect(
+    text.indexOf("Repair has no fixed round or fix-count limit"),
+  ).toBeGreaterThan(text.indexOf(oldPolicy));
+  expect(text).toContain(
+    "Never stop or request input/replan solely because three fixes or repair rounds failed",
+  );
   expect(text).toContain("approval, scope, runtime and environment gates");
 });
 test("explicit feature scope accompanies conflicting skill provenance", () => {

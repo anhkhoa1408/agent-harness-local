@@ -6,7 +6,7 @@ import {
   ScreenshotLinks,
 } from "../../src/components/organisms/task-detail/ui-verification";
 import { planFixture } from "../support/task-fixture";
-(globalThis as any).React = React;
+(globalThis as typeof globalThis & { React: typeof React }).React = React;
 
 test("approved UI plan exposes viewports, mapped criteria and reference to the user", () => {
   const plan = planFixture({

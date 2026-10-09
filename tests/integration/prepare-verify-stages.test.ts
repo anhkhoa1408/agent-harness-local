@@ -7,6 +7,8 @@ import { taskFixture, planFixture } from "../support/task-fixture";
 import { aiStages, type Plan } from "../../src/core/contracts";
 import { openStore } from "../../src/storage/store";
 import { createHandlers } from "../../src/worker/stages";
+import { failureEvidence } from "../../src/execution/failure-evidence";
+import type { CheckResult } from "../../src/core/evidence";
 import { gitText, inspectRepository } from "../../src/repositories/inspect";
 import type { AgentClient, AgentInput } from "../../src/codex/client";
 
@@ -84,7 +86,9 @@ async function fixture(ui = false, pass = true) {
     ],
     respondToApproval: vi.fn(async () => {}),
     interruptTurn: async () => {},
-    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
+    runDirectTurn: async () => {
+      throw new Error("fixture_direct_turn_unavailable");
+    },
     close: async () => {},
     runDelegatedStage: async (input) => {
       calls.push(input);
@@ -150,6 +154,86 @@ test("verify without selected UI screenshots stays runner-only", async () => {
   }
 });
 
+test.each(["missing", "malformed"])(
+  "a failed test command with %s JUnit goes to repair and preserves stderr",
+  async (report) => {
+    const f = await fixture();
+    try {
+      f.store.putRecord("plan", `${f.task.id}:1`, {
+        ...f.plan,
+        checks: [
+          {
+            ...f.plan.checks[0],
+            reportPath: "evidence/junit.xml",
+            reportFormat: "junit",
+            args: [
+              "-e",
+              `${report === "malformed" ? "require('fs').writeFileSync('evidence/junit.xml','<broken>');" : ""}console.error('Cannot find module: approved test runner');process.exit(1)`,
+            ],
+          },
+        ],
+      });
+      expect(
+        await f.handlers.verify(f.task, new AbortController().signal),
+      ).toMatchObject({ stage: "repair", status: "queued" });
+      const checks = f.store.getRecord("checks", f.task.id) as CheckResult[];
+      expect(checks[0]).toMatchObject({ status: "failed", exitCode: 1 });
+      const evidence = await failureEvidence(checks);
+      expect(evidence.checks[0].stderrExcerpt).toContain(
+        "Cannot find module: approved test runner",
+      );
+    } finally {
+      await f.dispose();
+    }
+  },
+);
+
+test("a successful command without required JUnit stays blocked", async () => {
+  const f = await fixture();
+  try {
+    f.store.putRecord("plan", `${f.task.id}:1`, {
+      ...f.plan,
+      checks: [
+        {
+          ...f.plan.checks[0],
+          reportPath: "evidence/junit.xml",
+          reportFormat: "junit",
+        },
+      ],
+    });
+    expect(
+      await f.handlers.verify(f.task, new AbortController().signal),
+    ).toMatchObject({ stage: "verify", status: "blocked" });
+  } finally {
+    await f.dispose();
+  }
+});
+
+test("an optional blocked check does not prevent a required failed check from being repaired", async () => {
+  const f = await fixture(false, false);
+  try {
+    f.store.putRecord("plan", `${f.task.id}:1`, {
+      ...f.plan,
+      checks: [
+        ...f.plan.checks,
+        {
+          ...f.plan.checks[0],
+          id: "legacy",
+          required: false,
+          reportPath: "evidence/legacy.xml",
+          reportFormat: "junit",
+          args: ["-e", "process.exit(0)"],
+        },
+      ],
+    });
+    expect(
+      await f.handlers.verify(f.task, new AbortController().signal),
+    ).toMatchObject({ stage: "repair", status: "queued" });
+  } finally {
+    await f.dispose();
+  }
+});
+
 test("UI verify makes one read-only compact image assignment and routes visual failure to repair", async () => {
   const f = await fixture(true);
   try {
@@ -192,7 +276,10 @@ test("E2E failure avoids image AI and missing screenshot blocks handoff", async 
   const f = await fixture(true, false);
   try {
     expect(
-      await f.handlers.verify({ ...f.task, repairCount: 3 }, new AbortController().signal),
+      await f.handlers.verify(
+        { ...f.task, repairCount: 3 },
+        new AbortController().signal,
+      ),
     ).toMatchObject({ stage: "repair" });
     expect(f.calls).toHaveLength(0);
     const missing: Plan = {
@@ -260,7 +347,10 @@ test("delivery excludes generated screenshots from source diff but rechecks froz
   const f = await fixture(true);
   try {
     await f.handlers.verify(f.task, new AbortController().signal);
-    const checks = f.store.getRecord("checks", f.task.id) as any[];
+    const checks = f.store.getRecord(
+      "checks",
+      f.task.id,
+    ) as import("../../src/core/evidence").CheckResult[];
     f.store.putRecord("review", f.task.id, {
       taskId: f.task.id,
       fingerprint: checks[0].fingerprint,

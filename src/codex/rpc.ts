@@ -1,11 +1,33 @@
 import { RPC_REQUEST_TIMEOUT_MS } from "./limits";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
+export type RuntimeThread = {
+  id: string;
+  parentThreadId?: string;
+  path?: string | null;
+  status?: { type: string };
+  turns: Array<{
+    id: string;
+    status: string;
+    items: Array<{ type: string; phase?: string; text?: string }>;
+  }>;
+};
+export type ThreadResponse = {
+  thread: RuntimeThread;
+  turn: { id: string };
+  model: string;
+  reasoningEffort?: string;
+  cwd: string;
+  approvalPolicy: string;
+  sandbox?: { type: string; networkAccess: boolean };
+};
 export type RpcMessage = {
   id?: number | string;
   method?: string;
+  // Notifications and approval requests carry method-specific, experimental wire payloads.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   params?: any;
-  result?: any;
+  result?: unknown;
   error?: { code: number; message: string };
 };
 export class RpcRemoteError extends Error {}
@@ -15,7 +37,7 @@ export class JsonRpc {
   private pending = new Map<
     number,
     {
-      resolve: (v: any) => void;
+      resolve: (v: unknown) => void;
       reject: (e: Error) => void;
       timer: ReturnType<typeof setTimeout>;
     }
@@ -51,15 +73,23 @@ export class JsonRpc {
     output.on("error", () => this.fail(new Error("runtime_disconnected")));
     input.on("error", () => this.fail(new Error("runtime_disconnected")));
   }
-  request(method: string, params: unknown, timeoutMs = RPC_REQUEST_TIMEOUT_MS): Promise<any> {
+  request<T = ThreadResponse>(
+    method: string,
+    params: unknown,
+    timeoutMs = RPC_REQUEST_TIMEOUT_MS,
+  ): Promise<T> {
     if (this.closed) return Promise.reject(new Error("runtime_disconnected"));
     const id = ++this.sequence;
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`runtime_request_timeout: ${method}`));
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, {
+        resolve: (value) => resolve(value as T),
+        reject,
+        timer,
+      });
       this.send({ id, method, params });
     });
   }

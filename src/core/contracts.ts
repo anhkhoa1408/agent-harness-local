@@ -1,4 +1,16 @@
-import { MAX_TITLE_CHARACTERS, MAX_REQUIREMENT_CHARACTERS, MIN_CHECK_TIMEOUT_MS, MAX_CHECK_TIMEOUT_MS, MAX_SCREENSHOT_ID_CHARACTERS, MAX_VIEWPORT_PIXELS, MAX_SELECTED_SCREENSHOTS, MAX_VISUAL_EVIDENCE_CHARACTERS, MAX_STORY_ID_CHARACTERS, MAX_PLAN_COMMENT_CHARACTERS, MAX_COMMAND_ID_CHARACTERS } from "./limits";
+import {
+  MAX_TITLE_CHARACTERS,
+  MAX_REQUIREMENT_CHARACTERS,
+  MIN_CHECK_TIMEOUT_MS,
+  MAX_CHECK_TIMEOUT_MS,
+  MAX_SCREENSHOT_ID_CHARACTERS,
+  MAX_VIEWPORT_PIXELS,
+  MAX_SELECTED_SCREENSHOTS,
+  MAX_VISUAL_EVIDENCE_CHARACTERS,
+  MAX_STORY_ID_CHARACTERS,
+  MAX_PLAN_COMMENT_CHARACTERS,
+  MAX_COMMAND_ID_CHARACTERS,
+} from "./limits";
 import { z } from "zod";
 export const stages = [
   "discover",
@@ -119,7 +131,11 @@ export const CommandSpecSchema = z.object({
   args: z.array(z.string()),
   cwd: z.string().min(1),
   envNames: z.array(z.string()),
-  timeoutMs: z.number().int().min(MIN_CHECK_TIMEOUT_MS).max(MAX_CHECK_TIMEOUT_MS),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(MIN_CHECK_TIMEOUT_MS)
+    .max(MAX_CHECK_TIMEOUT_MS),
   reportPath: z.string().nullable(),
 });
 export type CommandSpec = z.infer<typeof CommandSpecSchema>;
@@ -175,10 +191,20 @@ export const VisualReviewSchema = z.object({
     .max(MAX_SELECTED_SCREENSHOTS),
 });
 export const StorySchema = z.object({
-  id: z.string().min(1).max(MAX_STORY_ID_CHARACTERS).regex(/^[a-zA-Z0-9_-]+$/),
+  id: z
+    .string()
+    .min(1)
+    .max(MAX_STORY_ID_CHARACTERS)
+    .regex(/^[a-zA-Z0-9_-]+$/),
   title: z.string().min(1),
   outcome: z.string().min(1),
-  points: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8)]),
+  points: z.union([
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(5),
+    z.literal(8),
+  ]),
   dependsOn: z.array(z.string()),
   criterionIds: z.array(z.string()).min(1),
   stepIds: z.array(z.string()).min(1),
@@ -192,10 +218,17 @@ export const StorySelectionSchema = z.object({
 });
 export type StorySelection = z.infer<typeof StorySelectionSchema>;
 export type StoryRun = {
-  featureId: string; planVersion: number; storyId: string;
+  featureId: string;
+  planVersion: number;
+  storyId: string;
   state: "pending" | "running" | "completed" | "interrupted" | "blocked";
-  childTaskId?: string; baselineCommit: string; commit?: string;
-  checkpointPath?: string; checkpointArtifactId?: string; prUrl?: string | null; updatedAt: number;
+  childTaskId?: string;
+  baselineCommit: string;
+  commit?: string;
+  checkpointPath?: string;
+  checkpointArtifactId?: string;
+  prUrl?: string | null;
+  updatedAt: number;
 };
 export type StoryExecution = {
   selection: StorySelection;

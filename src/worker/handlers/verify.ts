@@ -1,7 +1,11 @@
 import { VisualReviewSchema } from "../../core/contracts";
 
 import { runChecks } from "../../execution/checks";
-import { collectScreenshots, visualChecks, verifyImageEvidence } from "../../execution/ui-verification";
+import {
+  collectScreenshots,
+  visualChecks,
+  verifyImageEvidence,
+} from "../../execution/ui-verification";
 
 import { canImplement } from "../../core/transitions";
 
@@ -33,13 +37,14 @@ export function createVerifyHandler(
         !checks.some((c) => c.id === s.id && c.status === "passed"),
     );
     if (failures.length) {
-      if (checks.some((c) => c.status === "blocked"))
+      const blocked = checks.find(
+        (c) => c.status === "blocked" && failures.some((s) => s.id === c.id),
+      );
+      if (blocked)
         return {
           stage: "verify",
           status: "blocked",
-          reason:
-            checks.find((c) => c.status === "blocked")?.reason ??
-            "test_blocked",
+          reason: blocked.reason ?? "test_blocked",
           output: checks,
         };
       return queuedStageResult("repair", checks);
@@ -69,7 +74,7 @@ export function createVerifyHandler(
           ),
           screenshots: images,
           instruction:
-            "Use view_image to inspect every selected actual screenshot and its reference when present. Evaluate only the mapped UI criteria, layout, readable content and responsive behavior visible in these viewport images. Without a reference compare against explicit criteria only. Do not browse, read source, rerun tests or infer hidden interactions. If an image cannot be inspected, do not report pass. Return one verdict per screenshot with brief concrete evidence.",
+            "Use view_image to inspect every selected actual screenshot and its reference when present. Evaluate only the visible UI portions of the mapped criteria: layout, readable content and responsive presentation in these viewport images. Without a reference compare against explicit criteria only. Do not fail a screenshot solely because a static image cannot prove animation, interactions, cleanup, resize handling or DPR backing-store sizing; those behaviors remain the responsibility of automated checks and the independent code review. Do not claim those behaviors passed from an image. Fail visible mismatches and report concrete visual evidence. Do not browse, read source, rerun tests or infer hidden interactions. If an image cannot be inspected, do not report pass. Return one verdict per screenshot with brief concrete evidence.",
         },
         signal,
         {

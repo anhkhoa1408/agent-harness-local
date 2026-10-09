@@ -4,9 +4,9 @@ import {
   type ProgressAttempt,
 } from "../../src/core/pipeline-progress";
 import { taskFixture } from "../support/task-fixture";
-import type { Stage } from "../../src/core/contracts";
-const task = (stage: Stage, status = "running") =>
-  taskFixture({ stage, status: status as any });
+import type { Stage, Status } from "../../src/core/contracts";
+const task = (stage: Stage, status: Status = "running") =>
+  taskFixture({ stage, status });
 const done = (
   stage: Stage,
   nextStage: Stage,

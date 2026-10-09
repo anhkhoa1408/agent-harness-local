@@ -119,7 +119,10 @@ test("local bootstrap, CSRF, hostile origins, stale commands and artifact traver
     );
     const summary = await (await handle(request("tasks"))).json();
     expect(
-      summary[0].pipeline.find((n: any) => n.stage === "discover").state,
+      summary[0].pipeline.find(
+        (n: import("../../src/core/pipeline-progress").StageNode) =>
+          n.stage === "discover",
+      ).state,
     ).toBe("done");
     const detail = await (await handle(request(`tasks/${task.id}`))).json();
     expect(detail.pipeline).toEqual(summary[0].pipeline);

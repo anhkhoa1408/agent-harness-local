@@ -11,6 +11,7 @@ export function LoginPage() {
   const router = useRouter();
   const [login, setLogin] = useState<LoginState | null>(null);
   const [error, setError] = useState("");
+  const [popupOpen, setPopupOpen] = useState(false);
   const popup = useRef<Window | null>(null);
   const redirected = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,10 @@ export function LoginPage() {
     const load = async () => {
       try {
         const result = await api<LoginState>("codex-auth");
-        if (active) setLogin(result);
+        if (active) {
+          setLogin(result);
+          setPopupOpen(!!popup.current && !popup.current.closed);
+        }
       } catch {
         if (active)
           setError("Không thể kiểm tra đăng nhập. Thử tải lại trang.");
@@ -59,6 +63,7 @@ export function LoginPage() {
       "codex-oauth",
       "width=700,height=800",
     );
+    setPopupOpen(!!popup.current && !popup.current.closed);
     try {
       setLogin(await api<LoginState>("codex-auth", "POST"));
     } catch {
@@ -102,16 +107,11 @@ export function LoginPage() {
         {pending && (
           <>
             <p role="status">Hoàn tất đăng nhập trên trang OpenAI.</p>
-            {login.authorizationUrl &&
-              (!popup.current || popup.current.closed) && (
-                <a
-                  href={login.authorizationUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Mở trang đăng nhập ↗
-                </a>
-              )}
+            {login.authorizationUrl && !popupOpen && (
+              <a href={login.authorizationUrl} target="_blank" rel="noreferrer">
+                Mở trang đăng nhập ↗
+              </a>
+            )}
           </>
         )}
       </div>

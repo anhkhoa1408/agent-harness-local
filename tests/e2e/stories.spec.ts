@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 async function create(
-  page: any,
+  page: import("@playwright/test").Page,
   title: string,
   requirement = "stories feature",
 ) {
@@ -53,9 +53,18 @@ test("shared PR selection, dependency validation, checkpoint pause, resume and c
     detail = await (await page.request.get(`/api/tasks/${id}`)).json();
   expect(detail.stories.runs).toHaveLength(2);
   expect(
-    detail.stories.runs.every((r: any) => r.commit && r.state === "completed"),
+    detail.stories.runs.every(
+      (r: import("../../src/core/contracts").StoryRun) =>
+        r.commit && r.state === "completed",
+    ),
   ).toBe(true);
-  expect(new Set(detail.stories.runs.map((r: any) => r.commit)).size).toBe(2);
+  expect(
+    new Set(
+      detail.stories.runs.map(
+        (r: import("../../src/core/contracts").StoryRun) => r.commit,
+      ),
+    ).size,
+  ).toBe(2);
   await page.screenshot({ path: "/private/tmp/harness-story-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
@@ -162,7 +171,10 @@ test("interruption in second story retains first checkpoint and resume completes
   const detail = await (
     await page.request.get(`/api/tasks/${page.url().split("/").at(-1)}`)
   ).json();
-  expect(detail.stories.runs.every((r: any) => r.state === "completed")).toBe(
-    true,
-  );
+  expect(
+    detail.stories.runs.every(
+      (r: import("../../src/core/contracts").StoryRun) =>
+        r.state === "completed",
+    ),
+  ).toBe(true);
 });

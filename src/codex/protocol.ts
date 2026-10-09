@@ -1,6 +1,10 @@
 import type { DelegatedStageInput } from "./types";
 import { JsonRpc, RpcRemoteError } from "./rpc";
-import { ROLLOUT_INITIAL_RETRY_DELAY_MS, ROLLOUT_MAX_RETRY_DELAY_MS, RUNTIME_PAGE_SIZE } from "./limits";
+import {
+  ROLLOUT_INITIAL_RETRY_DELAY_MS,
+  ROLLOUT_MAX_RETRY_DELAY_MS,
+  RUNTIME_PAGE_SIZE,
+} from "./limits";
 import { PARENT_AGENT_MODEL } from "./limits";
 export async function requestThreadWhenRolloutReady(
   rpc: JsonRpc,
@@ -37,13 +41,19 @@ export async function requestThreadWhenRolloutReady(
 export async function listDescendantThreads(
   rpc: JsonRpc,
   threadId: string,
-): Promise<any[]> {
-  const data: any[] = [],
+): Promise<import("./rpc").RuntimeThread[]> {
+  const data: import("./rpc").RuntimeThread[] = [],
     seen = new Set<string>();
   let cursor: string | null = null;
   do {
-    const page: { data: any[]; nextCursor?: string | null } = await rpc
-      .request("thread/list", {
+    const page: {
+      data: import("./rpc").RuntimeThread[];
+      nextCursor?: string | null;
+    } = await rpc
+      .request<{
+        data: import("./rpc").RuntimeThread[];
+        nextCursor?: string | null;
+      }>("thread/list", {
         ancestorThreadId: threadId,
         sourceKinds: ["subAgent", "subAgentThreadSpawn"],
         limit: RUNTIME_PAGE_SIZE,
@@ -60,7 +70,7 @@ export async function listDescendantThreads(
   return data;
 }
 export function matchesAgentSettings(
-  response: any,
+  response: import("./rpc").ThreadResponse,
   input: DelegatedStageInput,
   child: boolean,
 ) {
@@ -76,19 +86,21 @@ export function matchesAgentSettings(
   );
 }
 export function verifyChildSpawn(
-  args: any,
+  args: unknown,
   assignment: ReturnType<typeof import("../context/prompts").stageAssignment>,
   input: DelegatedStageInput,
 ) {
+  if (!args || typeof args !== "object") return false;
+  const spawn = args as Record<string, unknown>;
   return (
-    args?.task_name === assignment.task_name &&
-    args.fork_turns === "none" &&
-    args.model === input.model.model &&
-    args.reasoning_effort === input.model.effort &&
+    spawn.task_name === assignment.task_name &&
+    spawn.fork_turns === "none" &&
+    spawn.model === input.model.model &&
+    spawn.reasoning_effort === input.model.effort &&
     // This native runtime encrypts message in both raw events and rollout evidence.
     // Plaintext can be compared exactly; encrypted contents cannot be audited here.
-    typeof args.message === "string" &&
-    (args.message === assignment.message ||
-      /^gAAAA[A-Za-z0-9_-]+=*$/.test(args.message))
+    typeof spawn.message === "string" &&
+    (spawn.message === assignment.message ||
+      /^gAAAA[A-Za-z0-9_-]+=*$/.test(spawn.message))
   );
 }

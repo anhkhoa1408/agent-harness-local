@@ -99,17 +99,17 @@ Statuses: `queued`, `running`, `waiting_input`, `waiting_approval`, `blocked`, `
 
 Mỗi trạng thái chờ có reason và hành động cần thiết; ví dụ `quota`, `environment`, `model_unavailable`, `test_failure`, `delivery_error`.
 
-| Stage | Đầu ra và điều kiện chuyển tiếp |
-| --- | --- |
-| discover | Repo Profile và kiểm tra khả năng thực thi → analyze |
-| analyze | Requirement đủ rõ; thiếu thông tin → waiting_input; đủ → plan |
-| plan | Plan có phiên bản → waiting_approval; được duyệt → prepare |
-| prepare | Tạo/xác minh worktree, fetch base từ remote và merge trong worktree riêng; conflict dùng AI giới hạn theo file. Base đổi → discover/plan và duyệt lại; baseline giữ nguyên → implement hoặc repair |
-| implement | Code và test cho tính năng mới/bug → verify |
-| verify | Runner chạy checks; UI task có screenshot được chọn thì thêm một lượt AI đọc ảnh. Tất cả bắt buộc pass → review; lỗi hành vi/giao diện → repair; thiếu evidence/môi trường → blocked |
-| review | Không còn finding bắt buộc sửa, đủ bằng chứng → deliver; có finding → repair |
-| repair | Sửa theo lỗi test/review, tăng repair round → verify; thay phạm vi → plan |
-| deliver | Kiểm tra evidence còn hiệu lực, commit/push/tạo PR hoặc xuất bàn giao local → completed |
+| Stage     | Đầu ra và điều kiện chuyển tiếp                                                                                                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| discover  | Repo Profile và kiểm tra khả năng thực thi → analyze                                                                                                                                               |
+| analyze   | Requirement đủ rõ; thiếu thông tin → waiting_input; đủ → plan                                                                                                                                      |
+| plan      | Plan có phiên bản → waiting_approval; được duyệt → prepare                                                                                                                                         |
+| prepare   | Tạo/xác minh worktree, fetch base từ remote và merge trong worktree riêng; conflict dùng AI giới hạn theo file. Base đổi → discover/plan và duyệt lại; baseline giữ nguyên → implement hoặc repair |
+| implement | Code và test cho tính năng mới/bug → verify                                                                                                                                                        |
+| verify    | Runner chạy checks; UI task có screenshot được chọn thì thêm một lượt AI đọc ảnh. Tất cả bắt buộc pass → review; lỗi hành vi/giao diện → repair; thiếu evidence/môi trường → blocked               |
+| review    | Không còn finding bắt buộc sửa, đủ bằng chứng → deliver; có finding → repair                                                                                                                       |
+| repair    | Sửa theo lỗi test/review, tăng repair round → verify; thay phạm vi → plan                                                                                                                          |
+| deliver   | Kiểm tra evidence còn hiệu lực, commit/push/tạo PR hoặc xuất bàn giao local → completed                                                                                                            |
 
 `paused`, `interrupted`, `blocked` giữ stage hiện tại và lần chạy cuối. Resume phải qua bước đối chiếu thực tế trước khi xác định stage tiếp tục. `failed` dành cho lỗi không thể phục hồi của lần chạy, không dùng thay cho chờ hạn mức/môi trường.
 
@@ -123,13 +123,13 @@ Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có c�
 
 Chính sách theo yêu cầu ngày 2026-10-03, thay thế lựa chọn effort trên UI:
 
-| Stage | Model mặc định | Effort |
-| --- | --- | --- |
-| plan, gồm replan | gpt-6-astra | high |
-| discover, analyze, implement, review, repair | gpt-6-luna | medium |
-| prepare | Worker; conflict dùng model repair đã chọn | medium khi có conflict |
-| verify | Runner; ảnh UI dùng model review đã chọn | medium khi có screenshot |
-| deliver | Worker, không gọi model | Không áp dụng |
+| Stage                                        | Model mặc định                             | Effort                   |
+| -------------------------------------------- | ------------------------------------------ | ------------------------ |
+| plan, gồm replan                             | gpt-6-astra                                | high                     |
+| discover, analyze, implement, review, repair | gpt-6-luna                                 | medium                   |
+| prepare                                      | Worker; conflict dùng model repair đã chọn | medium khi có conflict   |
+| verify                                       | Runner; ảnh UI dùng model review đã chọn   | medium khi có screenshot |
+| deliver                                      | Worker, không gọi model                    | Không áp dụng            |
 
 Policy nằm trong `src/core/model-policy.ts`; thay effort bằng cách sửa code. UI vẫn cho đổi model nhưng hiển thị effort cố định. API chuẩn hóa effort khi lưu settings, tạo task và áp dụng model vào task; runtime và attempt log dùng effort của policy. Lựa chọn model cũ của task được giữ; lịch sử attempt và context snapshot đã ghi không bị sửa. Cặp model/effort không khả dụng phải blocked, không tự fallback. Model tiết kiệm là lựa chọn cấu hình, không cam kết mức quota hoặc số tiền cụ thể.
 
@@ -156,19 +156,19 @@ Rule `rules/lighthouse-performance.md` chỉ được nạp khi task liên quan 
 
 Registry skill đã triển khai trong `src/context/skills.ts`; agent profile được map trong `src/context/agents.ts`. Theo yêu cầu cập nhật ngày 2026-10-04, worker nạp skills và profiles đóng gói trong repo (`skills/`, `agents/`), lưu snapshot nội dung và nguồn theo task. Bỏ cấu hình Skill roots; không phụ thuộc plugin cài trên máy. Task đã có snapshot giữ nguyên nội dung.
 
-| Stage | Skill/bộ hướng dẫn mặc định | Trách nhiệm và kết quả |
-| --- | --- | --- |
-| discover | Hướng dẫn Repo Profile riêng của harness; chưa có file skill độc lập | Đọc code/manifest/CI, trả profile có căn cứ; không sửa repo. Đây là contract trong mục 3, không giả định có skill Superpowers chuyên discovery |
-| analyze | `mattpocock-skills:grilling` | Hỏi các quyết định chưa rõ theo quan hệ phụ thuộc, đưa đề xuất và chờ câu trả lời; trả requirement/acceptance criteria |
-| analyze — nhánh thiết kế mới | `superpowers:brainstorming`, khi task cần thiết kế kiến trúc/UI/hành vi chưa chốt | Khảo sát lựa chọn và đánh đổi. Dùng chung luồng hỏi/approval của harness, không mở thêm một vòng phỏng vấn trùng lặp |
-| plan | `superpowers:writing-plans` | Kế hoạch có bước thực hiện, nơi thay đổi và điều kiện kiểm chứng; đầu ra gắn với PlanVersion |
-| prepare | Worker thực thi Git/môi trường | Không nạp skill điều phối để agent tự tạo thêm worktree. Quyền và side effect thuộc worker |
-| implement | `superpowers:test-driven-development` + rule mục tiêu/đơn giản/thay đổi có mục tiêu từ AGENTS.md | Red → green cho feature/bug; triển khai tối thiểu theo plan đã duyệt |
-| verify | Runner + nguyên tắc `superpowers:verification-before-completion` | Runner là nguồn bằng chứng; chỉ báo pass khi command/report xác nhận. Không cần thêm lượt AI chỉ để gọi lại test |
-| review | `superpowers:requesting-code-review` cho bước chuẩn bị; `requesting-code-review/code-reviewer.md` cho phiên reviewer riêng | Worker tạo review package gồm plan, diff/revision và test evidence; reviewer chỉ đọc, trả finding có cấu trúc |
-| repair — nhận review | `superpowers:receiving-code-review` | Kiểm tra tính đúng đắn của finding; có thể phản biện bằng căn cứ, không sửa máy móc |
-| repair — chẩn đoán và sửa | `superpowers:systematic-debugging` → `superpowers:test-driven-development` → `superpowers:verification-before-completion` | Tái hiện → thu bằng chứng → xác định nguyên nhân → kiểm chứng giả thuyết → test hồi quy → sửa tối thiểu → xác minh |
-| deliver | Worker + nguyên tắc `superpowers:verification-before-completion` | Đối chiếu gate và evidence của snapshot cuối, tạo PR hoặc bàn giao local; không thêm một phiên AI để tự quyết merge |
+| Stage                        | Skill/bộ hướng dẫn mặc định                                                                                                | Trách nhiệm và kết quả                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| discover                     | Hướng dẫn Repo Profile riêng của harness; chưa có file skill độc lập                                                       | Đọc code/manifest/CI, trả profile có căn cứ; không sửa repo. Đây là contract trong mục 3, không giả định có skill Superpowers chuyên discovery |
+| analyze                      | `mattpocock-skills:grilling`                                                                                               | Hỏi các quyết định chưa rõ theo quan hệ phụ thuộc, đưa đề xuất và chờ câu trả lời; trả requirement/acceptance criteria                         |
+| analyze — nhánh thiết kế mới | `superpowers:brainstorming`, khi task cần thiết kế kiến trúc/UI/hành vi chưa chốt                                          | Khảo sát lựa chọn và đánh đổi. Dùng chung luồng hỏi/approval của harness, không mở thêm một vòng phỏng vấn trùng lặp                           |
+| plan                         | `superpowers:writing-plans`                                                                                                | Kế hoạch có bước thực hiện, nơi thay đổi và điều kiện kiểm chứng; đầu ra gắn với PlanVersion                                                   |
+| prepare                      | Worker thực thi Git/môi trường                                                                                             | Không nạp skill điều phối để agent tự tạo thêm worktree. Quyền và side effect thuộc worker                                                     |
+| implement                    | `superpowers:test-driven-development` + rule mục tiêu/đơn giản/thay đổi có mục tiêu từ AGENTS.md                           | Red → green cho feature/bug; triển khai tối thiểu theo plan đã duyệt                                                                           |
+| verify                       | Runner + nguyên tắc `superpowers:verification-before-completion`                                                           | Runner là nguồn bằng chứng; chỉ báo pass khi command/report xác nhận. Không cần thêm lượt AI chỉ để gọi lại test                               |
+| review                       | `superpowers:requesting-code-review` cho bước chuẩn bị; `requesting-code-review/code-reviewer.md` cho phiên reviewer riêng | Worker tạo review package gồm plan, diff/revision và test evidence; reviewer chỉ đọc, trả finding có cấu trúc                                  |
+| repair — nhận review         | `superpowers:receiving-code-review`                                                                                        | Kiểm tra tính đúng đắn của finding; có thể phản biện bằng căn cứ, không sửa máy móc                                                            |
+| repair — chẩn đoán và sửa    | `superpowers:systematic-debugging` → `superpowers:test-driven-development` → `superpowers:verification-before-completion`  | Tái hiện → thu bằng chứng → xác định nguyên nhân → kiểm chứng giả thuyết → test hồi quy → sửa tối thiểu → xác minh                             |
+| deliver                      | Worker + nguyên tắc `superpowers:verification-before-completion`                                                           | Đối chiếu gate và evidence của snapshot cuối, tạo PR hoặc bàn giao local; không thêm một phiên AI để tự quyết merge                            |
 
 `systematic-debugging` cũng kích hoạt ngay khi gặp bug/test failure/unexpected behavior trong analyze hoặc implement. Lỗi có sẵn ngoài phạm vi chỉ được ghi nhận, trừ khi nó chặn kiểm chứng feature. Chưa rõ root cause thì thu thêm bằng chứng hoặc hỏi, không nối tiếp các bản vá phỏng đoán.
 
@@ -266,15 +266,15 @@ PR được đối chiếu bằng repo/head/base và task marker để tránh t�
 
 Các thực thể chính:
 
-| Thực thể | Nội dung |
-| --- | --- |
-| Repository / RepoProfile | Path, base/remote, commit, công nghệ, command candidates và căn cứ |
-| Task | Requirement, stage/status/reason, branch/worktree, dependency, repair count, delivery mode |
-| PlanVersion / Approval | Phạm vi, tiêu chí, test plan, cấu hình và phiên bản được duyệt |
-| StageAttempt | Phiên Codex, snapshot cấu hình/model/rule/skill và ghi chú tích hợp, input/output, thời điểm, revision, usage |
-| CheckResult / ReviewFinding | Bằng chứng test, finding và vòng sửa xử lý |
-| Event / ControlCommand | Timeline có thứ tự; lệnh pause/resume/cancel có ID chống lặp |
-| SideEffect / Artifact | Intent/result của tác động ngoài DB; đường dẫn và fingerprint báo cáo |
+| Thực thể                    | Nội dung                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Repository / RepoProfile    | Path, base/remote, commit, công nghệ, command candidates và căn cứ                                            |
+| Task                        | Requirement, stage/status/reason, branch/worktree, dependency, repair count, delivery mode                    |
+| PlanVersion / Approval      | Phạm vi, tiêu chí, test plan, cấu hình và phiên bản được duyệt                                                |
+| StageAttempt                | Phiên Codex, snapshot cấu hình/model/rule/skill và ghi chú tích hợp, input/output, thời điểm, revision, usage |
+| CheckResult / ReviewFinding | Bằng chứng test, finding và vòng sửa xử lý                                                                    |
+| Event / ControlCommand      | Timeline có thứ tự; lệnh pause/resume/cancel có ID chống lặp                                                  |
+| SideEffect / Artifact       | Intent/result của tác động ngoài DB; đường dẫn và fingerprint báo cáo                                         |
 
 Các màn hình: danh sách repo/task; tạo task; hỏi đáp và duyệt plan; chi tiết task với timeline, tests, review; cấu hình model theo stage; kết quả bàn giao. Task detail thể hiện rõ đang chạy/chờ gì, người dùng cần làm gì và trạng thái worker. Theo yêu cầu ngày 2026-10-04, bỏ tab Diff; người dùng review diff trên GitHub. Pipeline vẫn giữ dữ liệu diff để review và kiểm tra phạm vi thay đổi.
 
@@ -349,7 +349,6 @@ Trong container, dashboard bind `0.0.0.0` để Docker forward port; cổng host
 Theo yêu cầu người dùng: Plan hỗ trợ comment chung hoặc theo step/criterion/check, gắn với version. Người dùng gửi comments rồi yêu cầu sửa; planner nhận Plan trước và feedback, tạo version mới để duyệt. Version cũ và comments giữ nguyên. Khi version hiện tại có comments, phải tạo version mới trước approval. Replan giữ worktree và repair count.
 
 Settings có chế độ mặc định cho task mới; task có thể đổi chế độ tại stage boundary. Manual giữ `on-request`; Auto dùng `never` với sandbox hiện tại (`read-only` trước implementation và cho reviewer, `workspace-write` cho implement/repair). Auto không tự mở rộng quyền filesystem/network; request quyền bất ngờ bị decline và ghi event. Approval Plan thuộc worker vẫn bắt buộc, độc lập với policy công cụ. Repair không giới hạn số vòng; test/review gates và quy tắc replan giữ nguyên.
-
 
 ## Bổ sung Prepare và UI Verify tiết kiệm token — 2026-10-05
 

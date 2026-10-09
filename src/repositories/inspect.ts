@@ -1,12 +1,28 @@
-import { GIT_MAX_BUFFER_BYTES, GIT_COMMAND_TIMEOUT_MS, MAX_SOURCE_DOCUMENT_BYTES, MAX_SOURCE_CONTEXT_BYTES } from "./limits";
+import {
+  GIT_MAX_BUFFER_BYTES,
+  GIT_COMMAND_TIMEOUT_MS,
+  MAX_SOURCE_DOCUMENT_BYTES,
+  MAX_SOURCE_CONTEXT_BYTES,
+} from "./limits";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { realpath, mkdtemp, mkdir, writeFile, rm, stat } from "node:fs/promises";
+import {
+  realpath,
+  mkdtemp,
+  mkdir,
+  writeFile,
+  rm,
+  stat,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { RepoProfileSchema, type Repository, type ModelChoice } from "../core/contracts";
+import {
+  RepoProfileSchema,
+  type Repository,
+  type ModelChoice,
+} from "../core/contracts";
 import type { AgentClient, AgentEvent } from "../codex/types";
 import type { Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";
@@ -20,9 +36,18 @@ export class RepositoryRegistrationError extends Error {
     this.name = "RepositoryRegistrationError";
   }
 }
-export async function gitText(root: string, args: string[], signal?: AbortSignal): Promise<string> {
+export async function gitText(
+  root: string,
+  args: string[],
+  signal?: AbortSignal,
+): Promise<string> {
   return (
-    await exec("git", ["-C", root, ...args], { maxBuffer: GIT_MAX_BUFFER_BYTES, signal, timeout: GIT_COMMAND_TIMEOUT_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } })
+    await exec("git", ["-C", root, ...args], {
+      maxBuffer: GIT_MAX_BUFFER_BYTES,
+      signal,
+      timeout: GIT_COMMAND_TIMEOUT_MS,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    })
   ).stdout.trim();
 }
 export async function inspectRepository(
@@ -100,7 +125,11 @@ export async function sourceDocuments(
     const size = Number(
       await gitText(repo.root, ["cat-file", "-s", `${repo.head}:${path}`]),
     );
-    if (size > MAX_SOURCE_DOCUMENT_BYTES || total + size > MAX_SOURCE_CONTEXT_BYTES) continue;
+    if (
+      size > MAX_SOURCE_DOCUMENT_BYTES ||
+      total + size > MAX_SOURCE_CONTEXT_BYTES
+    )
+      continue;
     const content = (
       await exec("git", ["-C", repo.root, "show", `${repo.head}:${path}`], {
         maxBuffer: GIT_MAX_BUFFER_BYTES,
