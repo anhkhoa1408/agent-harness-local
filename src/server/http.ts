@@ -1,3 +1,5 @@
+import { ModelService } from "../application/models";
+import { SettingsSchema } from "../core/settings";
 import { TaskService } from "../application/task-service";
 import { gitText } from "../repositories/inspect";
 import { MAX_REQUEST_BODY_SIZE } from "./limits";
@@ -28,6 +30,14 @@ export function createHttpHandler(
   const { stories: storyService, plans: planService } = createServices(store);
   const taskService = new TaskService(store, { readGit: gitText }, models);
   const context = {
+    modelService: new ModelService(
+      {
+        get: () =>
+          SettingsSchema.parse(store.getRecord("settings", "current") ?? {}),
+        put: (value) => store.putRecord("settings", "current", value),
+      },
+      { listModels: models },
+    ),
     store,
     data,
     models,
