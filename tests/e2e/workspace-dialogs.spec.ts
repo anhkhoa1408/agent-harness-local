@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { selectOption } from "../support/select";
-import type { Repository } from "../../src/core/contracts";
-import type { TaskWithProgress } from "../../src/core/pipeline-progress";
+import type { Repository } from "../../src/domain/contracts";
+import type { TaskWithProgress } from "../../src/domain/pipeline-progress";
 
 const repos: Repository[] = ["alpha", "beta", "empty"].map((id) => ({
   id,

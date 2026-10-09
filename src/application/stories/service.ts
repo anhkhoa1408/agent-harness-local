@@ -1,5 +1,5 @@
-import type {ValidationPort} from "../validation";
-import type {RuntimePort} from "../runtime";
+import type { ValidationPort } from "../validation";
+import type { RuntimePort } from "../runtime";
 import { storyKey } from "../../domain/story-key";
 export { storyKey } from "../../domain/story-key";
 import {
@@ -28,8 +28,8 @@ export class StoryService {
   constructor(
     private readonly store: ApplicationStore,
     private readonly repository: StoryRepositoryPort,
-    private readonly validation:ValidationPort,
-    private readonly runtime:RuntimePort,
+    private readonly validation: ValidationPort,
+    private readonly runtime: RuntimePort,
   ) {}
   getExecution(id: string) {
     return this.store.storyExecutions.get(id) as StoryExecution | null;

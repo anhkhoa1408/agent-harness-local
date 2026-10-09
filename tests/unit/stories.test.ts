@@ -4,13 +4,13 @@ import {
   StorySchema,
   StorySelectionSchema,
   TaskSchema,
-} from "../../src/core/contracts";
+} from "../../src/infrastructure/validation/contracts";
 import {
   validateStories,
   selectedStories,
   projectStoryPlan,
   projectSelectedPlan,
-} from "../../src/core/stories";
+} from "../../src/domain/stories";
 import { planFixture, taskFixture } from "../support/task-fixture";
 import { storiesPlan } from "../support/story-fixture";
 const select = (storyIds = ["A", "B"]) =>

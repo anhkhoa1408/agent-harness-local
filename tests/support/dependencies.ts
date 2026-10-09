@@ -8,15 +8,17 @@ export function dependencyViolations(
   const violations: string[] = [];
   const edges = new Map<string, string[]>();
   const host: ts.ModuleResolutionHost = {
-    fileExists: (path) => path in sources,
-    readFile: (path) => sources[path],
+    fileExists: (path) => path in sources || ts.sys.fileExists(path),
+    readFile: (path) => sources[path] ?? ts.sys.readFile(path),
     directoryExists: (path) =>
-      Object.keys(sources).some((file) => file.startsWith(path + "/")),
+      Object.keys(sources).some((file) => file.startsWith(path + "/")) ||
+      (ts.sys.directoryExists?.(path) ?? false),
   };
   const options: ts.CompilerOptions = {
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     module: ts.ModuleKind.ESNext,
     baseUrl: root,
+    resolveJsonModule: true,
     paths: { "@/*": ["./*"] },
   };
   for (const [file, text] of Object.entries(sources)) {
@@ -52,9 +54,10 @@ export function dependencyViolations(
     for (const specifier of dependencies) {
       const target = ts.resolveModuleName(specifier, file, options, host)
         .resolvedModule?.resolvedFileName;
-      const dependency = target
-        ? relative(root, target).split("/")[0]
-        : "external";
+      const dependency =
+        target && !relative(root, target).startsWith("../")
+          ? relative(root, target).split("/")[0]
+          : "external";
       const allowed =
         owner === "domain"
           ? ["domain"]
@@ -77,7 +80,7 @@ export function dependencyViolations(
         !target.endsWith("/index.ts")
       )
         violations.push(`${relative(root, file)} -> private ${specifier}`);
-      if (target) targets.push(target);
+      if (target && target in sources) targets.push(target);
       if (!target && (specifier.startsWith(".") || specifier.startsWith("@/")))
         violations.push(`${relative(root, file)} -> unresolved ${specifier}`);
     }

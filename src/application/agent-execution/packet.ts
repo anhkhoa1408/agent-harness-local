@@ -1,4 +1,4 @@
-import type {Bundle,DelegatedStageInput} from "./contracts";
+import type { Bundle, DelegatedStageInput } from "../execution-contracts";
 export function stageEnvelope(
   input: DelegatedStageInput,
 ): Record<string, unknown> {

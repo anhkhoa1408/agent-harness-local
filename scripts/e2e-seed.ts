@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-import { openStore } from "../src/storage/store";
-import { inspectRepository } from "../src/repositories/inspect";
-import { aiStages } from "../src/core/contracts";
+import { openStore } from "../src/infrastructure/persistence/store";
+import { inspectRepository } from "../src/infrastructure/repositories/inspect";
+import { aiStages } from "../src/domain/contracts";
 if (process.env.HARNESS_TEST_MODE !== "1")
   throw new Error("test_mode_required");
 const data = resolve(process.env.HARNESS_DATA_DIR!),

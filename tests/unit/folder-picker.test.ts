@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { createFolderPicker } from "../../src/server/folder-picker";
+import { createFolderPicker } from "../../src/infrastructure/system/folder-picker";
 
 test("returns the selected absolute path without losing spaces", async () => {
   const pick = createFolderPicker("darwin", async () => ({

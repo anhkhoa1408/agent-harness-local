@@ -1,4 +1,4 @@
-import type { TaskWithProgress } from "@/core/pipeline-progress";
+import type { TaskWithProgress } from "@/domain/pipeline-progress";
 import { Activity, Layers3, CircleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";

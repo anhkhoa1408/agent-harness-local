@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { AuthLayout } from "@/components/templates/auth-layout";
 import { FeedbackMessage } from "@/components/molecules/feedback-message";
 import { api } from "@/lib/api";
-import type { LoginState } from "@/server/codex-login";
+import type { LoginState } from "@/presentation/dto";
 
 export function LoginPage() {
   const router = useRouter();

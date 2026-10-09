@@ -2,7 +2,7 @@ import { test, expect, vi } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runProcess } from "../../src/execution/process";
+import { runProcess } from "../../src/infrastructure/execution/process";
 import { planFixture } from "../support/task-fixture";
 
 test("runner shares the configured browser cache without exposing unrelated environment variables", async () => {

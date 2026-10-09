@@ -1,5 +1,9 @@
-import { createHttpHandler } from "../../../server/http";
-import { getStore, dataDir, modelCatalog } from "../../../server/runtime";
+import { createHttpHandler } from "../../../bootstrap/http";
+import {
+  getStore,
+  dataDir,
+  modelCatalog,
+} from "../../../bootstrap/web-runtime";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const handler = (request: Request) =>

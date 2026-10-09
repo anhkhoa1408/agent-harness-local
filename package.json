@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "build": "next build",
     "web": "next dev --hostname 127.0.0.1",
-    "worker": "tsx src/worker/main.ts",
+    "worker": "tsx src/bootstrap/worker-main.ts",
     "dev": "node scripts/dev.mjs",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix --max-warnings=0",

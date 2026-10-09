@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@/core/model-policy";
+import type { ModelInfo } from "@/domain/model-policy";
 import { SelectField } from "./select-field";
 export function ModelSelector({
   id,

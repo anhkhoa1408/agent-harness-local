@@ -1,4 +1,4 @@
-import type { Plan } from "@/core/contracts";
+import type { Plan } from "@/presentation/dto";
 export function UiVerificationPlan({ plan }: { plan: Plan }) {
   if (!plan.uiVerification) return null;
   return (

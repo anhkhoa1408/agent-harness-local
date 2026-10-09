@@ -1,15 +1,15 @@
-import type {ValidationPort} from "../validation";
-import type {RuntimePort} from "../runtime";
+import type { ValidationPort } from "../validation";
+import type { RuntimePort } from "../runtime";
 import type { ApplicationStore } from "../ports";
-import {
-  type PlanComment,
-  type Plan,
-} from "../../domain/contracts";
+import { type PlanComment, type Plan } from "../../domain/contracts";
 import { validatePlan } from "../../domain/acceptance";
 import type { StoryService } from "../stories";
 export class PlanService {
   constructor(
-    private readonly store: ApplicationStore,
+    private readonly store: Pick<
+      ApplicationStore,
+      "atomic" | "tasks" | "plans" | "planComments"
+    >,
     private readonly stories: Pick<StoryService, "validateStoryReplan">,
     private readonly validation: ValidationPort,
     private readonly runtime: RuntimePort,
@@ -64,9 +64,7 @@ export class PlanService {
       !["waiting_approval", "waiting_input"].includes(task.status)
     )
       throw new Error("invalid_status");
-    const plan = this.validation.plan(
-      store.plans.get(`${taskId}:${version}`),
-    );
+    const plan = this.validation.plan(store.plans.get(`${taskId}:${version}`));
     return { task, plan };
   }
   addPlanComment(taskId: string, raw: unknown) {
@@ -102,7 +100,7 @@ export class PlanService {
   requestPlanRevision(taskId: string, raw: unknown) {
     const store = this.store;
 
-    const {version}=this.validation.revision(raw);
+    const { version } = this.validation.revision(raw);
     return store.atomic(() => {
       const { task } = this.editablePlan(taskId, version);
       if (!this.planComments(taskId).some((c) => c.version === version))

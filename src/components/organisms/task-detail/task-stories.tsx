@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { Plan, StorySelection } from "@/core/contracts";
-import { selectedStories } from "@/core/stories";
+import type { Plan, StorySelection } from "@/presentation/dto";
+import { selectedStories } from "@/domain/stories";
 import { Card, CardContent } from "@/components/ui/card";
 import type { TaskDetailData } from "./types";
 

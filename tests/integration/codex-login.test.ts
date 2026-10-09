@@ -2,7 +2,7 @@ import { test, expect, vi } from "vitest";
 import { mkdtemp, writeFile, chmod, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CodexLogin } from "../../src/server/codex-login";
+import { CodexLogin } from "../../src/infrastructure/codex/login";
 
 async function fixture(mode = "success", timeoutMs = 5000) {
   const root = await mkdtemp(join(tmpdir(), "harness-login-"));

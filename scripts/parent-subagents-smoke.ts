@@ -1,15 +1,34 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { strict as assert } from "node:assert";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { connectCodex } from "../src/codex/client";
-import type { DelegatedStageInput, AgentEvent } from "../src/codex/types";
-import { stageEnvelope } from "../src/context/prompts";
-import { PARENT_AGENT_MODEL } from "../src/codex/limits";
+import { connectCodex } from "../src/infrastructure/codex/client";
+import type {
+  DelegatedStageInput,
+  AgentEvent,
+} from "../src/infrastructure/codex/types";
+import { stageEnvelope } from "../src/application/agent-execution";
+import { PARENT_AGENT_MODEL } from "../src/infrastructure/codex/limits";
 const root = await mkdtemp(join(tmpdir(), "harness-refactor-native-"));
 const value = randomUUID();
 await writeFile(join(root, "input.txt"), value);
+const git = promisify(execFile);
+await git("git", ["-C", root, "init", "-b", "main"]);
+await git("git", ["-C", root, "add", "input.txt"]);
+await git("git", [
+  "-C",
+  root,
+  "-c",
+  "user.name=Harness Smoke",
+  "-c",
+  "user.email=smoke@example.test",
+  "commit",
+  "-m",
+  "smoke baseline",
+]);
 const client = await connectCodex();
 const children: string[] = [];
 let parentId: string | undefined;

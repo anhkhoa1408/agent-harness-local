@@ -3,8 +3,8 @@ import {
   resolveModel,
   defaultModels,
   applyEffortPolicy,
-} from "../../src/core/model-policy";
-import { aiStages } from "../../src/core/contracts";
+} from "../../src/domain/model-policy";
+import { aiStages } from "../../src/domain/contracts";
 const catalog = [
   { id: "strong", efforts: ["high"], isDefault: false },
   { id: "economy", efforts: ["medium"], isDefault: true },

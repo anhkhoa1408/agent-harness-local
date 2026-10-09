@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
-import { StatusSchema, type Repository } from "@/core/contracts";
+import { statuses } from "../../../domain/contracts";
+import { type Repository } from "../../../domain/contracts";
 import { SelectField } from "@/components/molecules/select-field";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import type { TaskWithProgress } from "@/core/pipeline-progress";
+import type { TaskWithProgress } from "@/domain/pipeline-progress";
 import { Pipeline } from "@/components/organisms/pipeline";
 import { stageLabel, statusLabel } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,7 +58,7 @@ export function TaskList({
               onValueChange={setFilterStatus}
               options={[
                 { value: "all", label: "Tất cả trạng thái" },
-                ...StatusSchema.options.map((status) => ({
+                ...statuses.map((status) => ({
                   value: status,
                   label: statusLabel[status],
                 })),

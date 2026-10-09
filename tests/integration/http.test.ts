@@ -1,7 +1,7 @@
 import { test, expect } from "vitest";
-import { openStore } from "../../src/storage/store";
-import { createHttpHandler } from "../../src/server/http";
-import { bootstrapSession } from "../../src/server/local-session";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createHttpHandler } from "../../src/bootstrap/http";
+import { bootstrapSession } from "../../src/bootstrap/session";
 import { taskFixture } from "../support/task-fixture";
 test("local bootstrap, CSRF, hostile origins, stale commands and artifact traversal", async () => {
   const store = openStore(":memory:");
@@ -120,7 +120,7 @@ test("local bootstrap, CSRF, hostile origins, stale commands and artifact traver
     const summary = await (await handle(request("tasks"))).json();
     expect(
       summary[0].pipeline.find(
-        (n: import("../../src/core/pipeline-progress").StageNode) =>
+        (n: import("../../src/domain/pipeline-progress").StageNode) =>
           n.stage === "discover",
       ).state,
     ).toBe("done");

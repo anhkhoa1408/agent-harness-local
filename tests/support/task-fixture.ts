@@ -1,4 +1,4 @@
-import { aiStages, type Task, type Plan } from "../../src/core/contracts";
+import { aiStages, type Task, type Plan } from "../../src/domain/contracts";
 export function taskFixture(patch: Partial<Task> = {}): Task {
   return {
     id: "task",

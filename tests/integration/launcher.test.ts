@@ -18,7 +18,7 @@ test.each([undefined, "0.0.0.0", "docker-oauth"])(
       for (const dir of [
         "node_modules/next/dist/bin",
         "node_modules/tsx",
-        "src/worker",
+        "src/bootstrap",
         "scripts",
       ])
         await mkdir(join(root, dir), { recursive: true });
@@ -37,7 +37,10 @@ test.each([undefined, "0.0.0.0", "docker-oauth"])(
         join(root, "node_modules/next/dist/bin/next"),
         stub("dashboard"),
       );
-      await writeFile(join(root, "src/worker/main.ts"), stub("worker"));
+      await writeFile(
+        join(root, "src/bootstrap/worker-main.ts"),
+        stub("worker"),
+      );
       await writeFile(join(root, "scripts/oauth-proxy.ts"), stub("callback"));
       const env: NodeJS.ProcessEnv = {
         ...process.env,

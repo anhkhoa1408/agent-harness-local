@@ -2,8 +2,8 @@
 import { useEffect, useEffectEvent, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Repository } from "@/core/contracts";
-import type { TaskWithProgress } from "@/core/pipeline-progress";
+import type { Repository } from "@/presentation/dto";
+import type { TaskWithProgress } from "@/domain/pipeline-progress";
 import { FeedbackMessage } from "@/components/molecules/feedback-message";
 import { api } from "@/lib/api";
 import { NewTaskForm } from "@/components/organisms/workspace/new-task-form";

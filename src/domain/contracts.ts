@@ -30,17 +30,19 @@ export type Stage =
   | "repair"
   | "deliver";
 
-export type Status =
-  | "queued"
-  | "running"
-  | "waiting_input"
-  | "waiting_approval"
-  | "blocked"
-  | "paused"
-  | "interrupted"
-  | "completed"
-  | "cancelled"
-  | "failed";
+export const statuses = [
+  "queued",
+  "running",
+  "waiting_input",
+  "waiting_approval",
+  "blocked",
+  "paused",
+  "interrupted",
+  "completed",
+  "cancelled",
+  "failed",
+] as const;
+export type Status = (typeof statuses)[number];
 
 export type AiStage = (typeof aiStages)[number];
 

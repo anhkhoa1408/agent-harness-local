@@ -1,7 +1,7 @@
 import { test, expect } from "vitest";
-import { openStore } from "../../src/storage/store";
-import { createHttpHandler } from "../../src/server/http";
-import { bootstrapSession } from "../../src/server/local-session";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createHttpHandler } from "../../src/bootstrap/http";
+import { bootstrapSession } from "../../src/bootstrap/session";
 import { taskFixture } from "../support/task-fixture";
 
 test("notification feed only returns pending permissions for running manual tasks and requires a local session", async () => {

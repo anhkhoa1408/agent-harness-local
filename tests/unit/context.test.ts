@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { composeInstructions } from "../../src/context/prompts";
+import { composeInstructions } from "../../src/application/agent-execution";
 test("repair receives the current no-limit policy after frozen skill instructions", () => {
   const oldPolicy = "STOP after three failed fixes and ask before Fix #4.";
   const text = composeInstructions({
