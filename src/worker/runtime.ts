@@ -1,7 +1,11 @@
+import {createStoryGit} from "../infrastructure/repositories/story-git";
+import {createRepositories} from "../infrastructure/persistence/repositories";
+import {validation} from "../infrastructure/validation/gateway";
+import {systemRuntime} from "../infrastructure/runtime/system";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
-import { PlanService } from "../application/plan-service";
-import { StoryService, storyKey } from "../application/story-service";
+import { PlanService } from "../application/planning";
+import { StoryService, storyKey } from "../application/stories";
 import { WORKER_POLL_INTERVAL_MS } from "./limits";
 import {
   WORKER_LEASE_TTL_MS,
@@ -47,11 +51,8 @@ export class WorkerRuntime {
     const store = fencedStore(raw, lease),
       handlers = typeof source === "function" ? source(store, lease) : source,
       bootId = bootIdentity();
-    const storyService = new StoryService(store, {
-      readGit: gitText,
-      fingerprintWorktree,
-    });
-    const planService = new PlanService(store, storyService);
+    const storyService = new StoryService(createRepositories(store), createStoryGit(),validation,systemRuntime);
+    const planService = new PlanService(createRepositories(store), storyService,validation,systemRuntime);
     store.putRecord("health", "worker", { at: Date.now(), owner: lease.owner });
     const heartbeat = setInterval(() => {
       if (!renewLease(raw.db, lease, Date.now(), WORKER_LEASE_TTL_MS)) {
@@ -198,10 +199,7 @@ export class WorkerRuntime {
     task: Task,
     entry: ActiveStageAttempt,
   ) {
-    const storyService = new StoryService(store, {
-      readGit: gitText,
-      fingerprintWorktree,
-    });
+    const storyService = new StoryService(createRepositories(store), createStoryGit(),validation,systemRuntime);
     try {
       await executeStageAttempt(
         store,

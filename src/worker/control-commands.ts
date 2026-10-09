@@ -1,5 +1,5 @@
-import { PlanService } from "../application/plan-service";
-import { StoryService, storyKey } from "../application/story-service";
+import { PlanService } from "../application/planning";
+import { StoryService, storyKey } from "../application/stories";
 
 import { applyEffortPolicy } from "../core/model-policy";
 

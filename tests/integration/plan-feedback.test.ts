@@ -1,5 +1,5 @@
-import { StoryService } from "../../src/application/story-service";
-import { PlanService } from "../../src/application/plan-service";
+import { StoryService } from "../support/services";
+import { PlanService } from "../support/services";
 import { gitText as readStoryGit } from "../../src/repositories/inspect";
 import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/repositories/fingerprint";
 import { test, expect } from "vitest";

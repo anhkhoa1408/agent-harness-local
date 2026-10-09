@@ -27,15 +27,8 @@ import type { AgentClient, AgentEvent } from "../codex/types";
 import type { Bundle } from "../context/skills";
 import { composeInstructions } from "../context/prompts";
 const exec = promisify(execFile);
-export class RepositoryRegistrationError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "RepositoryRegistrationError";
-  }
-}
+import {RepositoryRegistrationError} from "../application/repositories";
+export {RepositoryRegistrationError} from "../application/repositories";
 export async function gitText(
   root: string,
   args: string[],

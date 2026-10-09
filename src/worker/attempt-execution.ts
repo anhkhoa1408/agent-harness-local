@@ -1,4 +1,4 @@
-import { StoryService, storyKey } from "../application/story-service";
+import { StoryService, storyKey } from "../application/stories";
 import { STAGE_TIMEOUT_MS } from "./limits";
 
 import type { Store } from "../storage/store";
