@@ -1,13 +1,1 @@
-export const WORKER_LEASE_TTL_MS = 15_000;
-export const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
-export const MAX_TITLE_CHARACTERS = 200;
-export const MAX_REQUIREMENT_CHARACTERS = 100_000;
-export const MAX_COMMAND_ID_CHARACTERS = 200;
-export const MIN_CHECK_TIMEOUT_MS = 100;
-export const MAX_CHECK_TIMEOUT_MS = 3_600_000;
-export const MAX_SCREENSHOT_ID_CHARACTERS = 80;
-export const MAX_VIEWPORT_PIXELS = 3840;
-export const MAX_SELECTED_SCREENSHOTS = 6;
-export const MAX_VISUAL_EVIDENCE_CHARACTERS = 2000;
-export const MAX_STORY_ID_CHARACTERS = 100;
-export const MAX_PLAN_COMMENT_CHARACTERS = 10_000;
+export * from "../domain/limits";
