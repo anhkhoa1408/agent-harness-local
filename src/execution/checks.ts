@@ -38,6 +38,8 @@ export async function runChecks(
   for (const spec of plan.checks) {
     signal.throwIfAborted();
     let evidencePath = "",
+      stderrPath: string | undefined,
+      commandFailed = false,
       exitCode: number | null = null;
     try {
       await clearScreenshots(root, plan, spec.id);
@@ -52,7 +54,10 @@ export async function runChecks(
       }
       const run = await runProcess(spec, root, artifacts, signal);
       evidencePath = run.stdoutPath;
+      stderrPath = run.stderrPath;
       exitCode = run.exitCode;
+      commandFailed =
+        !run.timedOut && run.exitCode !== null && run.exitCode !== 0;
       const text = await boundedRead(report ?? run.stdoutPath);
       const counts = await parseEvidence(spec.reportFormat, text);
       const successMatched =
@@ -76,11 +81,16 @@ export async function runChecks(
         taskId: task.id,
         planVersion: plan.version,
         fingerprint,
-        status: "blocked",
+        status: commandFailed ? "failed" : "blocked",
         executed: null,
         exitCode,
         evidencePath,
-        reason: error instanceof Error ? error.message : String(error),
+        stderrPath,
+        reason: commandFailed
+          ? "check_command_failed_without_valid_report"
+          : error instanceof Error
+            ? error.message
+            : String(error),
       });
     }
   }

@@ -15,6 +15,9 @@ test.skipIf(process.env.HARNESS_DOCKER_COMPOSE_TEST !== "1")(
     );
     const model = JSON.parse(stdout);
     const service = model.services.harness;
+    expect(service.environment.PLAYWRIGHT_BROWSERS_PATH).toBe(
+      "/tmp/playwright",
+    );
     expect(service.develop?.watch).toEqual([
       expect.objectContaining({
         path: resolve("."),
@@ -41,6 +44,11 @@ test.skipIf(process.env.HARNESS_DOCKER_COMPOSE_TEST !== "1")(
           type: "volume",
           source: "codex-login",
           target: "/codex",
+        }),
+        expect.objectContaining({
+          type: "volume",
+          source: "playwright-cache",
+          target: "/tmp/playwright",
         }),
       ]),
     );

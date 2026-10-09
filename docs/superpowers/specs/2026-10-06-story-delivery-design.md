@@ -29,14 +29,14 @@ flowchart TD
   M --> N[Push và tạo PR chung]
 ```
 
-| Thành phần | Trách nhiệm |
-| --- | --- |
-| Planner | Đề xuất story có kết quả độc lập, point và mapping vào plan; không tự chọn thay người dùng |
-| UI/API | Hiển thị lựa chọn, dependency, point; gửi lựa chọn có version/revision |
-| Worker | Kiểm tra lựa chọn, dependency, approval; chạy tuần tự, lưu checkpoint và điều phối delivery |
-| Implement/repair agent | Chỉ sửa phạm vi story hiện hành hoặc finding của lượt tổng hợp |
-| Runner/reviewer | Chứng minh từng story và kiểm tra lại snapshot cuối của feature chung PR |
-| Delivery | Commit/push/PR có intent và xác nhận; retry không tạo trùng |
+| Thành phần             | Trách nhiệm                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| Planner                | Đề xuất story có kết quả độc lập, point và mapping vào plan; không tự chọn thay người dùng  |
+| UI/API                 | Hiển thị lựa chọn, dependency, point; gửi lựa chọn có version/revision                      |
+| Worker                 | Kiểm tra lựa chọn, dependency, approval; chạy tuần tự, lưu checkpoint và điều phối delivery |
+| Implement/repair agent | Chỉ sửa phạm vi story hiện hành hoặc finding của lượt tổng hợp                              |
+| Runner/reviewer        | Chứng minh từng story và kiểm tra lại snapshot cuối của feature chung PR                    |
+| Delivery               | Commit/push/PR có intent và xác nhận; retry không tạo trùng                                 |
 
 ## Tương thích và kích hoạt
 

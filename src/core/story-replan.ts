@@ -1,7 +1,12 @@
 import type { Plan, StoryRun } from "./contracts";
 import { projectStoryPlan } from "./stories";
 function comparable(plan: Plan) {
-  const { taskId: _id, version: _version, sourceCommit: _source, ...scope } = plan;
+  const {
+    taskId: _id,
+    version: _version,
+    sourceCommit: _source,
+    ...scope
+  } = plan;
   return JSON.stringify(scope);
 }
 export function assertCompletedStoryScopeUnchanged(

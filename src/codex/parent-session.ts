@@ -1,12 +1,21 @@
 import { JsonRpc } from "./rpc";
 import type { DelegatedStageInput, AgentEvent } from "./types";
-import { parentInstructions, parentReceiptSchema, stageAssignment } from "../context/prompts";
+import {
+  parentInstructions,
+  parentReceiptSchema,
+  stageAssignment,
+} from "../context/prompts";
 import { listDescendantThreads, matchesAgentSettings } from "./protocol";
-import { PARENT_AGENT_MODEL } from "./limits";
+import {
+  PARENT_AGENT_MODEL,
+  AGENT_SETTINGS_SETTLE_TIMEOUT_MS,
+  ROLLOUT_INITIAL_RETRY_DELAY_MS,
+  ROLLOUT_MAX_RETRY_DELAY_MS,
+} from "./limits";
 export { PARENT_AGENT_MODEL } from "./limits";
 export type ParentSessionContext = {
   threadId: string;
-  response: any;
+  response: import("./rpc").ThreadResponse;
   previous: Set<string>;
   assignment: ReturnType<typeof stageAssignment>;
   receiptSchema: Record<string, unknown>;
@@ -46,7 +55,9 @@ export class ParentAgentSession {
     onEvent({ type: "parent", data: { threadId, model: PARENT_AGENT_MODEL } });
     if (
       response.thread.status?.type === "active" ||
-      response.thread.turns?.some((t: any) => t.status === "inProgress")
+      response.thread.turns?.some(
+        (t: { status: string }) => t.status === "inProgress",
+      )
     )
       throw new Error("runtime_state_unknown");
     const previous = new Set(
@@ -57,7 +68,11 @@ export class ParentAgentSession {
         threadId: id,
         includeTurns: true,
       });
-      if (read.thread.turns.some((t: any) => t.status === "inProgress"))
+      if (
+        read.thread.turns.some(
+          (t: { status: string }) => t.status === "inProgress",
+        )
+      )
         throw new Error("runtime_state_unknown");
     }
     if (signal.aborted) throw new Error("interrupted");
@@ -79,10 +94,27 @@ export class ParentAgentSession {
             }
           : { type: "readOnly", networkAccess: false },
       });
-      response = await preflightRequest("thread/resume", {
-        threadId,
-        excludeTurns: true,
-      });
+      // The settings acknowledgement can precede application to the loaded session.
+      const deadline = Date.now() + AGENT_SETTINGS_SETTLE_TIMEOUT_MS;
+      let delay = ROLLOUT_INITIAL_RETRY_DELAY_MS;
+      for (;;) {
+        if (signal.aborted) throw new Error("interrupted");
+        response = await preflightRequest("thread/resume", {
+          threadId,
+          excludeTurns: true,
+        });
+        if (response.thread.status?.type === "active")
+          throw new Error("runtime_state_unknown");
+        if (
+          matchesAgentSettings(response, input, false) ||
+          Date.now() >= deadline
+        )
+          break;
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(delay, deadline - Date.now())),
+        );
+        delay = Math.min(delay * 2, ROLLOUT_MAX_RETRY_DELAY_MS);
+      }
     }
     if (!matchesAgentSettings(response, input, false))
       throw new Error("subagent_capability_unavailable");

@@ -16,14 +16,14 @@ Dùng CSS variables semantic cho background, foreground, primary, muted, border,
 
 ## Cấu trúc Atomic Design
 
-| Tầng | Vị trí | Trách nhiệm và ví dụ |
-| --- | --- | --- |
-| Primitive shadcn | `src/components/ui/` | Component registry chính thức: Button, Input, Textarea, Label, Badge, Card, Select, Tabs, Alert, Collapsible, Separator; số lượng thực tế theo consumer |
-| Atoms | `src/components/atoms/` | Đơn vị trình bày nhỏ đặc thù Harness như StageIndicator; tái sử dụng trực tiếp primitive shadcn, không tạo wrapper chỉ đổi tên |
-| Molecules | `src/components/molecules/` | Tổ hợp nhỏ như FormField, StatusBadge, EmptyState, ModelSelector, thông báo trạng thái |
-| Organisms | `src/components/organisms/` | RepositoryForm, NewTaskForm, TaskList, WorkspaceOverview, Pipeline, TaskRequests, TaskPlan, TaskEvidence, TaskTimeline và các khối cấu hình model |
-| Templates | `src/components/templates/` | WorkspaceLayout, AuthLayout và TaskDetailLayout, chịu trách nhiệm bố cục, không gọi API |
-| Pages | `src/app/**/page.tsx` cùng `src/components/pages/` | Route Next.js và các page controller ghép template/organism với state, polling và mutation |
+| Tầng             | Vị trí                                             | Trách nhiệm và ví dụ                                                                                                                                    |
+| ---------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primitive shadcn | `src/components/ui/`                               | Component registry chính thức: Button, Input, Textarea, Label, Badge, Card, Select, Tabs, Alert, Collapsible, Separator; số lượng thực tế theo consumer |
+| Atoms            | `src/components/atoms/`                            | Đơn vị trình bày nhỏ đặc thù Harness như StageIndicator; tái sử dụng trực tiếp primitive shadcn, không tạo wrapper chỉ đổi tên                          |
+| Molecules        | `src/components/molecules/`                        | Tổ hợp nhỏ như FormField, StatusBadge, EmptyState, ModelSelector, thông báo trạng thái                                                                  |
+| Organisms        | `src/components/organisms/`                        | RepositoryForm, NewTaskForm, TaskList, WorkspaceOverview, Pipeline, TaskRequests, TaskPlan, TaskEvidence, TaskTimeline và các khối cấu hình model       |
+| Templates        | `src/components/templates/`                        | WorkspaceLayout, AuthLayout và TaskDetailLayout, chịu trách nhiệm bố cục, không gọi API                                                                 |
+| Pages            | `src/app/**/page.tsx` cùng `src/components/pages/` | Route Next.js và các page controller ghép template/organism với state, polling và mutation                                                              |
 
 `components/ui` là nền tảng của Atomic Design, gồm cả primitive ở mức atom và tổ hợp generic như Card/Tabs; không ép tất cả component shadcn vào atoms. Component của Harness chỉ được phân tầng khi có trách nhiệm thực tế; không thêm file rỗng để đủ năm tầng.
 

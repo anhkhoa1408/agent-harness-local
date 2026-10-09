@@ -10,7 +10,7 @@ export function createArtifactsRoute(
   context: HttpRouteContext,
 ): HttpResourceRoute {
   const { store, data } = context;
-  return async (request, url, parts, body) => {
+  return async (request, url, parts) => {
     const method = request.method;
     if (parts[0] === "artifacts" && method === "GET") {
       const record = store.getRecord("artifact", parts[1]) as {

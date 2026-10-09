@@ -8,7 +8,7 @@ export function createSystemRoute(
   context: HttpRouteContext,
 ): HttpResourceRoute {
   const { store, models, login } = context;
-  return async (request, url, parts, body) => {
+  return async (request, url, parts) => {
     const method = request.method;
     if (parts[0] === "codex-auth") {
       if (!parts[1] && method === "GET") return json(await login.status());

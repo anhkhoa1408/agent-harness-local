@@ -55,7 +55,11 @@ async function fixture() {
     ],
   }));
   store.putRecord("plan", `${task.id}:1`, plan);
-  new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).approveStorySelection(task,
+  new StoryService(store, {
+    readGit: readStoryGit,
+    fingerprintWorktree: fingerprintStoryWorktree,
+  }).approveStorySelection(
+    task,
     StorySelectionSchema.parse({
       planVersion: 1,
       storyIds: ["A", "B"],
@@ -69,7 +73,9 @@ async function fixture() {
     ],
     respondToApproval: async () => {},
     interruptTurn: async () => {},
-    runDirectTurn: async () => { throw new Error("fixture_direct_turn_unavailable"); },
+    runDirectTurn: async () => {
+      throw new Error("fixture_direct_turn_unavailable");
+    },
     close: async () => {},
     runDelegatedStage: async (input) => {
       const context = JSON.parse(input.prompt);
@@ -88,11 +94,15 @@ async function fixture() {
           planVersion: context.task.planVersion,
           fingerprint: context.fingerprint,
           findings: [],
-          criteria: context.plan.criteria.map((c: any) => ({
-            id: c.id,
-            passed: true,
-            evidence: "runner",
-          })),
+          criteria: context.plan.criteria.map(
+            (
+              c: import("../../src/core/contracts").Plan["criteria"][number],
+            ) => ({
+              id: c.id,
+              passed: true,
+              evidence: "runner",
+            }),
+          ),
           verdict: "pass",
         },
       };
@@ -106,8 +116,14 @@ async function fixture() {
       adaptations: "",
     });
   async function evidence(t = store.getTask(task.id)) {
-    const effective = new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getEffectiveTask(t),
-      p = new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getExecutionPlan(effective),
+    const effective = new StoryService(store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getEffectiveTask(t),
+      p = new StoryService(store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getExecutionPlan(effective),
       fingerprint = await fingerprintWorktree(
         f.root,
         [],
@@ -140,7 +156,10 @@ async function fixture() {
       })),
       verdict: "pass",
     });
-    new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).recordEvidence(effective);
+    new StoryService(store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).recordEvidence(effective);
     return effective;
   }
   return {
@@ -166,34 +185,67 @@ test("two checkpoint commits on same branch; aggregate verify/review before sing
       x.store,
       x.dir,
       await x.evidence(),
-      new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+      new AbortController().signal,
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(await x.evidence()),
     );
     const retry = await createStoryCheckpoint(
       x.store,
       x.dir,
       await x.evidence(),
-      new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+      new AbortController().signal,
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(await x.evidence()),
     );
     expect(retry.commit).toBe(a.commit);
     expect(await readFile(a.checkpointPath, "utf8")).toContain(
       '"storyId": "A"',
     );
     expect(x.store.getRecord("delivery", x.task.id)).toBeNull();
-    const next = new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.task, a);
+    const next = new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(x.task, a);
     expect(next.status).toBe("paused");
-    expect(new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getExecution(x.task.id)?.activeStoryId).toBe("B");
+    expect(
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getExecution(x.task.id)?.activeStoryId,
+    ).toBe("B");
     await writeFile(join(x.f.root, "second.js"), "feature");
     const b = await createStoryCheckpoint(
       x.store,
       x.dir,
       await x.evidence(),
-      new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+      new AbortController().signal,
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(await x.evidence()),
     );
     expect(b.commit).not.toBe(a.commit);
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.store.getTask(x.task.id), b);
-    expect(new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getExecution(x.task.id)?.aggregate).toBe(true);
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(x.store.getTask(x.task.id), b);
     expect(
-      new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).listStoryRuns(x.task.id).every((r) => r.state === "completed"),
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getExecution(x.task.id)?.aggregate,
+    ).toBe(true);
+    expect(
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      })
+        .listStoryRuns(x.task.id)
+        .every((r) => r.state === "completed"),
     ).toBe(true);
     const handlers = createHandlers(x.store, x.fake, x.dir),
       t = x.store.getTask(x.task.id);
@@ -220,21 +272,37 @@ test("later story regression fails aggregate checks and blocks final delivery", 
   const x = await fixture();
   try {
     await writeFile(join(x.f.root, "app.js"), "feature");
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.task,
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(
+      x.task,
       await createStoryCheckpoint(
         x.store,
         x.dir,
         await x.evidence(),
-        new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+        new AbortController().signal,
+        new StoryService(x.store, {
+          readGit: readStoryGit,
+          fingerprintWorktree: fingerprintStoryWorktree,
+        }).getCheckpointContext(await x.evidence()),
       ),
     );
     await writeFile(join(x.f.root, "second.js"), "feature");
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.store.getTask(x.task.id),
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(
+      x.store.getTask(x.task.id),
       await createStoryCheckpoint(
         x.store,
         x.dir,
         await x.evidence(),
-        new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+        new AbortController().signal,
+        new StoryService(x.store, {
+          readGit: readStoryGit,
+          fingerprintWorktree: fingerprintStoryWorktree,
+        }).getCheckpointContext(await x.evidence()),
       ),
     );
     await writeFile(join(x.f.root, "app.js"), "broken");
@@ -262,13 +330,36 @@ test("stale story evidence and unowned changes cannot checkpoint", async () => {
       baselineCommit: t.sourceCommit,
     });
     await expect(
-      (async () => createStoryCheckpoint(x.store, x.dir, t, new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(t)))(),
+      (async () =>
+        createStoryCheckpoint(
+          x.store,
+          x.dir,
+          t,
+          new AbortController().signal,
+          new StoryService(x.store, {
+            readGit: readStoryGit,
+            fingerprintWorktree: fingerprintStoryWorktree,
+          }).getCheckpointContext(t),
+        ))(),
     ).rejects.toThrow("stale_story_evidence");
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).recordEvidence(t);
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).recordEvidence(t);
     await writeFile(join(x.f.root, "second.js"), "unowned");
     await x.evidence();
     await expect(
-      (async () => createStoryCheckpoint(x.store, x.dir, t, new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(t)))(),
+      (async () =>
+        createStoryCheckpoint(
+          x.store,
+          x.dir,
+          t,
+          new AbortController().signal,
+          new StoryService(x.store, {
+            readGit: readStoryGit,
+            fingerprintWorktree: fingerprintStoryWorktree,
+          }).getCheckpointContext(t),
+        ))(),
     ).rejects.toThrow("scope_changed");
   } finally {
     await x.dispose();
@@ -283,11 +374,11 @@ test("crash after commit is reconciled without duplicate and each report is reta
     const failing = new Proxy(x.store, {
       get(target, key) {
         if (key === "putRecord")
-          return (kind: string, id: string, value: any) => {
+          return (kind: string, id: string, value: unknown) => {
             if (
               kind === "effect" &&
               id.includes(":story:") &&
-              value.state === "confirmed" &&
+              (value as { state?: string }).state === "confirmed" &&
               !lost
             ) {
               lost = true;
@@ -299,23 +390,43 @@ test("crash after commit is reconciled without duplicate and each report is reta
       },
     });
     await expect(
-      createStoryCheckpoint(failing, x.dir, t, new AbortController().signal, new StoryService(failing, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(t)),
+      createStoryCheckpoint(
+        failing,
+        x.dir,
+        t,
+        new AbortController().signal,
+        new StoryService(failing, {
+          readGit: readStoryGit,
+          fingerprintWorktree: fingerprintStoryWorktree,
+        }).getCheckpointContext(t),
+      ),
     ).rejects.toThrow("crash_after_commit");
     const head = await gitText(x.f.root, ["rev-parse", "HEAD"]);
     const a = await createStoryCheckpoint(
       x.store,
       x.dir,
       t,
-      new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(t)
+      new AbortController().signal,
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(t),
     );
     expect(a.commit).toBe(head);
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.task, a);
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(x.task, a);
     await writeFile(join(x.f.root, "second.js"), "feature");
     const b = await createStoryCheckpoint(
       x.store,
       x.dir,
       await x.evidence(),
-      new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+      new AbortController().signal,
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(await x.evidence()),
     );
     expect(
       await gitText(x.f.root, [
@@ -342,7 +453,11 @@ test("external HEAD outside checkpoint is rejected even if content fingerprint i
         x.store,
         x.dir,
         await x.evidence(),
-        new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+        new AbortController().signal,
+        new StoryService(x.store, {
+          readGit: readStoryGit,
+          fingerprintWorktree: fingerprintStoryWorktree,
+        }).getCheckpointContext(await x.evidence()),
       ),
     ).rejects.toThrow("story_head_changed");
   } finally {
@@ -353,21 +468,37 @@ test("single shared PR after all checkpoints reconciles lost response", async ()
   const x = await fixture();
   try {
     await writeFile(join(x.f.root, "app.js"), "feature");
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.task,
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(
+      x.task,
       await createStoryCheckpoint(
         x.store,
         x.dir,
         await x.evidence(),
-        new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+        new AbortController().signal,
+        new StoryService(x.store, {
+          readGit: readStoryGit,
+          fingerprintWorktree: fingerprintStoryWorktree,
+        }).getCheckpointContext(await x.evidence()),
       ),
     );
     await writeFile(join(x.f.root, "second.js"), "feature");
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.store.getTask(x.task.id),
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(
+      x.store.getTask(x.task.id),
       await createStoryCheckpoint(
         x.store,
         x.dir,
         await x.evidence(),
-        new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+        new AbortController().signal,
+        new StoryService(x.store, {
+          readGit: readStoryGit,
+          fingerprintWorktree: fingerprintStoryWorktree,
+        }).getCheckpointContext(await x.evidence()),
       ),
     );
     const remote = join(x.dir, "remote.git");
@@ -379,7 +510,10 @@ test("single shared PR after all checkpoints reconciles lost response", async ()
     let created = 0,
       pr: null | { url: string; headCommit: string } = null;
     const send = createDelivery(x.store, x.dir, {
-      plan: new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getExecutionPlan(t),
+      plan: new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getExecutionPlan(t),
       repositoryName: () => "test/repo",
       github: {
         findPullRequest: async () => pr,
@@ -421,9 +555,16 @@ test("replanned checkpoint preserves a usable artifact link to its original vers
       x.store,
       x.dir,
       await x.evidence(),
-      new AbortController().signal, new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(await x.evidence())
+      new AbortController().signal,
+      new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(await x.evidence()),
     );
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(x.task, checkpoint);
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(x.task, checkpoint);
     const current = x.store.getTask(x.task.id);
     const replanned = x.store.updateTask(
       current.id,
@@ -437,11 +578,22 @@ test("replanned checkpoint preserves a usable artifact link to its original vers
       { type: "replan", data: {} },
     );
     x.store.putRecord("plan", `${x.task.id}:2`, { ...x.plan, version: 2 });
-    new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).approveStorySelection(replanned, {
-      ...new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getExecution(x.task.id)!.selection,
+    new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).approveStorySelection(replanned, {
+      ...new StoryService(x.store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getExecution(x.task.id)!.selection,
       planVersion: 2,
     });
-    const run = new StoryService(x.store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).listStoryRuns(x.task.id).find((r) => r.storyId === "A")!;
+    const run = new StoryService(x.store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    })
+      .listStoryRuns(x.task.id)
+      .find((r) => r.storyId === "A")!;
     expect(
       x.store.getRecord("artifact", run.checkpointArtifactId!),
     ).not.toBeNull();
@@ -482,7 +634,11 @@ test("next story prepares its own repository instructions without resetting repa
     plan.steps[0].files = ["first/app.js"];
     plan.steps[1].files = ["second/app.js"];
     store.putRecord("plan", `${t.id}:1`, plan);
-    new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).approveStorySelection(t,
+    new StoryService(store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).approveStorySelection(
+      t,
       StorySelectionSchema.parse({
         planVersion: 1,
         storyIds: ["A", "B"],
@@ -501,13 +657,19 @@ test("next story prepares its own repository instructions without resetting repa
     await handlers.prepare(t, new AbortController().signal);
     t = store.getTask(t.id);
     await writeFile(join(t.worktree!, "first/app.js"), "feature");
-    const effective = new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getEffectiveTask(t),
+    const effective = new StoryService(store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getEffectiveTask(t),
       fingerprint = await fingerprintWorktree(
         t.worktree!,
         [],
         effective.sourceCommit,
       ),
-      projected = new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getExecutionPlan(effective);
+      projected = new StoryService(store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getExecutionPlan(effective);
     store.putRecord(
       "checks",
       t.id,
@@ -535,7 +697,10 @@ test("next story prepares its own repository instructions without resetting repa
       })),
       verdict: "pass",
     });
-    new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).recordEvidence(effective);
+    new StoryService(store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).recordEvidence(effective);
     store.updateTask(
       t.id,
       t.revision,
@@ -546,9 +711,16 @@ test("next story prepares its own repository instructions without resetting repa
       store,
       dir,
       effective,
-      new AbortController().signal, new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).getCheckpointContext(effective)
+      new AbortController().signal,
+      new StoryService(store, {
+        readGit: readStoryGit,
+        fingerprintWorktree: fingerprintStoryWorktree,
+      }).getCheckpointContext(effective),
     );
-    const next = new StoryService(store, { readGit: readStoryGit, fingerprintWorktree: fingerprintStoryWorktree }).completeSharedStory(t, checkpoint);
+    const next = new StoryService(store, {
+      readGit: readStoryGit,
+      fingerprintWorktree: fingerprintStoryWorktree,
+    }).completeSharedStory(t, checkpoint);
     expect(next.stage).toBe("prepare");
     expect(
       (

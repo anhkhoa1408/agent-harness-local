@@ -1,6 +1,6 @@
 "use client";
 let csrf = "";
-export async function api<T = any>(
+export async function api<T = unknown>(
   path: string,
   method = "GET",
   body?: unknown,
@@ -21,6 +21,8 @@ export async function api<T = any>(
     signal,
   });
   if (response.status === 403) {
+    // A full navigation is required to bootstrap the local session cookie.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.assign("/session");
     throw new Error("Đang mở phiên local…");
   }

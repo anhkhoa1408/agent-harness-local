@@ -30,6 +30,7 @@ export async function runProcess(
     PATH: process.env.PATH,
     HOME: process.env.HOME,
     TMPDIR: process.env.TMPDIR,
+    PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH,
     LANG: "en_US.UTF-8",
     CI: "1",
     NODE_ENV: process.env.NODE_ENV ?? "test",

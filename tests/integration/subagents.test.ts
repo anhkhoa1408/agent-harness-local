@@ -2,7 +2,7 @@ import { test, expect } from "vitest";
 import { PassThrough } from "node:stream";
 import { CodexClient } from "../../src/codex/client";
 import type { DelegatedStageInput } from "../../src/codex/types";
-import { JsonRpc } from "../../src/codex/rpc";
+import { JsonRpc, type RpcMessage } from "../../src/codex/rpc";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -22,20 +22,22 @@ function fixture(
     completionRace?: boolean;
     nativeInteraction?: boolean;
     parentError?: string;
+    staleSettingsReads?: number;
   } = {},
 ) {
   const input = new PassThrough(),
     output = new PassThrough(),
-    sent: any[] = [];
+    sent: RpcMessage[] = [];
   let parentStatus = "inProgress",
     childStatus = options.pending ? "inProgress" : "completed";
   let resumeCount = 0;
   let settingsUpdated = false;
+  let staleSettingsReads = options.staleSettingsReads ?? 0;
   let oldStatus = "completed";
   let accepted = !options.pendingStart,
     raced = false;
   const envelope = { stage: "analyze", attemptId: "a1", result: { ok: true } };
-  const notify = (method: string, params: any) =>
+  const notify = (method: string, params: unknown) =>
     output.write(JSON.stringify({ method, params }) + "\n");
   const child = (id = "child") => ({
     id,
@@ -100,10 +102,12 @@ function fixture(
       );
       return;
     }
-    let result: any = {};
+    let result: unknown = {};
     if (m.method === "thread/settings/update") settingsUpdated = true;
     if (m.method === "thread/start" || m.method === "thread/resume") {
       const isChild = m.params.threadId === "child";
+      const staleSettings =
+        !isChild && settingsUpdated && staleSettingsReads-- > 0;
       result = {
         thread: isChild
           ? child()
@@ -126,7 +130,9 @@ function fixture(
         sandbox: {
           type:
             (isChild && options.bad === "sandbox") ||
-            (!isChild && options.bad === "sticky-sandbox" && !settingsUpdated)
+            (!isChild &&
+              options.bad === "sticky-sandbox" &&
+              (!settingsUpdated || staleSettings))
               ? "workspaceWrite"
               : "readOnly",
           networkAccess: false,
@@ -181,7 +187,11 @@ function fixture(
           parentStatus = "failed";
           notify("turn/completed", {
             threadId: "parent",
-            turn: { id: "parent-turn", status: "failed", error: { message: options.parentError } },
+            turn: {
+              id: "parent-turn",
+              status: "failed",
+              error: { message: options.parentError },
+            },
           });
           return;
         }
@@ -319,8 +329,13 @@ test("retains the actual parent runtime failure instead of hiding it as agent_fa
   const message = "invalid_json_schema: Missing 'stories'";
   const f = fixture({ parentError: message });
   try {
-    await expect(f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal))
-      .rejects.toThrow(message);
+    await expect(
+      f.client.runDelegatedStage(
+        f.agentInput,
+        () => {},
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow(message);
   } finally {
     await f.client.close();
   }
@@ -329,7 +344,7 @@ test("retains the actual parent runtime failure instead of hiding it as agent_fa
 test("native stage uses a persistent parent and verified clean-context child evidence", async () => {
   const f = fixture();
   try {
-    const events: any[] = [];
+    const events: import("../../src/codex/types").AgentEvent[] = [];
     const run = await f.client.runDelegatedStage(
       f.agentInput,
       (e) => events.push(e),
@@ -345,17 +360,19 @@ test("native stage uses a persistent parent and verified clean-context child evi
       },
     });
     expect(events.some((e) => e.type === "child")).toBe(true);
-    expect(f.sent.find((m) => m.method === "turn/start").params.outputSchema)
-      .toEqual({
-        type: "object", additionalProperties: false,
-        required: ["stage", "attemptId"],
-        properties: {
-          stage: { type: "string", const: "analyze" },
-          attemptId: { type: "string", const: "a1" },
-        },
-      });
     expect(
-      f.sent.find((m) => m.method === "thread/start").params,
+      f.sent.find((m) => m.method === "turn/start")!.params.outputSchema,
+    ).toEqual({
+      type: "object",
+      additionalProperties: false,
+      required: ["stage", "attemptId"],
+      properties: {
+        stage: { type: "string", const: "analyze" },
+        attemptId: { type: "string", const: "a1" },
+      },
+    });
+    expect(
+      f.sent.find((m) => m.method === "thread/start")!.params,
     ).toMatchObject({
       model: "gpt-6-luna",
       sandbox: "read-only",
@@ -396,7 +413,11 @@ test.each([
   const f = fixture({ bad });
   try {
     await expect(
-      f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
+      f.client.runDelegatedStage(
+        f.agentInput,
+        () => {},
+        new AbortController().signal,
+      ),
     ).rejects.toThrow();
   } finally {
     await f.client.close();
@@ -444,7 +465,11 @@ test.each([
     });
     try {
       await expect(
-        f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
+        f.client.runDelegatedStage(
+          f.agentInput,
+          () => {},
+          new AbortController().signal,
+        ),
       ).resolves.toMatchObject({
         result: { ok: true },
         child: { threadId: "child" },
@@ -464,7 +489,11 @@ test("child metadata corruption is rejected without startup retries", async () =
   });
   try {
     await expect(
-      f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
+      f.client.runDelegatedStage(
+        f.agentInput,
+        () => {},
+        new AbortController().signal,
+      ),
     ).rejects.toThrow();
     expect(
       f.sent.filter(
@@ -486,7 +515,11 @@ test("persistent child startup error keeps runtime excluded instead of accepting
   });
   try {
     await expect(
-      f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
+      f.client.runDelegatedStage(
+        f.agentInput,
+        () => {},
+        new AbortController().signal,
+      ),
     ).rejects.toThrow("runtime_state_unknown");
   } finally {
     await f.client.close();
@@ -513,7 +546,11 @@ test.each([false, true])(
     const f = fixture({ bad: "reuse", nativeInteraction });
     try {
       await expect(
-        f.client.runDelegatedStage(f.agentInput, () => {}, new AbortController().signal),
+        f.client.runDelegatedStage(
+          f.agentInput,
+          () => {},
+          new AbortController().signal,
+        ),
       ).rejects.toThrow("subagent_reuse_violation");
       expect(
         f.sent.some(
@@ -628,7 +665,7 @@ test("loaded parent permissions are updated and verified before review can spawn
     );
     expect(run.result).toEqual({ ok: true });
     expect(
-      f.sent.find((m) => m.method === "thread/settings/update").params,
+      f.sent.find((m) => m.method === "thread/settings/update")!.params,
     ).toMatchObject({
       sandboxPolicy: { type: "readOnly", networkAccess: false },
       cwd: "/fixture",
@@ -636,6 +673,45 @@ test("loaded parent permissions are updated and verified before review can spawn
     expect(
       f.sent.findIndex((m) => m.method === "thread/settings/update"),
     ).toBeLessThan(f.sent.findIndex((m) => m.method === "turn/start"));
+  } finally {
+    await f.client.close();
+  }
+});
+
+test("an acknowledged settings update can be briefly stale; spawn waits for verified permissions", async () => {
+  const f = fixture({ bad: "sticky-sandbox", staleSettingsReads: 2 });
+  try {
+    const run = await f.client.runDelegatedStage(
+      { ...f.agentInput, threadId: "parent" },
+      () => {},
+      new AbortController().signal,
+    );
+    expect(run.result).toEqual({ ok: true });
+    const updateIndex = f.sent.findIndex(
+      (m) => m.method === "thread/settings/update",
+    );
+    const startIndex = f.sent.findIndex((m) => m.method === "turn/start");
+    expect(
+      f.sent
+        .slice(updateIndex + 1, startIndex)
+        .filter((m) => m.method === "thread/resume"),
+    ).toHaveLength(3);
+  } finally {
+    await f.client.close();
+  }
+});
+
+test("persistent settings mismatch never starts a parent turn", async () => {
+  const f = fixture({ bad: "sticky-sandbox", staleSettingsReads: Infinity });
+  try {
+    await expect(
+      f.client.runDelegatedStage(
+        { ...f.agentInput, threadId: "parent" },
+        () => {},
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow("subagent_capability_unavailable");
+    expect(f.sent.some((m) => m.method === "turn/start")).toBe(false);
   } finally {
     await f.client.close();
   }

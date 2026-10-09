@@ -40,7 +40,7 @@ export function createMutationHandler(
             }
           : {}),
         instruction:
-          "Implement only approved files and scope. Do not commit. Use feature TDD; expected red is allowed. For repair use bounded failure excerpts and selected screenshot evidence first; read additional logs only when needed. If scope/dependencies change return needsReplan before changing them.",
+          "Complete every approved implementation step in dependency order, including test files, test runner configuration and approved dependency setup. Do not stop after only the application code or skip missing test/setup steps. Dependencies already listed in the approved plan are in scope. Do not commit. Use feature TDD; expected red is allowed. If an environment or permission prevents completing a step, report the concrete blocker in the summary. The worker runs final checks and owns verdicts. For repair use bounded failure excerpts and selected screenshot evidence first; read additional logs only when needed. If scope/dependencies change return needsReplan before changing them.",
       },
       signal,
     );

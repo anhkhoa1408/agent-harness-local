@@ -90,29 +90,97 @@ Không tạo hết file trống trước. Tạo file trong task sở hữu nó. 
 **Produces:**
 
 ```ts
-type Stage = 'discover'|'analyze'|'plan'|'prepare'|'implement'|'verify'|'review'|'repair'|'deliver';
-type Status = 'queued'|'running'|'waiting_input'|'waiting_approval'|'blocked'|'paused'|'interrupted'|'completed'|'cancelled'|'failed';
+type Stage =
+  | "discover"
+  | "analyze"
+  | "plan"
+  | "prepare"
+  | "implement"
+  | "verify"
+  | "review"
+  | "repair"
+  | "deliver";
+type Status =
+  | "queued"
+  | "running"
+  | "waiting_input"
+  | "waiting_approval"
+  | "blocked"
+  | "paused"
+  | "interrupted"
+  | "completed"
+  | "cancelled"
+  | "failed";
 type ModelChoice = { model: string; effort: string };
-type ModelMap = Record<'discover'|'analyze'|'plan'|'implement'|'review'|'repair', ModelChoice>;
+type ModelMap = Record<
+  "discover" | "analyze" | "plan" | "implement" | "review" | "repair",
+  ModelChoice
+>;
 type Task = {
-  id: string; repositoryId: string; title: string; requirement: string;
-  stage: Stage; status: Status; reason: string|null; revision: number;
-  planVersion: number|null; approvedPlanVersion: number|null;
-  repairCount: number; models: ModelMap; worktree: string|null;
-  sourceCommit: string; branch: string; targetBranch: string;
-  deliveryMode: 'github'|'local'; resumeStage: Stage|null;
+  id: string;
+  repositoryId: string;
+  title: string;
+  requirement: string;
+  stage: Stage;
+  status: Status;
+  reason: string | null;
+  revision: number;
+  planVersion: number | null;
+  approvedPlanVersion: number | null;
+  repairCount: number;
+  models: ModelMap;
+  worktree: string | null;
+  sourceCommit: string;
+  branch: string;
+  targetBranch: string;
+  deliveryMode: "github" | "local";
+  resumeStage: Stage | null;
 };
-type Event = { seq: number; taskId: string; type: string; data: unknown; at: number };
-type ControlCommand = { id: string; taskId: string; kind: 'start'|'answer'|'approve'|'pause'|'resume'|'cancel'|'configure'|'grant'; expectedRevision: number; payload: unknown };
-type NewTask = Pick<Task,'repositoryId'|'title'|'requirement'|'models'|'sourceCommit'|'targetBranch'|'deliveryMode'>;
+type Event = {
+  seq: number;
+  taskId: string;
+  type: string;
+  data: unknown;
+  at: number;
+};
+type ControlCommand = {
+  id: string;
+  taskId: string;
+  kind:
+    | "start"
+    | "answer"
+    | "approve"
+    | "pause"
+    | "resume"
+    | "cancel"
+    | "configure"
+    | "grant";
+  expectedRevision: number;
+  payload: unknown;
+};
+type NewTask = Pick<
+  Task,
+  | "repositoryId"
+  | "title"
+  | "requirement"
+  | "models"
+  | "sourceCommit"
+  | "targetBranch"
+  | "deliveryMode"
+>;
 interface Store {
   createTask(input: NewTask): Task;
   getTask(id: string): Task;
   listTasks(): Task[];
-  updateTask(id: string, expectedRevision: number, patch: Partial<Task>, event: {type:string;data:unknown}): Task;
+  updateTask(
+    id: string,
+    expectedRevision: number,
+    patch: Partial<Task>,
+    event: { type: string; data: unknown },
+  ): Task;
   events(taskId: string, after: number): Event[];
   enqueue(command: ControlCommand): boolean;
-  nextCommand(): ControlCommand|null;
+  nextCommand(): ControlCommand | null;
   finishCommand(id: string, outcome: unknown): void;
   putRecord(kind: string, id: string, value: unknown): void;
   getRecord(kind: string, id: string): unknown;
@@ -152,17 +220,38 @@ Vitest `include: ['tests/unit/**/*.test.ts','tests/integration/**/*.test.ts']`, 
 - [ ] **Step 2 — viết và chạy failing test cho persistence/idempotency.** Test định nghĩa fixture trực tiếp:
 
 ```ts
-import { test, expect } from 'vitest';
-import { openStore } from '../../src/storage/store';
-test('duplicate commands are not executed twice', () => {
-  const store = openStore(':memory:');
-  const choice = { model: 'fixture-model', effort: 'medium' };
-  const task = store.createTask({ repositoryId:'repo-1', title:'Filter', requirement:'Filter by status', sourceCommit:'a'.repeat(40), targetBranch:'main', deliveryMode:'local', models:{discover:choice,analyze:choice,plan:choice,implement:choice,review:choice,repair:choice} });
-  const command = { id:'cmd-1', taskId:task.id, kind:'start' as const, expectedRevision:task.revision, payload:{} };
+import { test, expect } from "vitest";
+import { openStore } from "../../src/storage/store";
+test("duplicate commands are not executed twice", () => {
+  const store = openStore(":memory:");
+  const choice = { model: "fixture-model", effort: "medium" };
+  const task = store.createTask({
+    repositoryId: "repo-1",
+    title: "Filter",
+    requirement: "Filter by status",
+    sourceCommit: "a".repeat(40),
+    targetBranch: "main",
+    deliveryMode: "local",
+    models: {
+      discover: choice,
+      analyze: choice,
+      plan: choice,
+      implement: choice,
+      review: choice,
+      repair: choice,
+    },
+  });
+  const command = {
+    id: "cmd-1",
+    taskId: task.id,
+    kind: "start" as const,
+    expectedRevision: task.revision,
+    payload: {},
+  };
   expect(store.enqueue(command)).toBe(true);
   expect(store.enqueue(command)).toBe(false);
-  expect(store.nextCommand()?.id).toBe('cmd-1');
-  store.finishCommand('cmd-1', { accepted:true });
+  expect(store.nextCommand()?.id).toBe("cmd-1");
+  store.finishCommand("cmd-1", { accepted: true });
   expect(store.nextCommand()).toBeNull();
   store.close();
 });
@@ -195,10 +284,19 @@ CREATE TABLE IF NOT EXISTS records (
 `records` lưu các record có Zod schema riêng: repository, profile, plan, approval, attempt, check, finding, artifact, effect và settings. Không dùng nó để thay lock/transaction của tasks, commands hoặc lease. Bổ sung vào Store các hàm generic có kiểm tra schema `putRecord(kind,id,value)`, `getRecord(kind,id)`, `listRecords(kind)`; kiểu public là `unknown` trước khi parse ở service sở hữu record.
 
 ```ts
-export function transaction<T>(db: import('node:sqlite').DatabaseSync, work: () => T): T {
-  db.exec('BEGIN IMMEDIATE');
-  try { const result = work(); db.exec('COMMIT'); return result; }
-  catch (error) { db.exec('ROLLBACK'); throw error; }
+export function transaction<T>(
+  db: import("node:sqlite").DatabaseSync,
+  work: () => T,
+): T {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = work();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 ```
 
@@ -215,32 +313,72 @@ Update bằng `WHERE id=? AND revision=?`; `changes !== 1` là conflict. Chỉ a
 **Produces:**
 
 ```ts
-type ModelInfo = { id:string; efforts:string[]; isDefault:boolean };
-type AgentInput = { cwd:string; model:ModelChoice; instructions:string; prompt:string; outputSchema:Record<string,unknown>; write:boolean; threadId?:string };
-type AgentEvent = { type:'started'|'message'|'tool'|'approval'|'completed'|'error'; data:unknown };
-type AgentRun = { threadId:string; turnId:string; result:unknown; usage:unknown };
+type ModelInfo = { id: string; efforts: string[]; isDefault: boolean };
+type AgentInput = {
+  cwd: string;
+  model: ModelChoice;
+  instructions: string;
+  prompt: string;
+  outputSchema: Record<string, unknown>;
+  write: boolean;
+  threadId?: string;
+};
+type AgentEvent = {
+  type: "started" | "message" | "tool" | "approval" | "completed" | "error";
+  data: unknown;
+};
+type AgentRun = {
+  threadId: string;
+  turnId: string;
+  result: unknown;
+  usage: unknown;
+};
 interface AgentClient {
   models(): Promise<ModelInfo[]>;
-  run(input:AgentInput, onEvent:(event:AgentEvent)=>void, signal:AbortSignal):Promise<AgentRun>;
-  answer(requestId:string|number, result:unknown):Promise<void>;
-  interrupt(threadId:string,turnId:string):Promise<void>;
-  close():Promise<void>;
+  run(
+    input: AgentInput,
+    onEvent: (event: AgentEvent) => void,
+    signal: AbortSignal,
+  ): Promise<AgentRun>;
+  answer(requestId: string | number, result: unknown): Promise<void>;
+  interrupt(threadId: string, turnId: string): Promise<void>;
+  close(): Promise<void>;
 }
-function resolveModel(stage:keyof ModelMap, task:Partial<ModelMap>, defaults:Partial<ModelMap>, catalog:ModelInfo[]):ModelChoice;
+function resolveModel(
+  stage: keyof ModelMap,
+  task: Partial<ModelMap>,
+  defaults: Partial<ModelMap>,
+  catalog: ModelInfo[],
+): ModelChoice;
 ```
 
 - [ ] **Step 1 — model tests.** Trong `tests/unit/model-policy.test.ts`:
 
 ```ts
-import { test, expect } from 'vitest';
-import { resolveModel } from '../../src/core/model-policy';
-test('uses explicit planner and implementer choices', () => {
-  const catalog = [{id:'strong',efforts:['high'],isDefault:false},{id:'medium',efforts:['medium'],isDefault:true}];
-  const config = {plan:{model:'strong',effort:'high'},implement:{model:'medium',effort:'medium'}};
-  expect(resolveModel('plan',{},config,catalog).model).toBe('strong');
-  expect(resolveModel('implement',{},config,catalog).model).toBe('medium');
-  expect(() => resolveModel('plan',{}, {},catalog)).toThrow('model_unconfigured');
-  expect(() => resolveModel('plan',{plan:{model:'missing',effort:'high'}},config,catalog)).toThrow('model_unavailable');
+import { test, expect } from "vitest";
+import { resolveModel } from "../../src/core/model-policy";
+test("uses explicit planner and implementer choices", () => {
+  const catalog = [
+    { id: "strong", efforts: ["high"], isDefault: false },
+    { id: "medium", efforts: ["medium"], isDefault: true },
+  ];
+  const config = {
+    plan: { model: "strong", effort: "high" },
+    implement: { model: "medium", effort: "medium" },
+  };
+  expect(resolveModel("plan", {}, config, catalog).model).toBe("strong");
+  expect(resolveModel("implement", {}, config, catalog).model).toBe("medium");
+  expect(() => resolveModel("plan", {}, {}, catalog)).toThrow(
+    "model_unconfigured",
+  );
+  expect(() =>
+    resolveModel(
+      "plan",
+      { plan: { model: "missing", effort: "high" } },
+      config,
+      catalog,
+    ),
+  ).toThrow("model_unavailable");
 });
 ```
 
@@ -250,11 +388,21 @@ Run `npm test -- tests/unit/model-policy.test.ts`, observe RED. Implement lookup
 
 ```ts
 // tests/support/fake-rpc.ts: protocol fixture; không gọi model thật.
-import { createInterface } from 'node:readline';
-for await (const line of createInterface({ input:process.stdin })) {
+import { createInterface } from "node:readline";
+for await (const line of createInterface({ input: process.stdin })) {
   const request = JSON.parse(line);
-  if (request.method === 'initialize') process.stdout.write(JSON.stringify({id:request.id,result:{userAgent:'fixture'}})+'\n');
-  if (request.method === 'model/list') process.stdout.write(JSON.stringify({id:request.id,result:{data:[],nextCursor:null}})+'\n');
+  if (request.method === "initialize")
+    process.stdout.write(
+      JSON.stringify({ id: request.id, result: { userAgent: "fixture" } }) +
+        "\n",
+    );
+  if (request.method === "model/list")
+    process.stdout.write(
+      JSON.stringify({
+        id: request.id,
+        result: { data: [], nextCursor: null },
+      }) + "\n",
+    );
 }
 ```
 
@@ -264,16 +412,24 @@ Bổ sung fixture branches để phát các cases trên, không mock parser nộ
 
 ```ts
 const start = {
-  method: 'thread/start',
-  params: { cwd: input.cwd, model: input.model.model,
-    sandbox: input.write ? 'workspace-write' : 'read-only',
-    approvalPolicy: 'on-request',
-    developerInstructions: input.instructions }
+  method: "thread/start",
+  params: {
+    cwd: input.cwd,
+    model: input.model.model,
+    sandbox: input.write ? "workspace-write" : "read-only",
+    approvalPolicy: "on-request",
+    developerInstructions: input.instructions,
+  },
 };
 const turn = {
-  method: 'turn/start',
-  params: { threadId, model: input.model.model, effort: input.model.effort,
-    input: [{type:'text',text:input.prompt}], outputSchema:input.outputSchema }
+  method: "turn/start",
+  params: {
+    threadId,
+    model: input.model.model,
+    effort: input.model.effort,
+    input: [{ type: "text", text: input.prompt }],
+    outputSchema: input.outputSchema,
+  },
 };
 ```
 
@@ -292,22 +448,51 @@ const turn = {
 **Produces:**
 
 ```ts
-type ContextFile = { id:string; path:string; sha256:string; content:string };
-type Bundle = { stage:Stage; files:ContextFile[]; adaptations:string; hash:string };
-function resolveBundle(stage:Stage, roots:Record<string,string>, repoRoot:string, relevantPaths:string[], liquidTask:boolean):Promise<Bundle>;
-function composeInstructions(bundle:Bundle):string;
-function snapshotBundle(bundle:Bundle, artifactsDir:string):Promise<string>;
+type ContextFile = {
+  id: string;
+  path: string;
+  sha256: string;
+  content: string;
+};
+type Bundle = {
+  stage: Stage;
+  files: ContextFile[];
+  adaptations: string;
+  hash: string;
+};
+function resolveBundle(
+  stage: Stage,
+  roots: Record<string, string>,
+  repoRoot: string,
+  relevantPaths: string[],
+  liquidTask: boolean,
+): Promise<Bundle>;
+function composeInstructions(bundle: Bundle): string;
+function snapshotBundle(bundle: Bundle, artifactsDir: string): Promise<string>;
 ```
 
 - [ ] **Step 1 — test conditional rule và snapshot.** Dùng temp dirs trong `tests/integration/skills.test.ts`; tạo AGENTS.md baseline, một root skill có SKILL.md và file phụ. Resolve implement; sửa file nguồn; đọc snapshot cũ và assert hash/content không đổi. `liquidTask=false` không đòi Lighthouse; `true` và thiếu file trả `rule_unavailable`. Skill required thiếu trả `skill_unavailable`.
 
 ```ts
-import { test, expect } from 'vitest';
-import { composeInstructions } from '../../src/context/prompts';
-test('explicit feature scope survives a conflicting skill', () => {
-  const text = composeInstructions({stage:'implement',hash:'fixture',adaptations:'Only approved feature checks are mandatory. Keep skipped legacy checks visible.',files:[{id:'tdd',path:'/fixture/SKILL.md',sha256:'fixture',content:'Run the entire project suite.'}]});
-  expect(text).toContain('Only approved feature checks are mandatory');
-  expect(text).toContain('Run the entire project suite');
+import { test, expect } from "vitest";
+import { composeInstructions } from "../../src/context/prompts";
+test("explicit feature scope survives a conflicting skill", () => {
+  const text = composeInstructions({
+    stage: "implement",
+    hash: "fixture",
+    adaptations:
+      "Only approved feature checks are mandatory. Keep skipped legacy checks visible.",
+    files: [
+      {
+        id: "tdd",
+        path: "/fixture/SKILL.md",
+        sha256: "fixture",
+        content: "Run the entire project suite.",
+      },
+    ],
+  });
+  expect(text).toContain("Only approved feature checks are mandatory");
+  expect(text).toContain("Run the entire project suite");
 });
 ```
 
@@ -316,12 +501,14 @@ Test này kiểm tra truyền đầy đủ rule + adaptation; behavior thật đ
 - [ ] **Step 2 — mapping fixed theo spec 6.1.** Registry trong code liệt kê từng stage, skill ID và file phụ cần snapshot. Discover dùng prompt Repo Profile; không tạo một skill được khai báo nhưng không tồn tại. Review include `requesting-code-review/code-reviewer.md`; TDD include `writing-good-tests.md`; debugging include tài liệu root-cause khi nhánh cần dùng. Root skill do user cấu hình/resolve từ local installation; không chép path cache của máy phát triển vào code.
 
 ```ts
-import { createHash } from 'node:crypto';
-export function contentHash(content:string):string {
-  return createHash('sha256').update(content).digest('hex');
+import { createHash } from "node:crypto";
+export function contentHash(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
 }
 // Sắp xếp theo ID trước khi hash để cùng nội dung luôn có cùng fingerprint.
-const fingerprint = contentHash(JSON.stringify(files.map(f => [f.id,f.sha256]).sort()));
+const fingerprint = contentHash(
+  JSON.stringify(files.map((f) => [f.id, f.sha256]).sort()),
+);
 ```
 
 `files` là ContextFile[] đã resolve; bundle hash phải gồm adaptations và stage ngoài file fingerprints. Xác thực realpath nằm trong root tương ứng, không đi theo symlink thoát root; chỉ đọc tài liệu được phép, không theo link URL như instruction tự động. Load nested AGENTS chỉ cho thư mục liên quan. Parse baseline theo heading để bỏ mục 7, không cắt bằng số dòng.
@@ -339,28 +526,69 @@ const fingerprint = contentHash(JSON.stringify(files.map(f => [f.id,f.sha256]).s
 **Produces:**
 
 ```ts
-type Repository = {id:string;root:string;baseBranch:string;remote:string|null;head:string;dirty:boolean};
-type CommandSpec = {id:string;executable:string;args:string[];cwd:string;envNames:string[];timeoutMs:number;reportPath:string|null};
-type RepoProfile = {repositoryId:string;sourceCommit:string;languages:string[];areas:{path:string;purpose:string}[];commands:CommandSpec[];prerequisites:string[];evidence:{path:string;reason:string}[];unknowns:string[]};
-function inspectRepository(path:string, baseBranch:string, remote:string|null):Promise<Repository>;
-function discoverRepository(repo:Repository, client:AgentClient, bundle:Bundle, model:ModelChoice, signal:AbortSignal):Promise<RepoProfile>;
-function createTempRepo(files:Record<string,string>):Promise<{root:string;dispose:()=>Promise<void>}>;
+type Repository = {
+  id: string;
+  root: string;
+  baseBranch: string;
+  remote: string | null;
+  head: string;
+  dirty: boolean;
+};
+type CommandSpec = {
+  id: string;
+  executable: string;
+  args: string[];
+  cwd: string;
+  envNames: string[];
+  timeoutMs: number;
+  reportPath: string | null;
+};
+type RepoProfile = {
+  repositoryId: string;
+  sourceCommit: string;
+  languages: string[];
+  areas: { path: string; purpose: string }[];
+  commands: CommandSpec[];
+  prerequisites: string[];
+  evidence: { path: string; reason: string }[];
+  unknowns: string[];
+};
+function inspectRepository(
+  path: string,
+  baseBranch: string,
+  remote: string | null,
+): Promise<Repository>;
+function discoverRepository(
+  repo: Repository,
+  client: AgentClient,
+  bundle: Bundle,
+  model: ModelChoice,
+  signal: AbortSignal,
+): Promise<RepoProfile>;
+function createTempRepo(
+  files: Record<string, string>,
+): Promise<{ root: string; dispose: () => Promise<void> }>;
 ```
 
 - [ ] **Step 1 — Git fixture và RED.** Helper dùng `mkdtemp`, ghi files, `git init -b main`, local fixture user.name/email, add/commit; dispose chỉ xóa thư mục tạm do helper tạo. `execFile` với array args, không ghép shell command.
 
 ```ts
-import { test, expect } from 'vitest';
-import { createTempRepo } from '../support/temp-repo';
-import { inspectRepository } from '../../src/repositories/inspect';
-test('accepts a non-JavaScript repo without executing setup', async () => {
-  const fixture = await createTempRepo({'pyproject.toml':'[project]\nname="fixture"\nversion="0.1.0"\n','app.py':'print("hello")\n'});
+import { test, expect } from "vitest";
+import { createTempRepo } from "../support/temp-repo";
+import { inspectRepository } from "../../src/repositories/inspect";
+test("accepts a non-JavaScript repo without executing setup", async () => {
+  const fixture = await createTempRepo({
+    "pyproject.toml": '[project]\nname="fixture"\nversion="0.1.0"\n',
+    "app.py": 'print("hello")\n',
+  });
   try {
-    const repo = await inspectRepository(fixture.root,'main',null);
+    const repo = await inspectRepository(fixture.root, "main", null);
     expect(repo.head).toMatch(/^[a-f0-9]{40,64}$/);
     expect(repo.root).toBe(fixture.root);
     expect(repo.dirty).toBe(false);
-  } finally { await fixture.dispose(); }
+  } finally {
+    await fixture.dispose();
+  }
 });
 ```
 
@@ -369,11 +597,13 @@ Thêm case path có dấu cách, missing base, unborn repo, dirty original, mali
 - [ ] **Step 2 — inspect chính xác và discover có evidence.** Dùng `git -C root rev-parse --show-toplevel`, `rev-parse --verify <branch>^{commit}`, `status --porcelain=v1 -z`, `remote get-url`. Canonicalize root. Không tự init repo đích. Profile đọc commit nguồn qua `git show`/index tài liệu; working tree bẩn không được lẫn vào profile của commit đã chọn.
 
 ```ts
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
-export async function gitText(root:string,args:string[]):Promise<string> {
-  const { stdout } = await execFileAsync('git',['-C',root,...args],{maxBuffer:8*1024*1024});
+export async function gitText(root: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync("git", ["-C", root, ...args], {
+    maxBuffer: 8 * 1024 * 1024,
+  });
   return stdout.trim();
 }
 ```
@@ -391,28 +621,59 @@ API `registerRepository({path,baseBranch,remote})` ghi Repository, sau đó disc
 **Produces:**
 
 ```ts
-type Criterion = {id:string;description:string;checkIds:string[]};
-type CheckSpec = CommandSpec & {kind:'unit'|'integration'|'e2e'|'build'|'typecheck';required:boolean;minimumTests:number;reportFormat:'junit'|'tap'|'exit-code';successPattern:string|null};
-type PlanStep = {id:string;description:string;files:string[];dependsOn:string[];inputs:string;outputs:string;verification:string};
-type Plan = {taskId:string;version:number;sourceCommit:string;scope:string;outOfScope:string[];criteria:Criterion[];steps:PlanStep[];checks:CheckSpec[];dependencies:string[];environment:string[];unresolved:string[]};
-type Analysis = {requirement:string;questions:{id:string;question:string;recommendation:string}[]};
-function validatePlan(plan:Plan):string[];
-function approvePlan(task:Task,plan:Plan,expectedVersion:number):Task;
-function canImplement(task:Task,plan:Plan):boolean;
+type Criterion = { id: string; description: string; checkIds: string[] };
+type CheckSpec = CommandSpec & {
+  kind: "unit" | "integration" | "e2e" | "build" | "typecheck";
+  required: boolean;
+  minimumTests: number;
+  reportFormat: "junit" | "tap" | "exit-code";
+  successPattern: string | null;
+};
+type PlanStep = {
+  id: string;
+  description: string;
+  files: string[];
+  dependsOn: string[];
+  inputs: string;
+  outputs: string;
+  verification: string;
+};
+type Plan = {
+  taskId: string;
+  version: number;
+  sourceCommit: string;
+  scope: string;
+  outOfScope: string[];
+  criteria: Criterion[];
+  steps: PlanStep[];
+  checks: CheckSpec[];
+  dependencies: string[];
+  environment: string[];
+  unresolved: string[];
+};
+type Analysis = {
+  requirement: string;
+  questions: { id: string; question: string; recommendation: string }[];
+};
+function validatePlan(plan: Plan): string[];
+function approvePlan(task: Task, plan: Plan, expectedVersion: number): Task;
+function canImplement(task: Task, plan: Plan): boolean;
 ```
 
 - [ ] **Step 1 — test approval thuần.** Fixture Task/Plan lưu `tests/support/task-fixture.ts` cung cấp `taskFixture(patch:Partial<Task>={})` và `planFixture(patch:Partial<Plan>={})`, với toàn bộ fields hợp lệ, một criterion `AC-1`, một required check `feature-unit`, một step có verification.
 
 ```ts
-import {test,expect} from 'vitest';
-import {taskFixture,planFixture} from '../support/task-fixture';
-import {approvePlan,canImplement} from '../../src/core/transitions';
-test('editing a plan invalidates prior approval', () => {
-  const plan=planFixture({version:1});
-  const approved=approvePlan(taskFixture({planVersion:1}),plan,1);
-  expect(canImplement(approved,plan)).toBe(true);
-  expect(canImplement(approved,planFixture({version:2}))).toBe(false);
-  expect(()=>approvePlan(approved,planFixture({version:2}),1)).toThrow('stale_plan');
+import { test, expect } from "vitest";
+import { taskFixture, planFixture } from "../support/task-fixture";
+import { approvePlan, canImplement } from "../../src/core/transitions";
+test("editing a plan invalidates prior approval", () => {
+  const plan = planFixture({ version: 1 });
+  const approved = approvePlan(taskFixture({ planVersion: 1 }), plan, 1);
+  expect(canImplement(approved, plan)).toBe(true);
+  expect(canImplement(approved, planFixture({ version: 2 }))).toBe(false);
+  expect(() => approvePlan(approved, planFixture({ version: 2 }), 1)).toThrow(
+    "stale_plan",
+  );
 });
 ```
 
@@ -421,9 +682,13 @@ Thêm tests: unresolved questions, criterion không map evidence, dependency cyc
 - [ ] **Step 2 — implement guards.** Plan output validate Zod rồi validate nghiệp vụ; invalid output chờ sửa/làm rõ, không tạo approval tự động.
 
 ```ts
-export function canImplement(task:Task,plan:Plan):boolean {
-  return task.planVersion===plan.version && task.approvedPlanVersion===plan.version
-    && task.sourceCommit===plan.sourceCommit && validatePlan(plan).length===0;
+export function canImplement(task: Task, plan: Plan): boolean {
+  return (
+    task.planVersion === plan.version &&
+    task.approvedPlanVersion === plan.version &&
+    task.sourceCommit === plan.sourceCommit &&
+    validatePlan(plan).length === 0
+  );
 }
 ```
 
@@ -442,26 +707,69 @@ export function canImplement(task:Task,plan:Plan):boolean {
 **Produces:**
 
 ```ts
-type Lease = {owner:string;epoch:number;expiresAt:number};
-type Attempt = {id:string;taskId:string;stage:Stage;leaseEpoch:number;model:ModelChoice|null;bundleHash:string|null;threadId:string|null;turnId:string|null;fingerprint:string|null;status:'running'|'completed'|'interrupted'|'failed';output:unknown};
-type StageResult = {stage:Stage;status:Status;reason:string|null;output:unknown};
-type StageHandler = (task:Task,signal:AbortSignal)=>Promise<StageResult>;
-type RecoveryObservation = {agent:'stopped'|'running'|'unknown';process:'stopped'|'running'|'unknown';effect:'absent'|'confirmed'|'unknown'};
-function decideRecovery(observation:RecoveryObservation):'resume'|'wait'|'reconcile';
-function claimLease(db:import('node:sqlite').DatabaseSync,owner:string,now:number,ttlMs:number):Lease|null;
-function renewLease(db:import('node:sqlite').DatabaseSync,lease:Lease,now:number,ttlMs:number):boolean;
-function runWorker(store:Store,handlers:Record<Stage,StageHandler>,signal:AbortSignal):Promise<void>;
+type Lease = { owner: string; epoch: number; expiresAt: number };
+type Attempt = {
+  id: string;
+  taskId: string;
+  stage: Stage;
+  leaseEpoch: number;
+  model: ModelChoice | null;
+  bundleHash: string | null;
+  threadId: string | null;
+  turnId: string | null;
+  fingerprint: string | null;
+  status: "running" | "completed" | "interrupted" | "failed";
+  output: unknown;
+};
+type StageResult = {
+  stage: Stage;
+  status: Status;
+  reason: string | null;
+  output: unknown;
+};
+type StageHandler = (task: Task, signal: AbortSignal) => Promise<StageResult>;
+type RecoveryObservation = {
+  agent: "stopped" | "running" | "unknown";
+  process: "stopped" | "running" | "unknown";
+  effect: "absent" | "confirmed" | "unknown";
+};
+function decideRecovery(
+  observation: RecoveryObservation,
+): "resume" | "wait" | "reconcile";
+function claimLease(
+  db: import("node:sqlite").DatabaseSync,
+  owner: string,
+  now: number,
+  ttlMs: number,
+): Lease | null;
+function renewLease(
+  db: import("node:sqlite").DatabaseSync,
+  lease: Lease,
+  now: number,
+  ttlMs: number,
+): boolean;
+function runWorker(
+  store: Store,
+  handlers: Record<Stage, StageHandler>,
+  signal: AbortSignal,
+): Promise<void>;
 ```
 
 - [ ] **Step 1 — RED cho ownership và recovery.** SQLite connections riêng cùng file: hai claim đồng thời chỉ một thành công; expired owner không được update task/event/effect; duplicate command chỉ một stage attempt. Pure recovery test:
 
 ```ts
-import {test,expect} from 'vitest';
-import {decideRecovery} from '../../src/worker/recovery';
-test('does not start another writer when old process is unknown',()=>{
-  expect(decideRecovery({agent:'unknown',process:'stopped',effect:'absent'})).toBe('wait');
-  expect(decideRecovery({agent:'stopped',process:'stopped',effect:'unknown'})).toBe('reconcile');
-  expect(decideRecovery({agent:'stopped',process:'stopped',effect:'absent'})).toBe('resume');
+import { test, expect } from "vitest";
+import { decideRecovery } from "../../src/worker/recovery";
+test("does not start another writer when old process is unknown", () => {
+  expect(
+    decideRecovery({ agent: "unknown", process: "stopped", effect: "absent" }),
+  ).toBe("wait");
+  expect(
+    decideRecovery({ agent: "stopped", process: "stopped", effect: "unknown" }),
+  ).toBe("reconcile");
+  expect(
+    decideRecovery({ agent: "stopped", process: "stopped", effect: "absent" }),
+  ).toBe("resume");
 });
 ```
 
@@ -479,9 +787,11 @@ Claim/renew trong transaction, clock milliseconds; TTL 15s, heartbeat 5s. Mỗi 
 - [ ] **Step 3 — worker dispatch và lifecycle.** Một stage attempt tại một thời điểm. `main.ts` mở Store, tạo Codex adapter và handlers, đăng ký SIGINT/SIGTERM với AbortController, flush state và đóng adapter/DB khi dừng.
 
 ```ts
-export function decideRecovery(o:RecoveryObservation):'resume'|'wait'|'reconcile' {
-  if(o.agent!=='stopped'||o.process!=='stopped') return 'wait';
-  return o.effect==='unknown'?'reconcile':'resume';
+export function decideRecovery(
+  o: RecoveryObservation,
+): "resume" | "wait" | "reconcile" {
+  if (o.agent !== "stopped" || o.process !== "stopped") return "wait";
+  return o.effect === "unknown" ? "reconcile" : "resume";
 }
 ```
 
@@ -498,24 +808,94 @@ Control priority pause/cancel trước start của stage mới. Pause/timeout g�
 **Produces:**
 
 ```ts
-type ProcessResult={exitCode:number|null;signal:string|null;stdoutPath:string;stderrPath:string;timedOut:boolean};
-type CheckResult={id:string;taskId:string;planVersion:number;fingerprint:string;status:'passed'|'failed'|'blocked'|'skipped'|'not_applicable';executed:number|null;exitCode:number|null;evidencePath:string;reason:string|null};
-function prepareWorktree(repo:Repository,task:Task,root:string):Promise<string>;
-function fingerprintWorktree(path:string):Promise<string>;
-function runProcess(command:CommandSpec,root:string,artifacts:string,signal:AbortSignal):Promise<ProcessResult>;
-function evaluateCheck(spec:CheckSpec,execution:{exitCode:number|null;timedOut:boolean;executed:number|null;failed:number;skipped:number;successMatched:boolean}):CheckResult['status'];
-function runChecks(task:Task,plan:Plan,signal:AbortSignal):Promise<CheckResult[]>;
+type ProcessResult = {
+  exitCode: number | null;
+  signal: string | null;
+  stdoutPath: string;
+  stderrPath: string;
+  timedOut: boolean;
+};
+type CheckResult = {
+  id: string;
+  taskId: string;
+  planVersion: number;
+  fingerprint: string;
+  status: "passed" | "failed" | "blocked" | "skipped" | "not_applicable";
+  executed: number | null;
+  exitCode: number | null;
+  evidencePath: string;
+  reason: string | null;
+};
+function prepareWorktree(
+  repo: Repository,
+  task: Task,
+  root: string,
+): Promise<string>;
+function fingerprintWorktree(path: string): Promise<string>;
+function runProcess(
+  command: CommandSpec,
+  root: string,
+  artifacts: string,
+  signal: AbortSignal,
+): Promise<ProcessResult>;
+function evaluateCheck(
+  spec: CheckSpec,
+  execution: {
+    exitCode: number | null;
+    timedOut: boolean;
+    executed: number | null;
+    failed: number;
+    skipped: number;
+    successMatched: boolean;
+  },
+): CheckResult["status"];
+function runChecks(
+  task: Task,
+  plan: Plan,
+  signal: AbortSignal,
+): Promise<CheckResult[]>;
 ```
 
 - [ ] **Step 1 — failing evidence tests.**
 
 ```ts
-import {test,expect} from 'vitest';
-import {evaluateCheck} from '../../src/execution/checks';
-test('a green exit with zero feature tests is blocked',()=>{
-  const spec={id:'feature',executable:'node',args:['--test'],cwd:'.',envNames:[],timeoutMs:1000,reportPath:null,kind:'unit' as const,required:true,minimumTests:1,reportFormat:'tap' as const,successPattern:null};
-  expect(evaluateCheck(spec,{exitCode:0,timedOut:false,executed:0,failed:0,skipped:0,successMatched:false})).toBe('blocked');
-  expect(evaluateCheck(spec,{exitCode:0,timedOut:false,executed:2,failed:0,skipped:0,successMatched:false})).toBe('passed');
+import { test, expect } from "vitest";
+import { evaluateCheck } from "../../src/execution/checks";
+test("a green exit with zero feature tests is blocked", () => {
+  const spec = {
+    id: "feature",
+    executable: "node",
+    args: ["--test"],
+    cwd: ".",
+    envNames: [],
+    timeoutMs: 1000,
+    reportPath: null,
+    kind: "unit" as const,
+    required: true,
+    minimumTests: 1,
+    reportFormat: "tap" as const,
+    successPattern: null,
+  };
+  expect(
+    evaluateCheck(spec, {
+      exitCode: 0,
+      timedOut: false,
+      executed: 0,
+      failed: 0,
+      skipped: 0,
+      successMatched: false,
+    }),
+  ).toBe("blocked");
+  expect(
+    evaluateCheck(spec, {
+      exitCode: 0,
+      timedOut: false,
+      executed: 2,
+      failed: 0,
+      skipped: 0,
+      successMatched: false,
+    }),
+  ).toBe("passed");
 });
 ```
 
@@ -528,12 +908,14 @@ Fingerprint gồm base/source commit và sorted inventory của tracked source/c
 - [ ] **Step 3 — process/test execution.** `spawn(executable,args,{cwd,env,shell:false,detached:true})`, giới hạn env allowlist theo plan. Reject cwd/reportPath thoát worktree/artifact root sau canonicalize. Stdout/stderr stream ra artifacts, không giữ vô hạn trong memory. SIGTERM process group, grace 5s rồi SIGKILL; ghi unknown nếu không xác nhận dừng. Dịch vụ E2E có readiness check, port riêng và cleanup trong finally.
 
 ```ts
-if(execution.timedOut||execution.exitCode===null) return 'blocked';
-if(execution.exitCode!==0||execution.failed>0) return 'failed';
-if(spec.kind==='build'||spec.kind==='typecheck') return 'passed';
-if(execution.executed===null) return execution.successMatched?'passed':'blocked';
-if(execution.executed<spec.minimumTests||execution.skipped>0) return 'blocked';
-return 'passed';
+if (execution.timedOut || execution.exitCode === null) return "blocked";
+if (execution.exitCode !== 0 || execution.failed > 0) return "failed";
+if (spec.kind === "build" || spec.kind === "typecheck") return "passed";
+if (execution.executed === null)
+  return execution.successMatched ? "passed" : "blocked";
+if (execution.executed < spec.minimumTests || execution.skipped > 0)
+  return "blocked";
+return "passed";
 ```
 
 Report parser hỗ trợ JUnit và TAP bằng thư viện/parser được kiểm tra khi cài; exit-code fallback cho tool khác cần successPattern và acceptance evidence được duyệt trước. Nếu không có count hoặc bằng chứng run phù hợp thì blocked. Không nới assertion sau failure. Snapshot trước/sau test phải giống nhau về source; test sửa source khiến evidence stale.
@@ -549,22 +931,58 @@ Report parser hỗ trợ JUnit và TAP bằng thư viện/parser được kiểm
 **Produces:**
 
 ```ts
-type Finding={id:string;severity:'critical'|'important'|'minor';criterionId:string|null;path:string;line:number;description:string;evidence:string;status:'open'|'resolved'|'disputed'};
-type Review={taskId:string;fingerprint:string;planVersion:number;findings:Finding[];criteria:{id:string;passed:boolean;evidence:string}[];verdict:'pass'|'changes_requested'|'needs_input'};
-function nextAfterReview(task:Task,review:Review):Pick<Task,'stage'|'status'|'reason'|'repairCount'>;
-function canDeliver(task:Task,plan:Plan,checks:CheckResult[],review:Review,fingerprint:string):boolean;
+type Finding = {
+  id: string;
+  severity: "critical" | "important" | "minor";
+  criterionId: string | null;
+  path: string;
+  line: number;
+  description: string;
+  evidence: string;
+  status: "open" | "resolved" | "disputed";
+};
+type Review = {
+  taskId: string;
+  fingerprint: string;
+  planVersion: number;
+  findings: Finding[];
+  criteria: { id: string; passed: boolean; evidence: string }[];
+  verdict: "pass" | "changes_requested" | "needs_input";
+};
+function nextAfterReview(
+  task: Task,
+  review: Review,
+): Pick<Task, "stage" | "status" | "reason" | "repairCount">;
+function canDeliver(
+  task: Task,
+  plan: Plan,
+  checks: CheckResult[],
+  review: Review,
+  fingerprint: string,
+): boolean;
 ```
 
 - [ ] **Step 1 — RED cho review gate.**
 
 ```ts
-import {test,expect} from 'vitest';
-import {taskFixture} from '../support/task-fixture';
-import {nextAfterReview} from '../../src/core/transitions';
-test('repair budget survives restart and model changes',()=>{
-  const task=taskFixture({repairCount:3});
-  const review={taskId:task.id,fingerprint:'snap',planVersion:1,findings:[],criteria:[],verdict:'changes_requested' as const};
-  expect(nextAfterReview(task,review)).toMatchObject({status:'blocked',reason:'repair_limit',repairCount:3});
+import { test, expect } from "vitest";
+import { taskFixture } from "../support/task-fixture";
+import { nextAfterReview } from "../../src/core/transitions";
+test("repair budget survives restart and model changes", () => {
+  const task = taskFixture({ repairCount: 3 });
+  const review = {
+    taskId: task.id,
+    fingerprint: "snap",
+    planVersion: 1,
+    findings: [],
+    criteria: [],
+    verdict: "changes_requested" as const,
+  };
+  expect(nextAfterReview(task, review)).toMatchObject({
+    status: "blocked",
+    reason: "repair_limit",
+    repairCount: 3,
+  });
 });
 ```
 
@@ -573,11 +991,34 @@ Acceptance cases: required check skipped; test fingerprint khác code cuối; ne
 - [ ] **Step 2 — stage handlers.** Implement nhận plan/RepoProfile/bundle snapshot, dùng writable worktree và model implement. Review nhận plan/diff/evidence, tạo thread mới read-only, không dùng implementation conversation. Repair nhận findings/test reports, nạp receiving-code-review rồi systematic-debugging/TDD, không tự đổi model stage.
 
 ```ts
-export function nextAfterReview(task:Task,review:Review) {
-  if(review.verdict==='needs_input') return {stage:'review' as const,status:'waiting_input' as const,reason:'review_dispute',repairCount:task.repairCount};
-  if(review.verdict==='pass') return {stage:'deliver' as const,status:'queued' as const,reason:null,repairCount:task.repairCount};
-  if(task.repairCount>=3) return {stage:'review' as const,status:'blocked' as const,reason:'repair_limit',repairCount:task.repairCount};
-  return {stage:'repair' as const,status:'queued' as const,reason:null,repairCount:task.repairCount};
+export function nextAfterReview(task: Task, review: Review) {
+  if (review.verdict === "needs_input")
+    return {
+      stage: "review" as const,
+      status: "waiting_input" as const,
+      reason: "review_dispute",
+      repairCount: task.repairCount,
+    };
+  if (review.verdict === "pass")
+    return {
+      stage: "deliver" as const,
+      status: "queued" as const,
+      reason: null,
+      repairCount: task.repairCount,
+    };
+  if (task.repairCount >= 3)
+    return {
+      stage: "review" as const,
+      status: "blocked" as const,
+      reason: "repair_limit",
+      repairCount: task.repairCount,
+    };
+  return {
+    stage: "repair" as const,
+    status: "queued" as const,
+    reason: null,
+    repairCount: task.repairCount,
+  };
 }
 ```
 
@@ -596,23 +1037,53 @@ Chỉ gọi transition sau validation đầy đủ của Review. Verify fail m�
 **Produces:**
 
 ```ts
-type Delivery={mode:'github'|'local';commit:string;reportPath:string;prUrl:string|null};
+type Delivery = {
+  mode: "github" | "local";
+  commit: string;
+  reportPath: string;
+  prUrl: string | null;
+};
 interface GitHubPort {
-  findPullRequest(repo:string,head:string,base:string):Promise<{url:string;headCommit:string}|null>;
-  createPullRequest(input:{repo:string;head:string;base:string;title:string;bodyFile:string}):Promise<string>;
+  findPullRequest(
+    repo: string,
+    head: string,
+    base: string,
+  ): Promise<{ url: string; headCommit: string } | null>;
+  createPullRequest(input: {
+    repo: string;
+    head: string;
+    base: string;
+    title: string;
+    bodyFile: string;
+  }): Promise<string>;
 }
-function deliver(task:Task,signal:AbortSignal):Promise<Delivery>;
-function renderReport(plan:Plan,checks:CheckResult[],review:Review):string;
+function deliver(task: Task, signal: AbortSignal): Promise<Delivery>;
+function renderReport(
+  plan: Plan,
+  checks: CheckResult[],
+  review: Review,
+): string;
 ```
 
 - [ ] **Step 1 — RED với fake GitHubPort.** Test create trả lỗi mất kết nối sau khi fake server đã lưu PR; chạy lại phải find PR cũ, không create lần hai. Test remote head thay đổi ngoài task → blocked; repo không có remote → local report và commit; không force push. Dùng temp bare Git remote cho push tests, không GitHub thật.
 
 ```ts
 // Logic phải được test qua deliver và journal trong tests/integration/delivery.test.ts.
-const existing = await github.findPullRequest(repository, headBranch, baseBranch);
-if(existing) return {mode:'github',commit,reportPath,prUrl:existing.url};
-const prUrl = await github.createPullRequest({repo:repository,head:headBranch,base:baseBranch,title,bodyFile:reportPath});
-return {mode:'github',commit,reportPath,prUrl};
+const existing = await github.findPullRequest(
+  repository,
+  headBranch,
+  baseBranch,
+);
+if (existing)
+  return { mode: "github", commit, reportPath, prUrl: existing.url };
+const prUrl = await github.createPullRequest({
+  repo: repository,
+  head: headBranch,
+  base: baseBranch,
+  title,
+  bodyFile: reportPath,
+});
+return { mode: "github", commit, reportPath, prUrl };
 ```
 
 Biến trong snippet lấy từ Task/Repository, commit đã xác minh và renderReport đã ghi file; không nhận head/base tùy ý từ agent output.
@@ -633,25 +1104,36 @@ Run `gh pr list --repo <repo> --head <head> --base <base> --state all --json url
 
 - [ ] **Step 1 — routes và HTTP tests RED.** Contract endpoints:
 
-| Method/path | Input | Output |
-| --- | --- | --- |
-| GET /api/health | none | worker heartbeat + app status |
-| GET /api/models | none | model catalog, auth status đã lọc |
-| GET/PUT /api/settings | stage models + skill root paths | validated configuration |
-| GET/POST /api/repositories | path/base/remote | Repository list/created |
-| GET/POST /api/tasks | NewTask | Task list/created |
-| GET /api/tasks/:id | none | task + plan + checks + review + artifact metadata |
-| GET /api/tasks/:id/events?after=N | sequence cursor | Event[] |
-| POST /api/tasks/:id/commands | ControlCommand | accepted/conflict |
-| GET /api/artifacts/:id | registered artifact ID | authorized file content |
+| Method/path                       | Input                           | Output                                            |
+| --------------------------------- | ------------------------------- | ------------------------------------------------- |
+| GET /api/health                   | none                            | worker heartbeat + app status                     |
+| GET /api/models                   | none                            | model catalog, auth status đã lọc                 |
+| GET/PUT /api/settings             | stage models + skill root paths | validated configuration                           |
+| GET/POST /api/repositories        | path/base/remote                | Repository list/created                           |
+| GET/POST /api/tasks               | NewTask                         | Task list/created                                 |
+| GET /api/tasks/:id                | none                            | task + plan + checks + review + artifact metadata |
+| GET /api/tasks/:id/events?after=N | sequence cursor                 | Event[]                                           |
+| POST /api/tasks/:id/commands      | ControlCommand                  | accepted/conflict                                 |
+| GET /api/artifacts/:id            | registered artifact ID          | authorized file content                           |
 
 Zod validate body; Origin/Host check và same-site HttpOnly local session. Session bootstrap chỉ từ page served đúng loopback host; không cấp credential qua cross-origin endpoint. Không CORS wildcard. Artifact API resolve bằng ID đã đăng ký, không nhận path trực tiếp. Status codes 400 input invalid, 403 origin/session, 404 missing resource, 409 stale revision, 503 worker unavailable.
 
 ```ts
-export function validMutationOrigin(origin:string|null,host:string):boolean {
-  if(!origin) return false;
-  try { const url=new URL(origin); return url.protocol==='http:' && url.host===host && ['127.0.0.1','localhost'].includes(url.hostname); }
-  catch { return false; }
+export function validMutationOrigin(
+  origin: string | null,
+  host: string,
+): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === "http:" &&
+      url.host === host &&
+      ["127.0.0.1", "localhost"].includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
 }
 ```
 
@@ -660,12 +1142,26 @@ export function validMutationOrigin(origin:string|null,host:string):boolean {
 - [ ] **Step 2 — UI từ trạng thái thật.** Bố cục sidebar repo/task, phần giữa timeline và stage hiện tại, panel plan/diff/tests/review. Chỉ hiển thị actions hợp lệ, nhưng server vẫn enforce guard. Model dropdown lấy catalog thật; planner/implementer cần người dùng chọn và lưu trước start. Không tự đặt model có tên giả. Poll 1s khi running, 3s khi idle; cleanup interval khi unmount, dùng after cursor tránh lặp.
 
 ```tsx
-export function TaskActions({task,onCommand}:{task:Task;onCommand:(kind:'pause'|'resume'|'cancel')=>void}) {
-  return <div aria-label="Điều khiển task">
-    {task.status==='running' && <button onClick={()=>onCommand('pause')}>Tạm dừng</button>}
-    {['paused','interrupted','blocked'].includes(task.status) && <button onClick={()=>onCommand('resume')}>Tiếp tục</button>}
-    {!['completed','cancelled'].includes(task.status) && <button onClick={()=>onCommand('cancel')}>Hủy task</button>}
-  </div>;
+export function TaskActions({
+  task,
+  onCommand,
+}: {
+  task: Task;
+  onCommand: (kind: "pause" | "resume" | "cancel") => void;
+}) {
+  return (
+    <div aria-label="Điều khiển task">
+      {task.status === "running" && (
+        <button onClick={() => onCommand("pause")}>Tạm dừng</button>
+      )}
+      {["paused", "interrupted", "blocked"].includes(task.status) && (
+        <button onClick={() => onCommand("resume")}>Tiếp tục</button>
+      )}
+      {!["completed", "cancelled"].includes(task.status) && (
+        <button onClick={() => onCommand("cancel")}>Hủy task</button>
+      )}
+    </div>
+  );
 }
 ```
 
@@ -674,17 +1170,27 @@ Dùng semantic HTML/CSS responsive và code/diff text có escaping. Phase blocke
 - [ ] **Step 3 — E2E fixture và test.** `HARNESS_TEST_MODE=1` chỉ cho worker test dùng fake AgentClient/GitHubPort; không bật qua HTTP input và không bật mặc định ở dev/prod. Seed temp repo/settings qua fixture setup trước webServer; fake IDs dùng trong catalog test. Không đưa endpoint test bypass vào production.
 
 ```ts
-import {test,expect} from '@playwright/test';
-test('approval unlocks implementation and ends with a local report',async({page})=>{
-  await page.goto('/');
-  await page.getByLabel('Tên task').fill('Thêm bộ lọc trạng thái');
-  await page.getByLabel('Yêu cầu').fill('Lọc danh sách theo trạng thái đã chọn');
-  await page.getByRole('button',{name:'Tạo task'}).click();
-  await expect(page.getByText('Chờ duyệt plan',{exact:true})).toBeVisible();
-  await expect(page.getByText('Đang implement',{exact:true})).toHaveCount(0);
-  await page.getByRole('button',{name:'Duyệt plan'}).click();
-  await expect(page.getByText('Đã bàn giao local',{exact:true})).toBeVisible({timeout:30000});
-  await expect(page.getByRole('link',{name:'Báo cáo nghiệm thu'})).toBeVisible();
+import { test, expect } from "@playwright/test";
+test("approval unlocks implementation and ends with a local report", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Tên task").fill("Thêm bộ lọc trạng thái");
+  await page
+    .getByLabel("Yêu cầu")
+    .fill("Lọc danh sách theo trạng thái đã chọn");
+  await page.getByRole("button", { name: "Tạo task" }).click();
+  await expect(page.getByText("Chờ duyệt plan", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đang implement", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "Duyệt plan" }).click();
+  await expect(
+    page.getByText("Đã bàn giao local", { exact: true }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.getByRole("link", { name: "Báo cáo nghiệm thu" }),
+  ).toBeVisible();
 });
 ```
 
@@ -700,19 +1206,19 @@ README ghi Node floor, npm ci, login Codex/GitHub, chọn planner/implementer, s
 
 ## Ma trận bao phủ spec
 
-| Spec | Task thực hiện |
-| --- | --- |
-| 1–2: scope/architecture/local worker | 1, 6, 10 |
-| 3: đa ngôn ngữ/discovery/môi trường | 4, 7 |
-| 4: requirement/plan/approval | 5 |
-| 5: pipeline/trạng thái/attempts | 5, 6, 8 |
-| 6: model/context và 6.1–6.3 skill/rules | 2, 3, 5, 8 |
-| 7: Git isolation/source/feature dependencies | 4, 7, 9 |
-| 8: feature tests/review/evidence | 7, 8 |
-| 9: budgets/pause/crash/quota | 6, 8, 9 |
-| 10: gate/PR/local fallback | 8, 9 |
-| 11: data/UI/security | 1, 6, 10 |
-| 12: unit/integration/E2E/fault injection | Test steps của cả mười task |
+| Spec                                         | Task thực hiện              |
+| -------------------------------------------- | --------------------------- |
+| 1–2: scope/architecture/local worker         | 1, 6, 10                    |
+| 3: đa ngôn ngữ/discovery/môi trường          | 4, 7                        |
+| 4: requirement/plan/approval                 | 5                           |
+| 5: pipeline/trạng thái/attempts              | 5, 6, 8                     |
+| 6: model/context và 6.1–6.3 skill/rules      | 2, 3, 5, 8                  |
+| 7: Git isolation/source/feature dependencies | 4, 7, 9                     |
+| 8: feature tests/review/evidence             | 7, 8                        |
+| 9: budgets/pause/crash/quota                 | 6, 8, 9                     |
+| 10: gate/PR/local fallback                   | 8, 9                        |
+| 11: data/UI/security                         | 1, 6, 10                    |
+| 12: unit/integration/E2E/fault injection     | Test steps của cả mười task |
 
 Thu metrics từ task events/attempts: time waiting_input/approval, số intervention commands, repairCount, durations, delivery mode và kết quả được người dùng chấp nhận. Không thêm analytics server; report local đủ cho MVP.
 

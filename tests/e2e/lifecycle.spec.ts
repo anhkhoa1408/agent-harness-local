@@ -69,7 +69,9 @@ test("approval unlocks isolated implementation, repair, review and local report"
   await expect(
     page.getByRole("link", { name: "Báo cáo nghiệm thu" }),
   ).toBeVisible();
-  await expect(page.getByText("Repair 1 · Plan v1", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Repair 1 · Plan v1", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "Tests", exact: true }).click();
   await expect(page.getByText("passed", { exact: true })).toBeVisible();
   await expect(
@@ -101,13 +103,21 @@ test("approval unlocks isolated implementation, repair, review and local report"
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Duyệt plan" })).toHaveCount(0);
 });
-test("a feature that needs four repairs completes and shows its repair count", async ({ page }) => {
+test("a feature that needs four repairs completes and shows its repair count", async ({
+  page,
+}) => {
   await create(page, "repair-many");
   await expect(page.getByRole("button", { name: "Duyệt plan" })).toBeVisible();
   await page.getByRole("button", { name: "Duyệt plan" }).click();
-  await expect(page.getByRole("heading", { name: "Đã bàn giao local" })).toBeVisible({ timeout: 30000 });
-  await expect(page.getByText("Repair 4 · Plan v1", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Báo cáo nghiệm thu" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Đã bàn giao local" }),
+  ).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.getByText("Repair 4 · Plan v1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Báo cáo nghiệm thu" }),
+  ).toBeVisible();
 });
 test("questions block planning until answered and Python commands need no npm", async ({
   page,

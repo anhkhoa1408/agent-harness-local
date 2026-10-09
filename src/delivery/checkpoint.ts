@@ -21,7 +21,8 @@ export async function createStoryCheckpoint(
   signal: AbortSignal,
   context: { plan: Plan; storyId: string },
 ): Promise<StoryCheckpoint> {
-  const { plan, storyId } = context, prefix = `${task.id}:story:${plan.version}:${storyId}`;
+  const { plan, storyId } = context,
+    prefix = `${task.id}:story:${plan.version}:${storyId}`;
   const head = await gitText(task.worktree!, ["rev-parse", "HEAD"]);
   if (head !== task.sourceCommit) {
     const fingerprint = await fingerprintWorktree(

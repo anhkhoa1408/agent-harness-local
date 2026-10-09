@@ -2,7 +2,13 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { ModelInfo } from "../core/model-policy";
 import { JsonRpc, RpcRemoteError } from "./rpc";
 import { executeDelegatedStage } from "./subagents";
-import type { AgentClient, DirectTurnInput, DelegatedStageInput, AgentEvent, AgentRun } from "./types";
+import type {
+  AgentClient,
+  DirectTurnInput,
+  DelegatedStageInput,
+  AgentEvent,
+  AgentRun,
+} from "./types";
 export type { AgentClient, AgentInput, AgentEvent, AgentRun } from "./types";
 import { RUNTIME_PAGE_SIZE, AGENT_INTERRUPT_TIMEOUT_MS } from "./limits";
 export class CodexClient implements AgentClient {
@@ -25,7 +31,23 @@ export class CodexClient implements AgentClient {
     let cursor: string | null = null;
     const seen = new Set<string>();
     do {
-      const page = await this.rpc.request("model/list", {
+      const page: {
+        data: Array<{
+          model?: string;
+          id: string;
+          supportedReasoningEfforts?: { reasoningEffort: string }[];
+          isDefault?: boolean;
+        }>;
+        nextCursor?: string | null;
+      } = await this.rpc.request<{
+        data: Array<{
+          model?: string;
+          id: string;
+          supportedReasoningEfforts?: { reasoningEffort: string }[];
+          isDefault?: boolean;
+        }>;
+        nextCursor?: string | null;
+      }>("model/list", {
         limit: RUNTIME_PAGE_SIZE,
         includeHidden: false,
         ...(cursor ? { cursor } : {}),
@@ -34,7 +56,7 @@ export class CodexClient implements AgentClient {
         models.push({
           id: m.model ?? m.id,
           efforts: (m.supportedReasoningEfforts ?? []).map(
-            (e: any) => e.reasoningEffort,
+            (e: { reasoningEffort: string }) => e.reasoningEffort,
           ),
           isDefault: !!m.isDefault,
         });
@@ -44,8 +66,18 @@ export class CodexClient implements AgentClient {
     } while (cursor);
     return models;
   }
-  async runDelegatedStage(input: DelegatedStageInput, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<AgentRun> {
-    return executeDelegatedStage(this.rpc, input, onEvent, signal, this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS);
+  async runDelegatedStage(
+    input: DelegatedStageInput,
+    onEvent: (event: AgentEvent) => void,
+    signal: AbortSignal,
+  ): Promise<AgentRun> {
+    return executeDelegatedStage(
+      this.rpc,
+      input,
+      onEvent,
+      signal,
+      this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS,
+    );
   }
   async runDirectTurn(
     input: DirectTurnInput,

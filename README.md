@@ -69,17 +69,17 @@ Worker quyết định bước nào chạy tiếp, chạy test và tạo commit/
 
 Subagent nhận hai loại hướng dẫn: **profile** nói nó phụ trách việc gì, **skill** nói cách làm việc đó. Nạp nhiều hướng dẫn vẫn chỉ chạy một subagent trong lượt ấy.
 
-| Bước | Ai thực hiện? | Công việc |
-| --- | --- | --- |
-| `discover` | Subagent đọc repo | Xác định stack, convention và lệnh kiểm tra |
-| `analyze` | Subagent phân tích + grilling | Làm rõ yêu cầu và câu hỏi còn thiếu |
-| `plan` | Subagent planner + writing-plans | Lập phạm vi sửa, tiêu chí nghiệm thu và test plan |
-| `prepare` | Worker; subagent khi có conflict | Tạo worktree và đồng bộ base remote |
-| `implement` | Subagent theo stack + TDD | Viết code và test trong phạm vi đã duyệt |
-| `verify` | Runner; subagent nếu có ảnh UI được chọn | Chạy test/checks và xem ảnh UI nếu plan yêu cầu |
-| `review` | Subagent reviewer, chỉ đọc | Kiểm tra code và test có đáp ứng plan không |
-| `repair` | Subagent debugger + TDD | Sửa lỗi test hoặc lỗi reviewer tìm thấy |
-| `deliver` | Worker | Kiểm tra lần cuối, tạo commit/báo cáo hoặc PR |
+| Bước        | Ai thực hiện?                            | Công việc                                         |
+| ----------- | ---------------------------------------- | ------------------------------------------------- |
+| `discover`  | Subagent đọc repo                        | Xác định stack, convention và lệnh kiểm tra       |
+| `analyze`   | Subagent phân tích + grilling            | Làm rõ yêu cầu và câu hỏi còn thiếu               |
+| `plan`      | Subagent planner + writing-plans         | Lập phạm vi sửa, tiêu chí nghiệm thu và test plan |
+| `prepare`   | Worker; subagent khi có conflict         | Tạo worktree và đồng bộ base remote               |
+| `implement` | Subagent theo stack + TDD                | Viết code và test trong phạm vi đã duyệt          |
+| `verify`    | Runner; subagent nếu có ảnh UI được chọn | Chạy test/checks và xem ảnh UI nếu plan yêu cầu   |
+| `review`    | Subagent reviewer, chỉ đọc               | Kiểm tra code và test có đáp ứng plan không       |
+| `repair`    | Subagent debugger + TDD                  | Sửa lỗi test hoặc lỗi reviewer tìm thấy           |
+| `deliver`   | Worker                                   | Kiểm tra lần cuối, tạo commit/báo cáo hoặc PR     |
 
 Danh sách profile và skill cho từng bước nằm trong [agents/README.md](agents/README.md) và [skills/README.md](skills/README.md).
 
@@ -123,3 +123,13 @@ Khi tạo task, bật **Chia thành stories để chọn**. Planner đề xuất
 Mặc định **dừng sau mỗi story**; bấm **Tiếp tục** để chạy phần tiếp theo. Có thể bật **Tự tiếp tục các stories đã chọn**, nhưng các gate về dependency, approval, test và review vẫn áp dụng. Trang feature có tiến độ, checkpoint và link task con/PR. Pause hoặc hết quota giữ checkpoint đã hoàn thành; resume không thực hiện lại story đó. Cách chia này giảm phần việc dang dở, không bảo đảm quota luôn đủ cho một story.
 
 [Thiết kế story delivery](docs/superpowers/specs/2026-10-06-story-delivery-design.md) · [Kế hoạch triển khai](docs/superpowers/plans/2026-10-06-story-delivery.md).
+
+## Kiểm tra code
+
+```sh
+npm run lint          # ESLint, không chấp nhận warning
+npm run lint:fix      # Tự sửa các lỗi ESLint hỗ trợ
+npm run format       # Format bằng Prettier
+npm run format:check # Kiểm tra format
+npm run typecheck
+```

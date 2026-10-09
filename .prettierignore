@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+.harness/
+.superpowers/
+.agents/
+test-results/
+playwright-report/
+next-env.d.ts
+package-lock.json
+*.tsbuildinfo
+
+# Vendored agent profiles and skills: preserve their upstream content.
+agents/upstream/
+skills/superpowers/
+skills/mattpocock-skills/

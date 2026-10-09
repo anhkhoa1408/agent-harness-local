@@ -18,5 +18,5 @@ export type HttpResourceRoute = (
   request: Request,
   url: URL,
   parts: string[],
-  body: () => Promise<any>,
+  body: () => Promise<Record<string, unknown>>,
 ) => Promise<Response | undefined>;

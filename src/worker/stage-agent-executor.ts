@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
-import { aiStages, type Task, type AiStage, type Stage } from "../core/contracts";
+import {
+  aiStages,
+  type Task,
+  type AiStage,
+  type Stage,
+} from "../core/contracts";
 
 import type { AgentClient, DelegatedStageInput } from "../codex/types";
 import { PARENT_AGENT_MODEL as parentModel } from "../codex/limits";
@@ -107,14 +112,14 @@ export class StageAgentExecutor {
       });
     }
     const model = resolveModel(stage, task.models, {}, catalog);
-    const attempt = store
-      .listRecords("attempt")
-      .find(
-        (a: any) =>
-          a.taskId === task.id &&
-          a.stage === runtimeStage &&
-          a.status === "running",
-      ) as { id: string } | undefined;
+    const attempt = (
+      store.listRecords("attempt") as import("./types").Attempt[]
+    ).find(
+      (a) =>
+        a.taskId === task.id &&
+        a.stage === runtimeStage &&
+        a.status === "running",
+    ) as { id: string } | undefined;
     const attemptId = attempt?.id ?? randomUUID(),
       packetDir = join(artifacts(task), "delegations");
     await mkdir(packetDir, { recursive: true });

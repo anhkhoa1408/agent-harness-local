@@ -14,7 +14,7 @@ import type { Delivery } from "@/delivery/github";
 
 export type TaskDetailData = {
   task: Task;
-  stories?: {execution: StoryExecution | null; runs: StoryRun[]};
+  stories?: { execution: StoryExecution | null; runs: StoryRun[] };
   pipeline: StageNode[];
   plan: Plan | null;
   comments: PlanComment[];

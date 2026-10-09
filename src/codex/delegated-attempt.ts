@@ -1,15 +1,23 @@
 import { isDeepStrictEqual } from "node:util";
 import type { DelegatedStageInput, AgentEvent, AgentRun } from "./types";
 import { JsonRpc, RpcRemoteError, type RpcMessage } from "./rpc";
-import { requestThreadWhenRolloutReady, listDescendantThreads, matchesAgentSettings, verifyChildSpawn } from "./protocol";
+import {
+  requestThreadWhenRolloutReady,
+  listDescendantThreads,
+  matchesAgentSettings,
+  verifyChildSpawn,
+} from "./protocol";
 import type { ParentSessionContext } from "./parent-session";
 import { PARENT_AGENT_MODEL, AGENT_TREE_STOP_SWEEPS } from "./limits";
 import { durableSpawnEvidence } from "./spawn-evidence";
 type LiveThread = { turnId?: string; status?: string; usage?: unknown };
 export class DelegatedStageAttempt {
   private readonly liveThreads: Map<string, LiveThread>;
-  private readonly childAudits = new Map<string, Promise<any>>();
-  private readonly spawnCalls = new Map<string, any>();
+  private readonly childAudits = new Map<
+    string,
+    Promise<import("./rpc").ThreadResponse>
+  >();
+  private readonly spawnCalls = new Map<string, unknown>();
   private parentReceiptText = "";
   private nativeChildId?: string;
   private finished = false;
@@ -225,7 +233,8 @@ export class DelegatedStageAttempt {
       }
       if (turn?.status !== "completed") throw new Error("subagent_failed");
       const texts = turn.items.filter(
-        (i: any) => i.type === "agentMessage" && i.phase !== "commentary",
+        (i: { type: string; phase?: string; text?: string }) =>
+          i.type === "agentMessage" && i.phase !== "commentary",
       );
       const result = JSON.parse(texts.at(-1)?.text ?? ""),
         parentResult = JSON.parse(this.parentReceiptText);

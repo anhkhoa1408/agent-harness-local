@@ -50,6 +50,7 @@ Task chạy tuần tự 1 → 2 → 3 → 4 → 5 vì dùng chung theme và inte
 **Files:** Cấu hình, theme, utils/ui primitives; template WorkspaceLayout/AuthLayout; organism WorkspaceNavigation; page Login; `src/app/layout.tsx`, `src/app/login/page.tsx`; `tests/e2e/login.spec.ts`, `tests/e2e/ui.spec.ts`.
 
 **Interfaces:**
+
 - `cn(...inputs: ClassValue[]): string` ở `src/lib/utils.ts`.
 - `WorkspaceLayout({ children }: { children: ReactNode }): ReactElement` và `AuthLayout` cùng props; WorkspaceLayout giữ auth guard đang có, AuthLayout chỉ bố cục.
 - `WorkspaceNavigation({ pathname }: { pathname: string }): ReactElement` có active link `aria-current="page"`.
@@ -67,6 +68,7 @@ Task chạy tuần tự 1 → 2 → 3 → 4 → 5 vì dùng chung theme và inte
 **Files:** `src/components/pages/workspace-page.tsx`; organisms workspace và Pipeline; molecules FormField/StatusBadge/EmptyState; atom StageIndicator; `src/app/page.tsx`, `src/lib/api.ts`; tests folder-picker/UI.
 
 **Interfaces:**
+
 - `WorkspacePage(): ReactElement` giữ state và handler từ TaskForm.
 - `FormField({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }): ReactElement`; Label htmlFor=id và hint id liên kết control qua aria-describedby tại caller.
 - `StatusBadge({ status }: { status: Status }): ReactElement`, dùng type Status trong contracts.
@@ -83,6 +85,7 @@ Task chạy tuần tự 1 → 2 → 3 → 4 → 5 vì dùng chung theme và inte
 **Files:** `src/components/pages/settings-page.tsx`, `src/components/organisms/settings/stage-model-row.tsx`, `src/components/molecules/model-selector.tsx`, `src/app/settings/page.tsx`; tests UI/lifecycle liên quan settings.
 
 **Interfaces:**
+
 - `SettingsPage(): ReactElement`, giữ GET models/settings và PUT settings hiện tại.
 - `ModelSelector({ id, value, catalog, onSelect, disabled }: { id: string; value: string; catalog: ModelInfo[]; onSelect: (value: string) => void; disabled?: boolean }): ReactElement`.
 - StageModelRow giữ props stage/model/catalog/onSelect hiện tại; effort vẫn lấy stageEffort.
@@ -96,6 +99,7 @@ Task chạy tuần tự 1 → 2 → 3 → 4 → 5 vì dùng chung theme và inte
 **Files:** page TaskDetail, template TaskDetailLayout; toàn bộ organisms task-detail; `src/app/tasks/[id]/page.tsx`; `tests/e2e/plan-feedback.spec.ts`, `tests/e2e/lifecycle.spec.ts`, `tests/e2e/ui.spec.ts`.
 
 **Interfaces:**
+
 - `TaskDetailPage({ id }: { id: string }): ReactElement` giữ polling/controller từ TaskDetail.
 - `TaskDetailLayout({ primary, timeline }: { primary: ReactNode; timeline: ReactNode }): ReactElement`, hai cột desktop/một cột mobile.
 - TaskPlan/TaskRequests/TaskEvidence/TaskTimeline giữ interface hiện tại và type TaskCommand; TaskEvidence dùng Tabs controlled value để không reset khi polling.

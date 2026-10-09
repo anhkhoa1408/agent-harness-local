@@ -39,7 +39,11 @@ export function pipelineProgress(
     if (attempt.stage === "verify") reset(["review", "deliver"]);
     if (attempt.stage === "review") reset(["deliver"]);
     const current = node(attempt.stage);
-    const output = attempt.output as any;
+    const output = attempt.output as {
+      needsReplan?: boolean;
+      verdict?: string;
+      version?: number;
+    } | null;
     const needsWork =
       (attempt.nextStage === "plan" &&
         ["implement", "repair"].includes(attempt.stage)) ||

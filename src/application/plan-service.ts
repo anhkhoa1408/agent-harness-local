@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { ApplicationStore } from "./ports";
-import { PlanSchema, PlanCommentInputSchema, type PlanComment, type Plan } from "../core/contracts";
+import {
+  PlanSchema,
+  PlanCommentInputSchema,
+  type PlanComment,
+  type Plan,
+} from "../core/contracts";
 import { validatePlan } from "../core/acceptance";
 import type { StoryService } from "./story-service";
 export class PlanService {

@@ -1,7 +1,16 @@
 import type { Store } from "../storage/store";
+import type { Attempt } from "./types";
 
 import { workerEvent as event } from "./events";
 export function restoreInterruptedTasks(store: Store, bootId: string | null) {
+  // The previous worker's attempts ended; agent/process safety still uses exclusions below.
+  for (const attempt of store.listRecords("attempt") as Attempt[])
+    if (attempt.status === "running")
+      store.putRecord("attempt", attempt.id, {
+        ...attempt,
+        status: "interrupted",
+        output: { error: "worker_restart_runtime_unknown" },
+      });
   // Unknown runtimes survive process death. An explicit reconciliation is required before reuse.
   for (const task of store.listTasks().filter((t) => t.status === "running"))
     store.atomic(() => {

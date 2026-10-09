@@ -129,7 +129,7 @@ test("settings save error is an alert and retains the selected model", async ({
 test("task form requires input and sends selected repository and delivery mode", async ({
   page,
 }) => {
-  let submitted: any = null;
+  let submitted: unknown = null;
   await page.route("**/api/tasks", (route) => {
     if (route.request().method() !== "POST") return route.continue();
     submitted = route.request().postDataJSON();
@@ -404,3 +404,41 @@ test("long Plan comments wrap inside the mobile viewport", async ({ page }) => {
   ).toBeLessThanOrEqual(390);
   await page.getByRole("button", { name: "Hủy task" }).click();
 });
+
+for (const blocked of [true, false]) {
+  test(`login fallback link appears when popup is ${blocked ? "blocked" : "closed"}`, async ({
+    page,
+  }) => {
+    let started = false;
+    await page.route("**/api/codex-auth", (route) => {
+      if (route.request().method() === "POST") started = true;
+      return route.fulfill({
+        json: {
+          status: started ? "waiting" : "signed_out",
+          authorizationUrl: started ? "about:blank#oauth" : null,
+          error: null,
+        },
+      });
+    });
+    if (blocked)
+      await page.addInitScript(() => {
+        window.open = () => null;
+      });
+    await page.goto("/login");
+    const button = page.getByRole("button", { name: "Đăng nhập với Codex" });
+    await expect(button).toBeEnabled();
+    const popupPromise = blocked ? null : page.waitForEvent("popup");
+    await button.click();
+    const link = page.getByRole("link", { name: "Mở trang đăng nhập" });
+    if (popupPromise) {
+      const popup = await popupPromise;
+      await expect(page.getByRole("status")).toContainText(
+        "Hoàn tất đăng nhập",
+      );
+      await expect(link).toBeHidden();
+      await popup.close();
+    }
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", "about:blank#oauth");
+  });
+}

@@ -13,7 +13,7 @@ export async function contained(root: string, path: string): Promise<string> {
   const base = await realpath(root);
   const candidate = resolve(base, path);
   let existing = candidate;
-  let suffix: string[] = [];
+  const suffix: string[] = [];
   for (;;) {
     try {
       existing = await realpath(existing);
