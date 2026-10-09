@@ -1,28 +1,19 @@
-import { resolveModel } from "../../core/model-policy";
-import { aiStages } from "../../core/contracts";
-
 import { SettingsSchema } from "../../core/settings";
 import { json } from "../http-response";
 import type { HttpRouteContext, HttpResourceRoute } from "../route-context";
 export function createSettingsRoute(
   context: HttpRouteContext,
 ): HttpResourceRoute {
-  const { store, models } = context;
-  return async (request, url, parts, body) => {
-    const method = request.method;
+  return async (_request, _url, parts, body) => {
     if (parts[0] === "settings") {
-      if (method === "GET")
+      if (_request.method === "GET")
+        return json(context.modelService.getSettings());
+      if (_request.method === "PUT")
         return json(
-          SettingsSchema.parse(store.getRecord("settings", "current") ?? {}),
+          await context.modelService.saveSettings(
+            SettingsSchema.parse(await body()),
+          ),
         );
-      if (method === "PUT") {
-        const settings = SettingsSchema.parse(await body()),
-          catalog = await models();
-        for (const stage of aiStages)
-          resolveModel(stage, settings.models, {}, catalog);
-        store.putRecord("settings", "current", settings);
-        return json(settings);
-      }
     }
   };
 }
