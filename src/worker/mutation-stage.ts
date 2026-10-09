@@ -1,4 +1,3 @@
-import { mutationSchema } from "./mutation-schema";
 
 import { type Task } from "../core/contracts";
 
@@ -23,7 +22,7 @@ export function createMutationHandler(
     const result = await executor.executeAgentStage(
       task,
       task.stage as "implement" | "repair",
-      mutationSchema,
+      context.validation.outputs.mutation,
       {
         task: stageTask(task),
         plan,

@@ -1,4 +1,3 @@
-import { AnalysisSchema } from "../../core/contracts";
 
 import type { StageHandlerContext } from "../handler-context";
 import type { StageHandler } from "../types";
@@ -11,7 +10,7 @@ export function createAnalyzeHandler(
     const analysis = await executor.executeAgentStage(
       task,
       "analyze",
-      AnalysisSchema,
+      context.validation.outputs.analysis,
       {
         task: stageTask(task),
         profile: store.getRecord(

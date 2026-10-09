@@ -1,3 +1,4 @@
+import {validation} from "../../src/infrastructure/validation/gateway";
 import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -66,6 +67,7 @@ test("visual reviewer receives an explicit boundary for behavior that static ima
     };
     let instruction = "";
     const handler = createVerifyHandler({
+      validation,
       store,
       artifacts: () => dir,
       planOf: () => p,

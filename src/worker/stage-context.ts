@@ -54,6 +54,7 @@ export function createStageContext(store: Store, data: string) {
     );
   return {
     store,
+    validation,
     data,
     storyService,
     planService,
