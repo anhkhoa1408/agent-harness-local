@@ -1,3 +1,4 @@
+import { builtinModules } from "node:module";
 import ts from "typescript";
 import { relative } from "node:path";
 
@@ -6,6 +7,21 @@ export function dependencyViolations(
   root: string,
 ): string[] {
   const violations: string[] = [];
+  const nodeModules = new Set(
+    builtinModules.flatMap((name) => {
+      const bare = name.replace(/^node:/, "");
+      return [bare, `node:${bare}`];
+    }),
+  );
+  const ioPackages = [
+    "better-sqlite3",
+    "sqlite3",
+    "simple-git",
+    "isomorphic-git",
+    "@octokit/rest",
+    "@octokit/core",
+  ];
+
   const edges = new Map<string, string[]>();
   const host: ts.ModuleResolutionHost = {
     fileExists: (path) => path in sources || ts.sys.fileExists(path),
@@ -68,7 +84,14 @@ export function dependencyViolations(
               : owner === "infrastructure"
                 ? ["domain", "application", "infrastructure", "external"]
                 : null;
-      if (allowed && !allowed.includes(dependency))
+      const presentationIO =
+        owner === "presentation" &&
+        (nodeModules.has(specifier) ||
+          specifier.startsWith("node:") ||
+          ioPackages.some(
+            (name) => specifier === name || specifier.startsWith(name + "/"),
+          ));
+      if (presentationIO || (allowed && !allowed.includes(dependency)))
         violations.push(`${relative(root, file)} -> ${specifier}`);
       else if (
         target &&

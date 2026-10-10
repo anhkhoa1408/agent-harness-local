@@ -59,3 +59,26 @@ test("type-only dependency cycles are rejected", () => {
     }).some((v) => v.startsWith("cycle:")),
   ).toBe(true);
 });
+
+test.each([
+  "node:fs/promises",
+  "fs",
+  "node:child_process",
+  "node:sqlite",
+  "better-sqlite3",
+  "simple-git",
+])("presentation rejects direct I/O through %s", (specifier) => {
+  expect(
+    audit({
+      "presentation/http/controller.ts": `import adapter from "${specifier}";`,
+    }),
+  ).toHaveLength(1);
+});
+test("presentation may use request validation and framework packages", () => {
+  expect(
+    audit({
+      "presentation/http/controller.ts":
+        'import {z} from "zod"; import type {NextRequest} from "next/server";',
+    }),
+  ).toEqual([]);
+});

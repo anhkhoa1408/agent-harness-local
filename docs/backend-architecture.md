@@ -15,13 +15,13 @@ flowchart TD
 
 Mũi tên là dependency của source code. Domain/application không import framework hoặc infrastructure, kể cả type imports. Các module nghiệp vụ trong application giao tiếp qua public `index.ts`; shared port/contracts nằm tại application root để tránh vòng phụ thuộc type. Không có DI framework, generic base service/repository hoặc legacy compatibility facade.
 
-| Lớp | Vị trí và trách nhiệm |
-|---|---|
-| Domain | `src/domain`: task initialization/immutability, transition, approval, model/effort policy, story selection/replan, acceptance và evidence rules. TypeScript thuần; không Zod/Next/Node I/O. |
-| Application | `src/application`: models, tasks, planning, stories, repositories, agent-execution, pipeline, verification, delivery, dashboard, sessions, system và artifacts. Sở hữu ports, transaction boundaries và input/output types. |
+| Lớp            | Vị trí và trách nhiệm                                                                                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain         | `src/domain`: task initialization/immutability, transition, approval, model/effort policy, story selection/replan, acceptance và evidence rules. TypeScript thuần; không Zod/Next/Node I/O.                                   |
+| Application    | `src/application`: models, tasks, planning, stories, repositories, agent-execution, pipeline, verification, delivery, dashboard, sessions, system và artifacts. Sở hữu ports, transaction boundaries và input/output types.   |
 | Infrastructure | `src/infrastructure`: SQLite repositories/lease, Codex RPC/login/native receipts, semantic Git operations, context loader, process/evidence parsers và filesystem adapters. Zod/JSON Schema conversion ở validation adapters. |
-| Presentation | `src/presentation`: HTTP request parsing/response/error/cookie mapping, public dashboard DTO, worker entrypoint. Không đọc database/Git/filesystem. |
-| Bootstrap | `src/bootstrap`: nối services và adapters, chọn agent/test fixture, cấu hình data directory, startup/shutdown. Next route files gọi composition root; worker chạy `worker-main.ts`. |
+| Presentation   | `src/presentation`: HTTP request parsing/response/error/cookie mapping, public dashboard DTO, worker entrypoint. Không đọc database/Git/filesystem.                                                                           |
+| Bootstrap      | `src/bootstrap`: nối services và adapters, chọn agent/test fixture, cấu hình data directory, startup/shutdown. Next route files gọi composition root; worker chạy `worker-main.ts`.                                           |
 
 ## Model và agent execution
 
@@ -57,6 +57,6 @@ Delivery/checkpoint orchestration dùng semantic Git, GitHub và artifact ports.
 
 ## Guardrails và kiểm chứng
 
-`tests/support/dependencies.ts` dùng TypeScript compiler API resolve relative/alias imports, re-export, dynamic import, CommonJS require và import types. `tests/unit/backend-boundaries.test.ts` audit toàn domain/application/infrastructure/presentation/bootstrap, cả vòng phụ thuộc type, không dùng danh sách ngoại lệ. Fixtures trong clean-dependencies test chứng minh checker bắt vi phạm.
+`tests/support/dependencies.ts` dùng TypeScript compiler API resolve relative/alias imports, re-export, dynamic import, CommonJS require và import types. `tests/unit/backend-boundaries.test.ts` audit toàn domain/application/infrastructure/presentation/bootstrap, cả vòng phụ thuộc type, không dùng danh sách ngoại lệ. Fixtures trong clean-dependencies test chứng minh checker bắt vi phạm, gồm chặn presentation import trực tiếp Node builtins và các package SQLite/Git/GitHub đã nhận diện; framework/request validation vẫn được phép.
 
 Node 24.18 là runtime bắt buộc. Chạy `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e`. E2E dùng fixture; `scripts/parent-subagents-smoke.ts` dùng Codex thật trong Git repo tạm riêng. Báo cáo cập nhật tại [verification](verification/2026-10-09-clean-architecture.md). Rollback theo commit đã kiểm chứng; không chạy hai phiên bản worker cùng dữ liệu.

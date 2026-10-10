@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "summaries": [
+    {
+      "stage": "analyze",
+      "parent": "01a11e71-cc82-7af0-8889-729720bbd4e1",
+      "child": "01a11e71-ee55-71f0-92a3-3b097e19b596",
+      "permissions": "read-only",
+      "status": "passed"
+    },
+    {
+      "stage": "implement",
+      "parent": "01a11e71-cc82-7af0-8889-729720bbd4e1",
+      "child": "01a11e72-28b7-7363-b407-99a4b1a6e4ab",
+      "permissions": "workspace-write",
+      "status": "passed"
+    },
+    {
+      "stage": "review",
+      "parent": "01a11e71-cc82-7af0-8889-729720bbd4e1",
+      "child": "01a11e72-7558-71f1-b858-65a3599578fc",
+      "permissions": "read-only",
+      "status": "passed"
+    },
+    {
+      "stage": "cancel",
+      "parent": "01a11e71-cc82-7af0-8889-729720bbd4e1",
+      "status": "passed",
+      "detail": "adapter confirmed parent and discovered children terminal"
+    }
+  ]
+}
