@@ -1,8 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { AgentClient } from "../../src/codex/client";
-import { type Plan } from "../../src/core/contracts";
+import type { AgentClient } from "../../src/infrastructure/codex/client";
+import { type Plan } from "../../src/domain/contracts";
 import { planFixture } from "./task-fixture";
 export function createFixtureAgent(): AgentClient {
   const interruptedStories = new Set<string>();

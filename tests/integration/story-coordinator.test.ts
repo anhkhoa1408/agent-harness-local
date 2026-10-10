@@ -1,14 +1,17 @@
-import { StoryService } from "../../src/application/story-service";
+import { StoryService } from "../support/services";
 
-import { gitText as readStoryGit } from "../../src/repositories/inspect";
-import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/repositories/fingerprint";
+import { gitText as readStoryGit } from "../../src/infrastructure/repositories/inspect";
+import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/infrastructure/repositories/fingerprint";
 import { test, expect } from "vitest";
-import { openStore } from "../../src/storage/store";
+import { openStore } from "../../src/infrastructure/persistence/store";
 import { taskFixture } from "../support/task-fixture";
 import { storiesPlan } from "../support/story-fixture";
 import { createTempRepo } from "../support/temp-repo";
-import { inspectRepository, gitText } from "../../src/repositories/inspect";
-import { StorySelectionSchema } from "../../src/core/contracts";
+import {
+  inspectRepository,
+  gitText,
+} from "../../src/infrastructure/repositories/inspect";
+import { StorySelectionSchema } from "../../src/infrastructure/validation/contracts";
 const selection = (
   mode: "shared_pr" | "separate_pr" = "shared_pr",
   auto = false,
@@ -267,8 +270,8 @@ test("auto-next queues coordinator, last delivery completes feature", async () =
 });
 
 test("worker validates selection atomically with plan approval and records story attempt identity", async () => {
-  const { runWorker } = await import("../../src/worker/engine");
-  const { unavailableHandlers } = await import("../../src/worker/stages");
+  const { runWorker } = await import("../../src/bootstrap/worker");
+  const { unavailableHandlers } = await import("../../src/bootstrap/stages");
   const { store, task } = fixture();
   const stop = new AbortController();
   const handlers = unavailableHandlers();
@@ -326,7 +329,7 @@ test("worker validates selection atomically with plan approval and records story
       (
         store.listRecords(
           "attempt",
-        ) as import("../../src/worker/types").Attempt[]
+        ) as import("../../src/application/pipeline-contracts").Attempt[]
       ).find((a) => a.stage === "implement")?.storyId,
     ).toBe("A");
   } finally {
@@ -460,8 +463,8 @@ test("replan migrates completed checkpoints and active baseline without resettin
 test.each(["pause", "cancel"] as const)(
   "%s feature stops its active child and retains completed checkpoints",
   async (kind) => {
-    const { runWorker } = await import("../../src/worker/engine"),
-      { unavailableHandlers } = await import("../../src/worker/stages");
+    const { runWorker } = await import("../../src/bootstrap/worker"),
+      { unavailableHandlers } = await import("../../src/bootstrap/stages");
     const { store, task } = fixture();
     const stop = new AbortController();
     let began = false;
@@ -565,7 +568,7 @@ test.each(["pause", "cancel"] as const)(
   },
 );
 test("separate coordinator cannot prepare without current plan approval", async () => {
-  const { createHandlers } = await import("../../src/worker/stages");
+  const { createHandlers } = await import("../../src/bootstrap/stages");
   const { store, task } = fixture();
   try {
     store.putRecord("repository", task.repositoryId, {
@@ -583,7 +586,7 @@ test("separate coordinator cannot prepare without current plan approval", async 
     await expect(
       createHandlers(
         store,
-        {} as import("../../src/codex/types").AgentClient,
+        {} as import("../../src/infrastructure/codex/types").AgentClient,
         "/private/tmp",
       ).prepare(task, new AbortController().signal),
     ).rejects.toThrow("plan_not_approved");

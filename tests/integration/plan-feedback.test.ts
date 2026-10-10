@@ -1,9 +1,9 @@
-import { StoryService } from "../../src/application/story-service";
-import { PlanService } from "../../src/application/plan-service";
-import { gitText as readStoryGit } from "../../src/repositories/inspect";
-import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/repositories/fingerprint";
+import { StoryService } from "../support/services";
+import { PlanService } from "../support/services";
+import { gitText as readStoryGit } from "../../src/infrastructure/repositories/inspect";
+import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/infrastructure/repositories/fingerprint";
 import { test, expect } from "vitest";
-import { openStore } from "../../src/storage/store";
+import { openStore } from "../../src/infrastructure/persistence/store";
 import { taskFixture, planFixture } from "../support/task-fixture";
 
 test("versioned comments revise the plan without resetting worktree or repair budget", () => {

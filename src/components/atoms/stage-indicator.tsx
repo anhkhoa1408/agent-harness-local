@@ -1,4 +1,4 @@
-import type { StageNode } from "@/core/pipeline-progress";
+import type { StageNode } from "@/domain/pipeline-progress";
 import { cn } from "@/lib/utils";
 export function StageIndicator({
   state,

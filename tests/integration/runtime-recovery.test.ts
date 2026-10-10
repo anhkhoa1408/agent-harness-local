@@ -1,6 +1,7 @@
+import { createRepositories } from "../../src/infrastructure/persistence/repositories";
 import { test, expect } from "vitest";
-import { openStore } from "../../src/storage/store";
-import { restoreInterruptedTasks } from "../../src/worker/recover-state";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { restoreInterruptedTasks } from "../../src/application/pipeline/recover-state";
 import { taskFixture } from "../support/task-fixture";
 
 test.each(["running", "blocked"] as const)(
@@ -31,7 +32,7 @@ test.each(["running", "blocked"] as const)(
         status: "completed",
         output: { summary: "done" },
       });
-      restoreInterruptedTasks(store, "same-boot");
+      restoreInterruptedTasks(createRepositories(store), "same-boot");
       expect(
         (store.listRecords("attempt") as { status: string }[]).filter(
           (a) => a.status === "running",

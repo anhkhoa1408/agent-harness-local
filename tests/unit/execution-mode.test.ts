@@ -1,6 +1,9 @@
 import { test, expect } from "vitest";
-import { SettingsSchema } from "../../src/server/http";
-import { TaskSchema, ControlCommandSchema } from "../../src/core/contracts";
+import { SettingsSchema } from "../../src/bootstrap/http";
+import {
+  TaskSchema,
+  ControlCommandSchema,
+} from "../../src/infrastructure/validation/contracts";
 import { taskFixture } from "../support/task-fixture";
 test("old settings and tasks remain manual; modes and feedback command kinds are validated", () => {
   expect(SettingsSchema.parse({}).executionMode).toBe("manual");

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { StorySelection } from "@/core/contracts";
+import type { StorySelection } from "@/presentation/dto";
 import { StoryPicker, validStorySelection } from "./task-stories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";

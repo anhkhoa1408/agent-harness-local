@@ -4,9 +4,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture } from "../support/task-fixture";
-import { gitText, inspectRepository } from "../../src/repositories/inspect";
-import { prepareWorktree } from "../../src/repositories/worktree";
-import { synchronizeBase } from "../../src/repositories/prepare-base";
+import {
+  gitText,
+  inspectRepository,
+} from "../../src/infrastructure/repositories/inspect";
+import { prepareWorktree } from "../../src/infrastructure/repositories/worktree";
+import { synchronizeBase } from "../../src/infrastructure/repositories/prepare-base";
 
 async function fixture(diverge = false) {
   const origin = await createTempRepo({

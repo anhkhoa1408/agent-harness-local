@@ -2,8 +2,11 @@ import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { agentProfiles, selectSpecialist } from "../../src/context/agents";
-import { contentHash } from "../../src/context/rules";
+import {
+  agentProfiles,
+  selectSpecialist,
+} from "../../src/infrastructure/context/agents";
+import { contentHash } from "../../src/infrastructure/context/rules";
 test("stack selection uses manifest evidence and unknown stacks stay generic", () => {
   expect(
     selectSpecialist([

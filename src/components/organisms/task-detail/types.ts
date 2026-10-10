@@ -7,10 +7,10 @@ import type {
   Task,
   StoryRun,
   StoryExecution,
-} from "@/core/contracts";
-import type { StageNode } from "@/core/pipeline-progress";
-import type { CheckResult } from "@/execution/checks";
-import type { Delivery } from "@/delivery/github";
+} from "@/presentation/dto";
+import type { StageNode } from "@/domain/pipeline-progress";
+import type { CheckResult } from "@/domain/evidence";
+import type { Delivery } from "@/presentation/dto";
 
 export type TaskDetailData = {
   task: Task;

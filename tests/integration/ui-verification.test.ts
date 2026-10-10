@@ -1,20 +1,23 @@
+import { createRepositories } from "../../src/infrastructure/persistence/repositories";
+import { verificationIO } from "../../src/infrastructure/execution/verification";
+import { validation } from "../../src/infrastructure/validation/gateway";
 import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { gitText } from "../../src/repositories/inspect";
-import { runChecks } from "../../src/execution/checks";
+import { gitText } from "../../src/infrastructure/repositories/inspect";
+import { runChecks } from "../../src/bootstrap/verification";
 import {
   collectScreenshots,
   visualChecks,
   verifyImageEvidence,
-} from "../../src/execution/ui-verification";
-import { acceptanceErrors, validatePlan } from "../../src/core/acceptance";
-import { createVerifyHandler } from "../../src/worker/handlers/verify";
-import type { StageHandlerContext } from "../../src/worker/handler-context";
-import { openStore } from "../../src/storage/store";
+} from "../../src/infrastructure/execution/ui-verification";
+import { acceptanceErrors, validatePlan } from "../../src/domain/acceptance";
+import { createVerifyHandler } from "../../src/application/pipeline/handlers/verify";
+import type { StageHandlerContext } from "../../src/application/pipeline/context";
+import { openStore } from "../../src/infrastructure/persistence/store";
 
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=";
@@ -66,7 +69,9 @@ test("visual reviewer receives an explicit boundary for behavior that static ima
     };
     let instruction = "";
     const handler = createVerifyHandler({
-      store,
+      validation,
+      store: createRepositories(store),
+      verificationIO,
       artifacts: () => dir,
       planOf: () => p,
       fingerprint: async () =>

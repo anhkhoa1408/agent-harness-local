@@ -8,7 +8,7 @@ import {
   inspectRepository,
   sourceDocuments,
   withSourceSnapshot,
-} from "../../src/repositories/inspect";
+} from "../../src/infrastructure/repositories/inspect";
 test("planning snapshot preserves committed bytes instead of dirty local rules", async () => {
   const f = await createTempRepo({
     "AGENTS.md": "  committed rule\n",

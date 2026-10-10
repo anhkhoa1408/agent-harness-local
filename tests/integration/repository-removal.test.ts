@@ -2,15 +2,18 @@ import { test, expect } from "vitest";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../src/storage/store";
-import { createHttpHandler } from "../../src/server/http";
-import { bootstrapSession } from "../../src/server/local-session";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createHttpHandler } from "../../src/bootstrap/http";
+import { bootstrapSession } from "../../src/bootstrap/session";
 import { taskFixture } from "../support/task-fixture";
-import { TaskService } from "../../src/application/task-service";
-import { inspectRepository, gitText } from "../../src/repositories/inspect";
+import { TaskService } from "../support/services";
+import {
+  inspectRepository,
+  gitText,
+} from "../../src/infrastructure/repositories/inspect";
 import { createTempRepo } from "../support/temp-repo";
-import { runWorker } from "../../src/worker/engine";
-import { stages } from "../../src/core/contracts";
+import { runWorker } from "../../src/bootstrap/worker";
+import { stages } from "../../src/domain/contracts";
 
 async function fixture() {
   const data = await mkdtemp(join(tmpdir(), "repository-removal-"));

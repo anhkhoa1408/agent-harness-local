@@ -11,10 +11,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { inspectRepository } from "../../src/repositories/inspect";
-import { prepareWorktree } from "../../src/repositories/worktree";
-import { fingerprintWorktree } from "../../src/repositories/fingerprint";
-import { gitText } from "../../src/repositories/inspect";
+import { inspectRepository } from "../../src/infrastructure/repositories/inspect";
+import { prepareWorktree } from "../../src/infrastructure/repositories/worktree";
+import { fingerprintWorktree } from "../../src/infrastructure/repositories/fingerprint";
+import { gitText } from "../../src/infrastructure/repositories/inspect";
 test("fingerprint survives staging and committing a deletion or rename", async () => {
   const f = await createTempRepo({ "old.js": "original", "gone.js": "delete" });
   try {
@@ -31,8 +31,8 @@ test("fingerprint survives staging and committing a deletion or rename", async (
     await f.dispose();
   }
 });
-import { runProcess } from "../../src/execution/process";
-import { runChecks } from "../../src/execution/checks";
+import { runProcess } from "../../src/infrastructure/execution/process";
+import { runChecks } from "../../src/bootstrap/verification";
 test("isolates dirty source, retries same worktree, fingerprints untracked and ignored tracked files", async () => {
   const f = await createTempRepo({
       "app.js": "original",

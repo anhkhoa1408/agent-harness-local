@@ -4,13 +4,19 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { aiStages, type Plan } from "../../src/core/contracts";
-import { openStore } from "../../src/storage/store";
-import { createHandlers } from "../../src/worker/stages";
-import { failureEvidence } from "../../src/execution/failure-evidence";
-import type { CheckResult } from "../../src/core/evidence";
-import { gitText, inspectRepository } from "../../src/repositories/inspect";
-import type { AgentClient, AgentInput } from "../../src/codex/client";
+import { aiStages, type Plan } from "../../src/domain/contracts";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createHandlers } from "../../src/bootstrap/stages";
+import { failureEvidence } from "../../src/infrastructure/execution/failure-evidence";
+import type { CheckResult } from "../../src/domain/evidence";
+import {
+  gitText,
+  inspectRepository,
+} from "../../src/infrastructure/repositories/inspect";
+import type {
+  AgentClient,
+  AgentInput,
+} from "../../src/infrastructure/codex/client";
 
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3ioAAAAASUVORK5CYII=";
@@ -350,7 +356,7 @@ test("delivery excludes generated screenshots from source diff but rechecks froz
     const checks = f.store.getRecord(
       "checks",
       f.task.id,
-    ) as import("../../src/core/evidence").CheckResult[];
+    ) as import("../../src/domain/evidence").CheckResult[];
     f.store.putRecord("review", f.task.id, {
       taskId: f.task.id,
       fingerprint: checks[0].fingerprint,

@@ -1,4 +1,0 @@
-export const DATABASE_BUSY_TIMEOUT_MS = 5_000;
-export const EVENT_PAGE_SIZE = 500;
-export const BRANCH_SLUG_CHARACTERS = 40;
-export const BRANCH_ID_PREFIX_CHARACTERS = 8;

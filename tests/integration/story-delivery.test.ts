@@ -1,22 +1,26 @@
-import { StoryService } from "../../src/application/story-service";
+import { StoryService } from "../support/services";
 
-import { gitText as readStoryGit } from "../../src/repositories/inspect";
-import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/repositories/fingerprint";
+import { gitText as readStoryGit } from "../../src/infrastructure/repositories/inspect";
+import { fingerprintWorktree as fingerprintStoryWorktree } from "../../src/infrastructure/repositories/fingerprint";
 import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore } from "../../src/storage/store";
+import { openStore } from "../../src/infrastructure/persistence/store";
 import { createTempRepo } from "../support/temp-repo";
 import { taskFixture } from "../support/task-fixture";
 import { storiesPlan } from "../support/story-fixture";
-import { createStoryCheckpoint } from "../../src/delivery/checkpoint";
-import { createDelivery } from "../../src/delivery/github";
-import { fingerprintWorktree } from "../../src/repositories/fingerprint";
-import { gitText, inspectRepository } from "../../src/repositories/inspect";
-import { createHandlers } from "../../src/worker/stages";
-import { aiStages, StorySelectionSchema } from "../../src/core/contracts";
-import type { AgentClient } from "../../src/codex/client";
+import { createStoryCheckpoint } from "../../src/bootstrap/delivery";
+import { createDelivery } from "../../src/bootstrap/delivery";
+import { fingerprintWorktree } from "../../src/infrastructure/repositories/fingerprint";
+import {
+  gitText,
+  inspectRepository,
+} from "../../src/infrastructure/repositories/inspect";
+import { createHandlers } from "../../src/bootstrap/stages";
+import { StorySelectionSchema } from "../../src/infrastructure/validation/contracts";
+import { aiStages } from "../../src/domain/contracts";
+import type { AgentClient } from "../../src/infrastructure/codex/client";
 async function fixture() {
   const f = await createTempRepo({
       "app.js": "original",
@@ -96,7 +100,7 @@ async function fixture() {
           findings: [],
           criteria: context.plan.criteria.map(
             (
-              c: import("../../src/core/contracts").Plan["criteria"][number],
+              c: import("../../src/domain/contracts").Plan["criteria"][number],
             ) => ({
               id: c.id,
               passed: true,

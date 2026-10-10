@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
-import { aiStages, type ModelMap } from "@/core/contracts";
-import { stageEffort, type ModelInfo } from "@/core/model-policy";
+import { aiStages, type ModelMap } from "../../domain/contracts";
+import { stageEffort, type ModelInfo } from "@/domain/model-policy";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/molecules/form-field";

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import type { Repository } from "@/core/contracts";
-import type { TaskWithProgress } from "@/core/pipeline-progress";
+import type { Repository } from "@/presentation/dto";
+import type { TaskWithProgress } from "@/domain/pipeline-progress";
 import { FeedbackMessage } from "@/components/molecules/feedback-message";
 import { Button } from "@/components/ui/button";
 import {

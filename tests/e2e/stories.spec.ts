@@ -54,14 +54,14 @@ test("shared PR selection, dependency validation, checkpoint pause, resume and c
   expect(detail.stories.runs).toHaveLength(2);
   expect(
     detail.stories.runs.every(
-      (r: import("../../src/core/contracts").StoryRun) =>
+      (r: import("../../src/domain/contracts").StoryRun) =>
         r.commit && r.state === "completed",
     ),
   ).toBe(true);
   expect(
     new Set(
       detail.stories.runs.map(
-        (r: import("../../src/core/contracts").StoryRun) => r.commit,
+        (r: import("../../src/domain/contracts").StoryRun) => r.commit,
       ),
     ).size,
   ).toBe(2);
@@ -173,7 +173,7 @@ test("interruption in second story retains first checkpoint and resume completes
   ).json();
   expect(
     detail.stories.runs.every(
-      (r: import("../../src/core/contracts").StoryRun) =>
+      (r: import("../../src/domain/contracts").StoryRun) =>
         r.state === "completed",
     ),
   ).toBe(true);

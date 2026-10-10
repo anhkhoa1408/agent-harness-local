@@ -2,9 +2,9 @@ import { test, expect } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { openStore } from "../../src/storage/store";
-import { createHttpHandler } from "../../src/server/http";
-import { bootstrapSession } from "../../src/server/local-session";
+import { openStore } from "../../src/infrastructure/persistence/store";
+import { createHttpHandler } from "../../src/bootstrap/http";
+import { bootstrapSession } from "../../src/bootstrap/session";
 
 test("screenshot artifact serves PNG bytes through authenticated local endpoint", async () => {
   const dir = await mkdtemp(join(tmpdir(), "screenshot-http-")),

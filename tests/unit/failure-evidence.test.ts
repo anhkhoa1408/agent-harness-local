@@ -2,7 +2,7 @@ import { test, expect } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { failureEvidence } from "../../src/execution/failure-evidence";
+import { failureEvidence } from "../../src/infrastructure/execution/failure-evidence";
 
 test("repair receives only failing checks and bounded tails of logs, preserving image pointers", async () => {
   const dir = await mkdtemp(join(tmpdir(), "failure-evidence-"));

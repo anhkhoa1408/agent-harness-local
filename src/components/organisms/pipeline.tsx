@@ -1,4 +1,4 @@
-import type { StageNode } from "@/core/pipeline-progress";
+import type { StageNode } from "@/domain/pipeline-progress";
 import { stageLabel } from "@/lib/api";
 import { StageIndicator } from "@/components/atoms/stage-indicator";
 import { cn } from "@/lib/utils";

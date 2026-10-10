@@ -1,4 +1,4 @@
-import { connectCodex } from "../src/codex/client";
+import { connectCodex } from "../src/infrastructure/codex/client";
 const args = process.argv.slice(2);
 const value = (flag: string) => args[args.indexOf(flag) + 1];
 const client = await connectCodex();

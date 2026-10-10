@@ -1,7 +1,7 @@
 import { test, expect } from "vitest";
 import { taskFixture, planFixture } from "../support/task-fixture";
-import { canDeliver } from "../../src/core/acceptance";
-import { nextAfterReview } from "../../src/core/transitions";
+import { canDeliver } from "../../src/domain/acceptance";
+import { nextAfterReview } from "../../src/domain/transitions";
 const task = taskFixture({ approvedPlanVersion: 1 }),
   plan = planFixture(),
   check = {
