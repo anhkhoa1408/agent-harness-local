@@ -2,6 +2,7 @@ import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode } from "../constants/index";
 import { WorkerLease } from "../../domain/constants/worker-lease";
 import { TaskStatus } from "../../domain/constants/task-status";
+import type { Attempt } from "../pipeline-contracts";
 import type { Task } from "../../domain/contracts";
 import type { ApplicationStore, ApprovalRecord } from "../ports";
 import type { StoryService } from "../stories";
@@ -37,10 +38,17 @@ export class DashboardService {
     return this.store.tasks.get(id);
   }
   tasks() {
-    const attempts = this.store.attempts.list();
-    return this.store.tasks
-      .list()
-      .map((task) => ({ ...task, pipeline: pipelineProgress(task, attempts) }));
+    const attemptsByTask = new Map<string, Attempt[]>();
+    for (const attempt of this.store.attempts.list()) {
+      const { taskId } = attempt;
+      const attempts = attemptsByTask.get(taskId);
+      if (attempts) attempts.push(attempt);
+      else attemptsByTask.set(taskId, [attempt]);
+    }
+    return this.store.tasks.list().map((task) => ({
+      ...task,
+      pipeline: pipelineProgress(task, attemptsByTask.get(task.id) ?? []),
+    }));
   }
   events(taskId: string, after: number) {
     return this.store.events.list(taskId, after);
