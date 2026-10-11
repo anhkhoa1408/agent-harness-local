@@ -1,3 +1,4 @@
+import { StoryRunState } from "../../domain/constants/story-run-state";
 import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import { TaskStatus } from "../../domain/constants/task-status";
@@ -188,7 +189,7 @@ export class StoryService {
     return store.atomic(() => {
       store.storyRuns.put(storyKey(run), {
         ...run,
-        state: TaskStatus.COMPLETED,
+        state: StoryRunState.COMPLETED,
         ...checkpoint,
         updatedAt: this.runtime.now(),
       });

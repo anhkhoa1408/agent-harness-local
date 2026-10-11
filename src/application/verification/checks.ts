@@ -1,3 +1,5 @@
+import { TaskReason } from "../../domain/constants/task-reason";
+import { CheckStatus } from "../../domain/constants/check-status";
 import { errorMessage } from "../utils/index";
 import { ApplicationErrorCode } from "../constants/index";
 import { evidenceExclusions } from "../../domain/evidence";
@@ -54,7 +56,8 @@ export async function runChecks(
         exitCode,
         evidencePath: report ?? evidencePath,
         stderrPath: run.stderrPath,
-        reason: status === "passed" ? null : "check_evidence_unsatisfied",
+        reason:
+          status === CheckStatus.PASSED ? null : "check_evidence_unsatisfied",
       });
     } catch (error) {
       results.push({
@@ -62,7 +65,7 @@ export async function runChecks(
         taskId: task.id,
         planVersion: plan.version,
         fingerprint,
-        status: commandFailed ? "failed" : "blocked",
+        status: commandFailed ? CheckStatus.FAILED : CheckStatus.BLOCKED,
         executed: null,
         exitCode,
         evidencePath,
@@ -76,8 +79,8 @@ export async function runChecks(
   if ((await io.fingerprint(root, excluded, task.sourceCommit)) !== fingerprint)
     return results.map((r) => ({
       ...r,
-      status: "blocked",
-      reason: "source_changed_during_tests",
+      status: CheckStatus.BLOCKED,
+      reason: TaskReason.SOURCE_CHANGED_DURING_TESTS,
     }));
   return results;
 }

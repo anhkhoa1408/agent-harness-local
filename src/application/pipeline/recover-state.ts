@@ -1,3 +1,5 @@
+import { TaskReason } from "../../domain/constants/task-reason";
+import { AttemptStatus } from "../../domain/constants/attempt-status";
 import { TaskStatus } from "../../domain/constants/task-status";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import type { ApplicationStore } from "../ports";
@@ -10,10 +12,10 @@ export function restoreInterruptedTasks(
 ) {
   // The previous worker's attempts ended; agent/process safety still uses exclusions below.
   for (const attempt of store.attempts.list() as Attempt[])
-    if (attempt.status === TaskStatus.RUNNING)
+    if (attempt.status === AttemptStatus.RUNNING)
       store.attempts.put(attempt.id, {
         ...attempt,
-        status: TaskStatus.INTERRUPTED,
+        status: AttemptStatus.INTERRUPTED,
         output: { error: "worker_restart_runtime_unknown" },
       });
   // Unknown runtimes survive process death. An explicit reconciliation is required before reuse.
@@ -55,7 +57,10 @@ export function restoreInterruptedTasks(
           store.tasks.update(
             task.id,
             task.revision,
-            { status: TaskStatus.PAUSED, reason: "host_restart_confirmed" },
+            {
+              status: TaskStatus.PAUSED,
+              reason: TaskReason.HOST_RESTART_CONFIRMED,
+            },
             event(EventType.RECOVERY_STOPPED),
           );
       });

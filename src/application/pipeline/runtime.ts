@@ -1,3 +1,6 @@
+import { StoryRunState } from "../../domain/constants/story-run-state";
+import { AttemptStatus } from "../../domain/constants/attempt-status";
+import { TaskReason } from "../../domain/constants/task-reason";
 import { WorkerLease } from "../../domain/constants/worker-lease";
 import {
   ApplicationErrorCode,
@@ -97,7 +100,7 @@ export class WorkerRuntime {
             (t) =>
               t.splitIntoStories &&
               t.status === TaskStatus.BLOCKED &&
-              t.reason === "story_running",
+              t.reason === TaskReason.STORY_RUNNING,
           ))
           await storyService.reconcileFeatureStories(feature.id, signal);
         if (!this.active && !store.exclusions.list().length) {
@@ -121,7 +124,7 @@ export class WorkerRuntime {
                 next.sourceCommit,
               stage: next.stage,
               leaseEpoch: lease.epoch,
-              status: TaskStatus.RUNNING,
+              status: AttemptStatus.RUNNING,
               output: null,
               model:
                 applyEffortPolicy(next.models)[
@@ -163,7 +166,7 @@ export class WorkerRuntime {
             )
               store.storyRuns.put(storyKey(run), {
                 ...run,
-                state: TaskStatus.RUNNING,
+                state: StoryRunState.RUNNING,
                 baselineCommit: attempt.baselineCommit!,
                 updatedAt: runtime.now(),
               });

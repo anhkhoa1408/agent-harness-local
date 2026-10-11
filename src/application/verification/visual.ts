@@ -1,3 +1,4 @@
+import { CheckStatus } from "../../domain/constants/check-status";
 import { ApplicationErrorCode } from "../constants/index";
 import type { Task, Plan, VisualReview } from "../../domain/contracts";
 import type { CheckResult } from "../../domain/evidence";
@@ -29,7 +30,7 @@ export function visualChecks(
       taskId: task.id,
       planVersion: plan.version,
       fingerprint,
-      status: finding.passed ? "passed" : "failed",
+      status: finding.passed ? CheckStatus.PASSED : CheckStatus.FAILED,
       executed: null,
       exitCode: null,
       evidencePath: shot.actual.path,

@@ -1,3 +1,4 @@
+import { TaskReason } from "../../../domain/constants/task-reason";
 import { planKey } from "../../../domain/utils/record-key";
 import { DomainErrorCode } from "../../../domain/constants/domain-error-code";
 import { PipelineStage } from "../../../domain/constants/pipeline-stage";
@@ -40,7 +41,7 @@ export function createPrepareHandler(
       return {
         stage: PipelineStage.PREPARE,
         status: TaskStatus.BLOCKED,
-        reason: "story_running",
+        reason: TaskReason.STORY_RUNNING,
         output: child,
       } as const;
     }
@@ -113,7 +114,7 @@ export function createPrepareHandler(
             approvedPlanVersion: null,
             stage: PipelineStage.DISCOVER,
             status: TaskStatus.QUEUED,
-            reason: "base_updated_requires_plan",
+            reason: TaskReason.BASE_UPDATED_REQUIRES_PLAN,
           },
           {
             type: EventType.BASE_SYNCHRONIZED,

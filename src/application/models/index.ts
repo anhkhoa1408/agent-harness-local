@@ -1,3 +1,4 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
 import { ApplicationErrorCode } from "../constants/index";
 import {
   defaultModels,
@@ -10,9 +11,9 @@ import {
   type AiStage,
   type ModelMap,
   type ModelChoice,
-  type ExecutionMode,
+  type ExecutionMode as ExecutionModeType,
 } from "../../domain/contracts";
-export type Settings = { models: ModelMap; executionMode: ExecutionMode };
+export type Settings = { models: ModelMap; executionMode: ExecutionModeType };
 export interface ModelCatalogPort {
   listModels(): Promise<ModelInfo[]>;
 }
@@ -29,7 +30,7 @@ export class ModelService {
     const stored = this.settings.get();
     return {
       models: stored ? applyEffortPolicy(stored.models) : defaultModels(),
-      executionMode: stored?.executionMode ?? "manual",
+      executionMode: stored?.executionMode ?? ExecutionMode.MANUAL,
     };
   }
   async saveSettings(value: Settings) {

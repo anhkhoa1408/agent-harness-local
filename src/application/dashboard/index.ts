@@ -1,3 +1,4 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
 import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode } from "../constants/index";
 import { WorkerLease } from "../../domain/constants/worker-lease";
@@ -20,7 +21,7 @@ function isPendingApproval(
 ): task is Task {
   return (
     task?.status === TaskStatus.RUNNING &&
-    task.executionMode !== "auto" &&
+    task.executionMode !== ExecutionMode.AUTO &&
     !approval.decision
   );
 }

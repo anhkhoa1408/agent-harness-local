@@ -1,3 +1,5 @@
+import { StoryRunState } from "../../domain/constants/story-run-state";
+import { TaskReason } from "../../domain/constants/task-reason";
 import { planKey } from "../../domain/utils/record-key";
 import { TaskStatus } from "../../domain/constants/task-status";
 import { ApplicationErrorCode, EventType } from "../constants/index";
@@ -158,7 +160,7 @@ export async function reconcileFeatureStories(
   const e = stories.getExecution(featureId);
   if (
     e?.selection.mode !== "separate_pr" ||
-    task.reason !== "story_running" ||
+    task.reason !== TaskReason.STORY_RUNNING ||
     task.status !== TaskStatus.BLOCKED
   )
     return;
@@ -175,7 +177,7 @@ export async function reconcileFeatureStories(
       if (child.status === TaskStatus.COMPLETED && delivery) {
         store.storyRuns.put(storyKey(run), {
           ...run,
-          state: TaskStatus.COMPLETED,
+          state: StoryRunState.COMPLETED,
           commit: delivery.commit,
           prUrl: delivery.prUrl,
           checkpointPath: delivery.reportPath,
@@ -219,9 +221,9 @@ export async function reconcileFeatureStories(
         store.storyRuns.put(storyKey(run), {
           ...run,
           state:
-            child.status === TaskStatus.INTERRUPTED
-              ? TaskStatus.INTERRUPTED
-              : TaskStatus.BLOCKED,
+            child.status === StoryRunState.INTERRUPTED
+              ? StoryRunState.INTERRUPTED
+              : StoryRunState.BLOCKED,
           updatedAt: runtime.now(),
         });
         store.tasks.update(

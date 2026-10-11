@@ -1,3 +1,4 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
 import { EventType, WorkerTiming } from "../constants/index";
 import type { ApplicationStore } from "../ports";
 import type { RuntimePort } from "../runtime";
@@ -33,7 +34,7 @@ export class ApprovalBroker {
   }
   handleRequest(request: Extract<AgentEvent, { type: "approval" }>["data"]) {
     const { store, client, task } = this;
-    if (task.executionMode === "auto") {
+    if (task.executionMode === ExecutionMode.AUTO) {
       void client.respondToApproval(request.requestId, { decision: "decline" });
       store.events.add(task.id, EventType.APPROVAL_AUTO_DECLINED, {
         method: request.method,

@@ -1,3 +1,5 @@
+import { AttemptStatus } from "../../domain/constants/attempt-status";
+import { StoryRunState } from "../../domain/constants/story-run-state";
 import { errorMessage } from "../utils/index";
 import {
   ApplicationErrorCode,
@@ -49,7 +51,7 @@ export async function executeStageAttempt(
         .find((r) => r.storyId === attempt.storyId);
       if (
         run &&
-        run.state !== TaskStatus.COMPLETED &&
+        run.state !== StoryRunState.COMPLETED &&
         (entry.stop ||
           [TaskStatus.BLOCKED, TaskStatus.INTERRUPTED, TaskStatus.PAUSED].some(
             (value) => value === result.status,
@@ -62,14 +64,14 @@ export async function executeStageAttempt(
             [TaskStatus.PAUSED, TaskStatus.INTERRUPTED].some(
               (value) => value === result.status,
             )
-              ? TaskStatus.INTERRUPTED
-              : TaskStatus.BLOCKED,
+              ? StoryRunState.INTERRUPTED
+              : StoryRunState.BLOCKED,
           updatedAt: runtime.now(),
         });
       store.attempts.put(attempt.id, {
         ...attempt,
         ...store.attempts.get(attempt.id),
-        status: TaskStatus.COMPLETED,
+        status: AttemptStatus.COMPLETED,
         output: result.output,
         nextStage: result.stage,
         nextStatus: entry.stop ?? result.status,
@@ -107,20 +109,20 @@ export async function executeStageAttempt(
       const run = storyService
         .listStoryRuns(next.featureId ?? next.id)
         .find((r) => r.storyId === attempt.storyId);
-      if (run && run.state !== TaskStatus.COMPLETED)
+      if (run && run.state !== StoryRunState.COMPLETED)
         store.storyRuns.put(storyKey(run), {
           ...run,
           state: abort.signal.aborted
-            ? TaskStatus.INTERRUPTED
-            : TaskStatus.BLOCKED,
+            ? StoryRunState.INTERRUPTED
+            : StoryRunState.BLOCKED,
           updatedAt: runtime.now(),
         });
       store.attempts.put(attempt.id, {
         ...attempt,
         ...store.attempts.get(attempt.id),
         status: abort.signal.aborted
-          ? TaskStatus.INTERRUPTED
-          : TaskStatus.FAILED,
+          ? AttemptStatus.INTERRUPTED
+          : AttemptStatus.FAILED,
         output: { error: message },
       });
       store.tasks.update(

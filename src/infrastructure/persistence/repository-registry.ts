@@ -1,3 +1,4 @@
+import { TaskReason } from "../../domain/constants/task-reason";
 import { ApplicationErrorCode } from "../../application/constants/index";
 import type { DatabaseSync } from "node:sqlite";
 import { transaction } from "./database";
@@ -37,7 +38,7 @@ export function createRepositoryRegistry(db: DatabaseSync) {
             exclusion ||
             activeCommand ||
             (latestAttempt?.status === "running" &&
-              state.reason !== "host_restart_confirmed")
+              state.reason !== TaskReason.HOST_RESTART_CONFIRMED)
           )
             throw new Error(ApplicationErrorCode.REPOSITORY_BUSY);
         }

@@ -1,3 +1,4 @@
+import { TaskReason } from "./constants/task-reason";
 import { PipelineStage } from "./constants/pipeline-stage";
 import { DomainErrorCode } from "./constants/domain-error-code";
 import { TaskStatus } from "./constants/task-status";
@@ -52,7 +53,7 @@ export function nextAfterReview(
     return {
       stage: PipelineStage.REVIEW,
       status: TaskStatus.WAITING_INPUT,
-      reason: "review_dispute",
+      reason: TaskReason.REVIEW_DISPUTE,
       repairCount: task.repairCount,
     };
   if (review.verdict === "pass")

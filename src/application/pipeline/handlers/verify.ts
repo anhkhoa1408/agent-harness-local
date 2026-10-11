@@ -1,3 +1,4 @@
+import { CheckStatus } from "../../../domain/constants/check-status";
 import { errorMessage } from "../../utils/index";
 import { DomainErrorCode } from "../../../domain/constants/domain-error-code";
 import { TaskStatus } from "../../../domain/constants/task-status";
@@ -44,7 +45,7 @@ export function createVerifyHandler(
     if (failures.length) {
       const blocked = checks.find(
         (c) =>
-          c.status === TaskStatus.BLOCKED &&
+          c.status === CheckStatus.BLOCKED &&
           failures.some((s) => s.id === c.id),
       );
       if (blocked)

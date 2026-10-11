@@ -1,3 +1,4 @@
+import { TaskReason } from "../../domain/constants/task-reason";
 import { TaskStatus } from "../../domain/constants/task-status";
 import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import { stages, type Task } from "../../domain/contracts";
@@ -18,7 +19,7 @@ export function unavailableHandlers(): Handlers {
       async () => ({
         stage,
         status: TaskStatus.BLOCKED,
-        reason: "capability_unavailable",
+        reason: TaskReason.CAPABILITY_UNAVAILABLE,
         output: null,
       }),
     ]),

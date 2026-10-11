@@ -1,3 +1,4 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
 import { ValidationLimits } from "../../domain/constants/validation-limits";
 import {
   stages,
@@ -20,7 +21,7 @@ export const ModelMapSchema = z.object(
     typeof ModelChoiceSchema
   >,
 );
-export const ExecutionModeSchema = z.enum(["manual", "auto"]);
+export const ExecutionModeSchema = z.enum(ExecutionMode.ALL);
 export const NewTaskSchema = z.object({
   splitIntoStories: z.boolean().optional(),
   featureId: z.string().optional(),

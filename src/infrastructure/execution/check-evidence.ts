@@ -1,3 +1,4 @@
+import { CheckStatus } from "../../domain/constants/check-status";
 import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { Parser } from "tap-parser";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
@@ -49,7 +50,7 @@ export async function parseEvidence(
           executed++;
           if (c && typeof c === "object") {
             if ("failure" in c || "error" in c) failed++;
-            if ("skipped" in c) skipped++;
+            if (CheckStatus.SKIPPED in c) skipped++;
           }
         }
       } else walk(v);

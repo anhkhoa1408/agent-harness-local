@@ -1,3 +1,5 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
+import { CodexPermissions } from "./constants/codex-permissions";
 import { CodexRpcMethod } from "./constants/codex-rpc-method";
 import { CodexLimits } from "./constants/codex-limits";
 import { CodexErrorCode } from "./constants/codex-error-code";
@@ -98,8 +100,13 @@ export class CodexClient implements AgentClient {
         ...(input.threadId ? { threadId: input.threadId } : {}),
         cwd: input.cwd,
         model: input.model.model,
-        sandbox: input.write ? "workspace-write" : "read-only",
-        approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
+        sandbox: input.write
+          ? CodexPermissions.SANDBOX_WORKSPACE_WRITE
+          : CodexPermissions.SANDBOX_READ_ONLY,
+        approvalPolicy:
+          input.executionMode === ExecutionMode.AUTO
+            ? CodexPermissions.APPROVAL_NEVER
+            : CodexPermissions.APPROVAL_ON_REQUEST,
         developerInstructions: input.instructions,
       },
     );

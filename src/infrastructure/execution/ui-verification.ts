@@ -1,3 +1,4 @@
+import { PngHeader } from "./constants/png-header";
 import { contentHash } from "../utils/content-hash";
 import { contained } from "../utils/contained-path";
 import { ExecutionErrorCode } from "./constants/execution-error-code";
@@ -41,14 +42,22 @@ async function png(path: string) {
     throw new Error(ExecutionErrorCode.UI_IMAGE_TOO_LARGE);
   const data = await readFile(path);
   if (
-    data.length < 24 ||
+    data.length < PngHeader.MINIMUM_BYTES ||
     !data
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-    data.toString("ascii", 12, 16) !== "IHDR"
+      .subarray(0, PngHeader.SIGNATURE.length)
+      .equals(Buffer.from(PngHeader.SIGNATURE)) ||
+    data.toString(
+      "ascii",
+      PngHeader.CHUNK_TYPE_START,
+      PngHeader.CHUNK_TYPE_END,
+    ) !== PngHeader.CHUNK_TYPE
   )
     throw new Error(ExecutionErrorCode.UI_INVALID_PNG);
-  return { data, width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+  return {
+    data,
+    width: data.readUInt32BE(PngHeader.WIDTH_OFFSET),
+    height: data.readUInt32BE(PngHeader.HEIGHT_OFFSET),
+  };
 }
 export async function collectScreenshots(
   task: Task,

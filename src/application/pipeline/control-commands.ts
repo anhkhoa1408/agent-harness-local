@@ -1,3 +1,5 @@
+import { TaskReason } from "../../domain/constants/task-reason";
+import { StoryRunState } from "../../domain/constants/story-run-state";
 import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import { TaskStatus } from "../../domain/constants/task-status";
@@ -84,12 +86,12 @@ export function processControlCommand(
           );
         if (
           run &&
-          run.state !== TaskStatus.COMPLETED &&
+          run.state !== StoryRunState.COMPLETED &&
           run.state !== "pending"
         )
           store.storyRuns.put(storyKey(run), {
             ...run,
-            state: TaskStatus.INTERRUPTED,
+            state: StoryRunState.INTERRUPTED,
             updatedAt: runtime.now(),
           });
       }
@@ -225,7 +227,7 @@ export function processControlCommand(
         store.tasks.update(
           task.id,
           task.revision,
-          { status: TaskStatus.BLOCKED, reason: "story_running" },
+          { status: TaskStatus.BLOCKED, reason: TaskReason.STORY_RUNNING },
           event(EventType.TASK_RESUMED),
         );
       } else

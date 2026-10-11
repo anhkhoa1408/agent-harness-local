@@ -1,3 +1,5 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
+import { CodexPermissions } from "./constants/codex-permissions";
 import { waitForRetry } from "./utils/retry-delay";
 import { ApplicationErrorCode } from "../../application/constants/index";
 import { CodexRpcMethod } from "./constants/codex-rpc-method";
@@ -44,8 +46,13 @@ export class ParentAgentSession {
         cwd: input.cwd,
         runtimeWorkspaceRoots: [input.cwd],
         model: ModelDefaults.PARENT.model,
-        sandbox: input.write ? "workspace-write" : "read-only",
-        approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
+        sandbox: input.write
+          ? CodexPermissions.SANDBOX_WORKSPACE_WRITE
+          : CodexPermissions.SANDBOX_READ_ONLY,
+        approvalPolicy:
+          input.executionMode === ExecutionMode.AUTO
+            ? CodexPermissions.APPROVAL_NEVER
+            : CodexPermissions.APPROVAL_ON_REQUEST,
         developerInstructions: parentInstructions,
         config: {
           "features.multi_agent": true,
@@ -88,16 +95,22 @@ export class ParentAgentSession {
         cwd: input.cwd,
         model: ModelDefaults.PARENT.model,
         effort: ModelDefaults.PARENT.effort,
-        approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
+        approvalPolicy:
+          input.executionMode === ExecutionMode.AUTO
+            ? CodexPermissions.APPROVAL_NEVER
+            : CodexPermissions.APPROVAL_ON_REQUEST,
         sandboxPolicy: input.write
           ? {
-              type: "workspaceWrite",
+              type: CodexPermissions.SANDBOX_TYPE_WORKSPACE_WRITE,
               writableRoots: [input.cwd],
               networkAccess: false,
               excludeTmpdirEnvVar: false,
               excludeSlashTmp: false,
             }
-          : { type: "readOnly", networkAccess: false },
+          : {
+              type: CodexPermissions.SANDBOX_TYPE_READ_ONLY,
+              networkAccess: false,
+            },
       });
       // The settings acknowledgement can precede application to the loaded session.
       const deadline =

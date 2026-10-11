@@ -1,3 +1,4 @@
+import { CheckStatus } from "./constants/check-status";
 import { DomainErrorCode } from "./constants/domain-error-code";
 import { validateStories } from "./stories";
 import { type Plan, type Task, type Review } from "./contracts";
@@ -127,7 +128,7 @@ export function acceptanceErrors(
           c.taskId === task.id &&
           c.planVersion === plan.version &&
           c.fingerprint === fingerprint &&
-          c.status === "passed" &&
+          c.status === CheckStatus.PASSED &&
           c.evidencePath,
       )
     )
@@ -150,7 +151,7 @@ export function acceptanceErrors(
           c.taskId === task.id &&
           c.planVersion === plan.version &&
           c.fingerprint === fingerprint &&
-          c.status === "passed" &&
+          c.status === CheckStatus.PASSED &&
           c.evidencePath &&
           c.imageEvidence?.length,
       )

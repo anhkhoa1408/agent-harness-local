@@ -1,3 +1,4 @@
+import { ExecutionMode as ExecutionModeValue } from "./constants/execution-mode";
 import { PipelineStage } from "./constants/pipeline-stage";
 import { TaskStatus } from "./constants/task-status";
 export const stages = PipelineStage.ALL;
@@ -31,7 +32,7 @@ export type Task = NewTask & {
   updatedAt: number;
 };
 
-export type ExecutionMode = "manual" | "auto";
+export type ExecutionMode = (typeof ExecutionModeValue.ALL)[number];
 export type NewTask = {
   repositoryId: string;
   title: string;

@@ -1,3 +1,4 @@
+import { AttemptStatus } from "./constants/attempt-status";
 import { PipelineStage } from "./constants/pipeline-stage";
 import { TaskStatus } from "./constants/task-status";
 import { stages, type Stage, type Status, type Task } from "./contracts";
@@ -86,7 +87,7 @@ export function pipelineProgress(
       output?.version != null &&
       task.approvedPlanVersion === output.version;
     if (
-      attempt.status === TaskStatus.COMPLETED &&
+      attempt.status === AttemptStatus.COMPLETED &&
       !needsWork &&
       (approvedPlan ||
         ![
@@ -99,7 +100,7 @@ export function pipelineProgress(
       current.state = "done";
       current.label = "Đã xong";
     } else if (
-      attempt.status === TaskStatus.FAILED ||
+      attempt.status === AttemptStatus.FAILED ||
       needsWork ||
       attempt.nextStatus === TaskStatus.BLOCKED
     ) {

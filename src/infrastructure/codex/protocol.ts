@@ -1,3 +1,5 @@
+import { CodexPermissions } from "./constants/codex-permissions";
+import { ExecutionMode } from "../../domain/constants/execution-mode";
 import { waitForRetry } from "./utils/retry-delay";
 import { CodexLimits } from "./constants/codex-limits";
 import { CodexRpcMethod } from "./constants/codex-rpc-method";
@@ -78,8 +80,13 @@ export function matchesAgentSettings(
     (!child || response.reasoningEffort === choice.effort) &&
     response.cwd === input.cwd &&
     response.approvalPolicy ===
-      (input.executionMode === "auto" ? "never" : "on-request") &&
-    response.sandbox?.type === (input.write ? "workspaceWrite" : "readOnly") &&
+      (input.executionMode === ExecutionMode.AUTO
+        ? CodexPermissions.APPROVAL_NEVER
+        : CodexPermissions.APPROVAL_ON_REQUEST) &&
+    response.sandbox?.type ===
+      (input.write
+        ? CodexPermissions.SANDBOX_TYPE_WORKSPACE_WRITE
+        : CodexPermissions.SANDBOX_TYPE_READ_ONLY) &&
     response.sandbox.networkAccess === false
   );
 }
