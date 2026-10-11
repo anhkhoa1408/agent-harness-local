@@ -14,3 +14,7 @@ Typed repositories và UnitOfWork giữ SQLite schema/record keys, synchronous t
 Chuyển từng lát cắt, dùng compatibility facade chỉ trong quá trình chuyển; cuối đợt xóa toàn bộ đường legacy. Policy là hàm; class dành cho state/lifecycle. Không thêm provider, DI framework, base service/repository, migration hoặc dual write.
 
 Kiểm chứng: dependency fixtures, model/settings/task behavior, typed persistence/rollback/fencing, agent packet/approval/cancel, crash recovery, verification/delivery, HTTP/E2E và native Codex smoke trong repo tạm. Runtime fixture không thay thế smoke thật.
+
+## Ngoại lệ constants được duyệt ngày 2026-10-11
+
+Theo yêu cầu refactor v2, constants dùng class chứa `static readonly`, constructor private và nằm trong thư mục `constants` của layer/module sở hữu. Quy tắc class dành cho state/lifecycle ở trên có thêm ngoại lệ này; policy vẫn là hàm. Giữ dependency hướng vào trong, HTTP/persistence/runtime contracts và toàn bộ giá trị hiện hành. Chi tiết trong [plan refactor v2](../plans/2026-10-11-backend-refactor-v2.md).
