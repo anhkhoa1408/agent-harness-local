@@ -1,7 +1,9 @@
-import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
+import { SessionLimits } from "../../application/sessions";
+import { contentHash } from "../utils/content-hash";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { SessionCryptoPort } from "../../application/sessions";
 export const sessionCrypto: SessionCryptoPort = {
-  token: () => randomBytes(32).toString("hex"),
-  hash: (value) => createHash("sha256").update(value).digest("hex"),
+  token: () => randomBytes(SessionLimits.TOKEN_BYTES).toString("hex"),
+  hash: contentHash,
   equal: (a, b) => timingSafeEqual(Buffer.from(a), Buffer.from(b)),
 };

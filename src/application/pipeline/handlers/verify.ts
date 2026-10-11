@@ -1,3 +1,4 @@
+import { errorMessage } from "../../utils/index";
 import { DomainErrorCode } from "../../../domain/constants/domain-error-code";
 import { TaskStatus } from "../../../domain/constants/task-status";
 import { PipelineStage } from "../../../domain/constants/pipeline-stage";
@@ -68,7 +69,7 @@ export function createVerifyHandler(
         return {
           stage: PipelineStage.VERIFY,
           status: TaskStatus.BLOCKED,
-          reason: `ui_evidence_missing:${error instanceof Error ? error.message : String(error)}`,
+          reason: `ui_evidence_missing:${errorMessage(error, String)}`,
           output: checks,
         };
       }

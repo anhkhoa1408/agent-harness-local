@@ -51,8 +51,8 @@ export function bootstrapSession(
   request: Request,
   sessions: SessionService,
 ): Response {
-  const host = request.headers.get("host") ?? "",
-    site = request.headers.get("sec-fetch-site");
+  const host = request.headers.get("host") ?? "";
+  const site = request.headers.get("sec-fetch-site");
   if (
     !validHost(host) ||
     request.headers.get("sec-fetch-mode") !== "navigate" ||

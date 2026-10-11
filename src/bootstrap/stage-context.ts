@@ -15,10 +15,10 @@ import {
 import { fingerprintWorktree } from "../infrastructure/repositories/fingerprint";
 import { createServices } from "./services";
 export function createStageContext(raw: Store, data: string) {
-  const services = createServices(raw, data),
-    store = services.store,
-    storyService = services.stories,
-    planService = services.plans;
+  const services = createServices(raw, data);
+  const store = services.store;
+  const storyService = services.stories;
+  const planService = services.plans;
   const artifacts = (task: Task) => {
     const e = storyService.getExecution(task.id);
     return e?.selection.mode === "shared_pr"

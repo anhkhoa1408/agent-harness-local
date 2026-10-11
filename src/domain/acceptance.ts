@@ -69,8 +69,8 @@ export function validatePlan(plan: Plan): string[] {
     )
       errors.push(`ui_path:${shot.id}`);
   }
-  const visited = new Set<string>(),
-    active = new Set<string>();
+  const visited = new Set<string>();
+  const active = new Set<string>();
   function visit(id: string) {
     if (active.has(id)) {
       errors.push("dependency_cycle");

@@ -1,10 +1,11 @@
+import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import { TaskStatus } from "../../domain/constants/task-status";
 import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import type { ValidationPort } from "../validation";
 import type { RuntimePort } from "../runtime";
-import { storyKey } from "../../domain/story-key";
-export { storyKey } from "../../domain/story-key";
+import { storyKey } from "../../domain/utils/record-key";
+export { storyKey } from "../../domain/utils/record-key";
 import {
   prepareSeparateStory,
   reconcileFeatureStories,
@@ -53,7 +54,7 @@ export class StoryService {
     const execution = this.getExecution(task.id);
     if (!execution || !started(this.listStoryRuns(task.id))) return;
     const previous = this.validation.plan(
-      store.plans.get(`${task.id}:${execution.selection.planVersion}`),
+      store.plans.get(planKey(task.id, execution.selection.planVersion)),
     );
     assertCompletedStoryScopeUnchanged(
       previous,
@@ -70,12 +71,12 @@ export class StoryService {
 
     store.atomic(() => {
       const plan = this.validation.plan(
-        store.plans.get(`${task.id}:${task.planVersion}`),
+        store.plans.get(planKey(task.id, task.planVersion)),
       );
-      const selection = this.validation.storySelection(raw),
-        ordered = selectedStories(plan, selection);
-      const old = this.getExecution(task.id),
-        runs = this.listStoryRuns(task.id);
+      const selection = this.validation.storySelection(raw);
+      const ordered = selectedStories(plan, selection);
+      const old = this.getExecution(task.id);
+      const runs = this.listStoryRuns(task.id);
       if (old && started(runs)) {
         if (
           old.selection.mode !== selection.mode ||
@@ -130,7 +131,7 @@ export class StoryService {
     const store = this.store;
 
     const plan = this.validation.plan(
-      store.plans.get(`${task.id}:${task.planVersion}`),
+      store.plans.get(planKey(task.id, task.planVersion)),
     );
     const e = this.getExecution(task.id);
     if (
@@ -192,7 +193,7 @@ export class StoryService {
         updatedAt: this.runtime.now(),
       });
       const plan = this.validation.plan(
-        store.plans.get(`${task.id}:${task.planVersion}`),
+        store.plans.get(planKey(task.id, task.planVersion)),
       );
       const next = selectedStories(plan, e.selection).find(
         (s) =>

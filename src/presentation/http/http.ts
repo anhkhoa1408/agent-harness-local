@@ -21,11 +21,11 @@ export function createHttpHandler(context: HttpRouteContext) {
   return async (request: Request): Promise<Response> => {
     if (!authorize(request, context.sessions))
       return json({ error: "origin_or_session_invalid" }, HttpStatus.FORBIDDEN);
-    const url = new URL(request.url),
-      parts = url.pathname
-        .slice("/api/".length)
-        .split("/")
-        .map(decodeURIComponent);
+    const url = new URL(request.url);
+    const parts = url.pathname
+      .slice("/api/".length)
+      .split("/")
+      .map(decodeURIComponent);
     const body = async () => {
       if (
         Number(request.headers.get("content-length")) >

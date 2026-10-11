@@ -1,3 +1,4 @@
+import { waitForRetry } from "./utils/retry-delay";
 import { ApplicationErrorCode } from "../../application/constants/index";
 import { CodexRpcMethod } from "./constants/codex-rpc-method";
 import { ModelDefaults } from "../../domain/constants/model-defaults";
@@ -115,17 +116,14 @@ export class ParentAgentSession {
           Date.now() >= deadline
         )
           break;
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.min(delay, deadline - Date.now())),
-        );
-        delay = Math.min(delay * 2, CodexLimits.ROLLOUT_MAX_RETRY_DELAY_MS);
+        delay = await waitForRetry(delay, deadline);
       }
     }
     if (!matchesAgentSettings(response, input, false))
       throw new Error(CodexErrorCode.SUBAGENT_CAPABILITY_UNAVAILABLE);
     if (signal.aborted) throw new Error("interrupted");
-    const assignment = stageAssignment(input),
-      receiptSchema = parentReceiptSchema(input);
+    const assignment = stageAssignment(input);
+    const receiptSchema = parentReceiptSchema(input);
     return { threadId, response, previous, assignment, receiptSchema };
   }
 }

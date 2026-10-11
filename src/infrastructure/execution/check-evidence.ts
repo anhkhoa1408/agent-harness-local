@@ -12,9 +12,9 @@ export async function parseEvidence(
   if (format === "tap")
     return new Promise((resolve) => {
       const parser = new Parser();
-      let executed = 0,
-        skipped = 0,
-        failed = 0;
+      let executed = 0;
+      let skipped = 0;
+      let failed = 0;
       parser.on("result", (result) => {
         if (result.closingTestPoint) return;
         if (result.skip || result.todo) skipped++;
@@ -38,9 +38,9 @@ export async function parseEvidence(
     ignoreAttributes: false,
     processEntities: false,
   }).parse(text);
-  let executed = 0,
-    failed = 0,
-    skipped = 0;
+  let executed = 0;
+  let failed = 0;
+  let skipped = 0;
   function walk(value: unknown) {
     if (!value || typeof value !== "object") return;
     for (const [key, v] of Object.entries(value)) {

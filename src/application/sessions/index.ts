@@ -18,8 +18,8 @@ export class SessionService {
     return session && session.expiresAt > this.runtime.now() ? session : null;
   }
   create() {
-    const token = this.crypto.token(),
-      csrf = this.crypto.token();
+    const token = this.crypto.token();
+    const csrf = this.crypto.token();
     this.data.sessions.put(this.crypto.hash(token), {
       csrf,
       expiresAt: this.runtime.now() + SessionLimits.TTL_SECONDS * 1000,

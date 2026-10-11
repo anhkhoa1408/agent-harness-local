@@ -7,10 +7,10 @@ async function tail(path: string | undefined) {
   try {
     const file = await open(path, "r");
     try {
-      const size = (await file.stat()).size,
-        buffer = Buffer.alloc(
-          Math.min(size, ExecutionLimits.MAX_FAILURE_EXCERPT_CHARACTERS),
-        );
+      const size = (await file.stat()).size;
+      const buffer = Buffer.alloc(
+        Math.min(size, ExecutionLimits.MAX_FAILURE_EXCERPT_CHARACTERS),
+      );
       await file.read(
         buffer,
         0,

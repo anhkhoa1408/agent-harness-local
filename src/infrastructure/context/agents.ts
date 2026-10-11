@@ -1,10 +1,11 @@
+import { contentHash } from "../utils/content-hash";
 import { RepositoryLimits } from "../repositories/constants/repository-limits";
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type { Stage } from "../../domain/contracts";
 import sources from "../../../agents/sources.json";
-import { contentHash, contextFile, type ContextFile } from "./rules";
+import { contextFile, type ContextFile } from "./rules";
 
 type ProfileId = keyof typeof sources;
 export function selectSpecialist(

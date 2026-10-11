@@ -1,34 +1,9 @@
-import { ContextErrorCode } from "./constants/context-error-code";
+import { contentHash } from "../utils/content-hash";
+import { contained } from "../utils/contained-path";
 import { realpath, readFile, stat } from "node:fs/promises";
-import { resolve, relative, dirname, join, isAbsolute } from "node:path";
-import { createHash } from "node:crypto";
+import { relative, dirname, join } from "node:path";
 import type { ContextFile } from "../../application/agent-execution";
 export type { ContextFile } from "../../application/agent-execution";
-export const contentHash = (value: string) =>
-  createHash("sha256").update(value).digest("hex");
-export async function contained(root: string, path: string): Promise<string> {
-  const base = await realpath(root);
-  const candidate = resolve(base, path);
-  let existing = candidate;
-  const suffix: string[] = [];
-  for (;;) {
-    try {
-      existing = await realpath(existing);
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      const parent = dirname(existing);
-      if (parent === existing) throw error;
-      suffix.unshift(existing.slice(parent.length + 1));
-      existing = parent;
-    }
-  }
-  const actual = resolve(existing, ...suffix),
-    rel = relative(base, actual);
-  if (rel === ".." || rel.startsWith("../") || isAbsolute(rel))
-    throw new Error(ContextErrorCode.PATH_OUTSIDE_ROOT);
-  return actual;
-}
 export async function contextFile(
   id: string,
   path: string,
@@ -41,8 +16,8 @@ export async function repoRules(
   paths: string[],
   liquid: boolean,
 ): Promise<ContextFile[]> {
-  const base = await realpath(root),
-    dirs = new Set([base]);
+  const base = await realpath(root);
+  const dirs = new Set([base]);
   for (const path of paths) {
     let current = await contained(base, path);
     try {

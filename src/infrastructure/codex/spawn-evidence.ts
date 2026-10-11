@@ -1,3 +1,4 @@
+import { waitForRetry } from "./utils/retry-delay";
 import { CodexErrorCode } from "./constants/codex-error-code";
 import { CodexLimits } from "./constants/codex-limits";
 import { ApplicationErrorCode } from "../../application/constants/index";
@@ -18,8 +19,8 @@ export async function durableSpawnEvidence(
   let delay = CodexLimits.ROLLOUT_INITIAL_RETRY_DELAY_MS;
   for (;;) {
     const calls = new Map<string, unknown>();
-    const stream = createReadStream(path, { encoding: "utf8" }),
-      lines = createInterface({ input: stream, crlfDelay: Infinity });
+    const stream = createReadStream(path, { encoding: "utf8" });
+    const lines = createInterface({ input: stream, crlfDelay: Infinity });
     try {
       for await (const line of lines) {
         let record;
@@ -44,9 +45,6 @@ export async function durableSpawnEvidence(
     if (calls.has(callId)) return calls;
     if (Date.now() >= deadline)
       throw new Error(ApplicationErrorCode.SUBAGENT_EVIDENCE_MISSING);
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.min(delay, deadline - Date.now())),
-    );
-    delay = Math.min(delay * 2, CodexLimits.ROLLOUT_MAX_RETRY_DELAY_MS);
+    delay = await waitForRetry(delay, deadline);
   }
 }

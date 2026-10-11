@@ -105,11 +105,11 @@ export class CodexClient implements AgentClient {
     );
     const threadId = thread.thread.id as string;
     return new Promise<AgentRun>((resolve, reject) => {
-      let turnId = "",
-        lastText = "",
-        usage: unknown = null,
-        finished = false,
-        interrupting = false;
+      let turnId = "";
+      let lastText = "";
+      let usage: unknown = null;
+      let finished = false;
+      let interrupting = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const cleanup = () => {
         if (timer) clearTimeout(timer);

@@ -1,3 +1,4 @@
+import { planKey } from "../../domain/utils/record-key";
 import { DomainErrorCode } from "../../domain/constants/domain-error-code";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import { PipelineStage } from "../../domain/constants/pipeline-stage";
@@ -22,8 +23,8 @@ export class PlanService {
     const store = this.store;
 
     return store.atomic(() => {
-      const task = store.tasks.get(taskId),
-        plan = this.validation.plan(raw);
+      const task = store.tasks.get(taskId);
+      const plan = this.validation.plan(raw);
       if (
         plan.taskId !== task.id ||
         plan.sourceCommit !== task.sourceCommit ||
@@ -33,7 +34,7 @@ export class PlanService {
       if (task.splitIntoStories && !plan.stories)
         throw new Error(ApplicationErrorCode.STORIES_REQUIRED);
       this.stories.validateStoryReplan(task, plan);
-      const key = `${taskId}:${plan.version}`;
+      const key = planKey(taskId, plan.version);
       if (store.plans.get(key))
         throw new Error(ApplicationErrorCode.IMMUTABLE_PLAN);
       store.plans.put(key, plan);
@@ -77,7 +78,9 @@ export class PlanService {
       )
     )
       throw new Error(DomainErrorCode.INVALID_STATUS);
-    const plan = this.validation.plan(store.plans.get(`${taskId}:${version}`));
+    const plan = this.validation.plan(
+      store.plans.get(planKey(taskId, version)),
+    );
     return { task, plan };
   }
   addPlanComment(taskId: string, raw: unknown) {

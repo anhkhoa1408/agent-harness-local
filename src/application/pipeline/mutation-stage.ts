@@ -59,18 +59,18 @@ export function createMutationHandler(
       return queuedStageResult(PipelineStage.PLAN, result);
     }
     const changed = [
-        ...(
-          await context.deliveryIO.git.changedFiles(
-            task.worktree,
-            task.sourceCommit,
-          )
-        ).split("\n"),
-        ...(await context.deliveryIO.git.untrackedFiles(task.worktree)).split(
-          "\n",
-        ),
-      ].filter(Boolean),
-      allowed = plan.steps.flatMap((s) => s.files),
-      reports = evidenceExclusions(plan);
+      ...(
+        await context.deliveryIO.git.changedFiles(
+          task.worktree,
+          task.sourceCommit,
+        )
+      ).split("\n"),
+      ...(await context.deliveryIO.git.untrackedFiles(task.worktree)).split(
+        "\n",
+      ),
+    ].filter(Boolean);
+    const allowed = plan.steps.flatMap((s) => s.files);
+    const reports = evidenceExclusions(plan);
     if (
       changed.some(
         (path) =>

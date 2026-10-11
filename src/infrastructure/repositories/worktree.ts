@@ -10,8 +10,8 @@ export async function prepareWorktree(
 ): Promise<string> {
   await mkdir(root, { recursive: true });
   root = await realpath(root);
-  const path = join(root, task.id),
-    intentPath = join(root, `${task.id}.intent.json`);
+  const path = join(root, task.id);
+  const intentPath = join(root, `${task.id}.intent.json`);
   const intent = {
     taskId: task.id,
     repository: repo.root,

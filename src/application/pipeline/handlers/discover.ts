@@ -8,8 +8,8 @@ export function createDiscoverHandler(
 ): StageHandler {
   const { store, repository, executor } = context;
   return async (task, signal) => {
-    const repo = repository(task),
-      docs = await context.repositoryIO.sourceDocuments(repo);
+    const repo = repository(task);
+    const docs = await context.repositoryIO.sourceDocuments(repo);
     const profile = await executor.executeAgentStage(
       task,
       PipelineStage.DISCOVER,

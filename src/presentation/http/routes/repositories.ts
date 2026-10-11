@@ -1,3 +1,4 @@
+import { errorMessage } from "../../../application/utils/index";
 import { ApplicationErrorCode } from "../../../application/constants/index";
 import { HttpStatus } from "../constants/http-status";
 import { z } from "zod";
@@ -45,7 +46,7 @@ export function createRepositoriesRoute(
       try {
         return json({ path: await system.pickFolder() });
       } catch (error) {
-        const code = error instanceof Error ? error.message : "";
+        const code = errorMessage(error, "");
         if (code === ApplicationErrorCode.FOLDER_PICKER_BUSY)
           return json({ error: code }, HttpStatus.CONFLICT);
         if (code === ApplicationErrorCode.FOLDER_PICKER_UNSUPPORTED)

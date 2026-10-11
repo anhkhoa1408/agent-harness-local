@@ -15,6 +15,33 @@ export type StageNode = {
   label: string;
 };
 export type TaskWithProgress = Task & { pipeline: StageNode[] };
+type ProgressOutput = {
+  needsReplan?: boolean;
+  verdict?: string;
+  version?: number;
+} | null;
+
+function attemptNeedsWork(attempt: ProgressAttempt, output: ProgressOutput) {
+  return (
+    (attempt.nextStage === PipelineStage.PLAN &&
+      [PipelineStage.IMPLEMENT, PipelineStage.REPAIR].some(
+        (value) => value === attempt.stage,
+      )) ||
+    (attempt.nextStage === PipelineStage.REPAIR &&
+      [PipelineStage.VERIFY, PipelineStage.REVIEW].some(
+        (value) => value === attempt.stage,
+      )) ||
+    output?.needsReplan === true ||
+    (attempt.stage === PipelineStage.REVIEW &&
+      output?.verdict &&
+      output.verdict !== "pass") ||
+    (attempt.stage === PipelineStage.VERIFY &&
+      !attempt.nextStage &&
+      Array.isArray(output) &&
+      output.some((c) => c.status !== "passed"))
+  );
+}
+
 export function pipelineProgress(
   task: Task,
   attempts: ProgressAttempt[],
@@ -34,8 +61,10 @@ export function pipelineProgress(
   };
   // Store returns attempts in insertion order, including subsequent retries.
   for (const attempt of attempts.filter((a) => a.taskId === task.id)) {
-    if (attempt.stage === PipelineStage.ANALYZE) reset(stages.slice(2));
-    if (attempt.stage === PipelineStage.PLAN) reset(stages.slice(3));
+    if (attempt.stage === PipelineStage.ANALYZE)
+      reset(stages.slice(stages.indexOf(PipelineStage.PLAN)));
+    if (attempt.stage === PipelineStage.PLAN)
+      reset(stages.slice(stages.indexOf(PipelineStage.PREPARE)));
     if (
       [PipelineStage.IMPLEMENT, PipelineStage.REPAIR].some(
         (value) => value === attempt.stage,
@@ -50,28 +79,8 @@ export function pipelineProgress(
       reset([PipelineStage.REVIEW, PipelineStage.DELIVER]);
     if (attempt.stage === PipelineStage.REVIEW) reset([PipelineStage.DELIVER]);
     const current = node(attempt.stage);
-    const output = attempt.output as {
-      needsReplan?: boolean;
-      verdict?: string;
-      version?: number;
-    } | null;
-    const needsWork =
-      (attempt.nextStage === PipelineStage.PLAN &&
-        [PipelineStage.IMPLEMENT, PipelineStage.REPAIR].some(
-          (value) => value === attempt.stage,
-        )) ||
-      (attempt.nextStage === PipelineStage.REPAIR &&
-        [PipelineStage.VERIFY, PipelineStage.REVIEW].some(
-          (value) => value === attempt.stage,
-        )) ||
-      output?.needsReplan === true ||
-      (attempt.stage === PipelineStage.REVIEW &&
-        output?.verdict &&
-        output.verdict !== "pass") ||
-      (attempt.stage === PipelineStage.VERIFY &&
-        !attempt.nextStage &&
-        Array.isArray(output) &&
-        output.some((c) => c.status !== "passed"));
+    const output = attempt.output as ProgressOutput;
+    const needsWork = attemptNeedsWork(attempt, output);
     const approvedPlan =
       attempt.stage === PipelineStage.PLAN &&
       output?.version != null &&
@@ -118,8 +127,10 @@ export function pipelineProgress(
     return nodes;
   }
   // A command can invalidate approval before the next attempt is recorded.
-  if (task.stage === PipelineStage.ANALYZE) reset(stages.slice(2));
-  if (task.stage === PipelineStage.PLAN) reset(stages.slice(3));
+  if (task.stage === PipelineStage.ANALYZE)
+    reset(stages.slice(stages.indexOf(PipelineStage.PLAN)));
+  if (task.stage === PipelineStage.PLAN)
+    reset(stages.slice(stages.indexOf(PipelineStage.PREPARE)));
   const current = node(task.stage);
   const labels: Record<Status, string> = {
     queued: "Sắp chạy",

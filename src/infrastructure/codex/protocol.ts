@@ -1,3 +1,4 @@
+import { waitForRetry } from "./utils/retry-delay";
 import { CodexLimits } from "./constants/codex-limits";
 import { CodexRpcMethod } from "./constants/codex-rpc-method";
 import { ApplicationErrorCode } from "../../application/constants/index";
@@ -30,10 +31,7 @@ export async function requestThreadWhenRolloutReady(
         Date.now() >= deadline
       )
         throw error;
-      await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(delay, deadline - Date.now())),
-      );
-      delay = Math.min(delay * 2, CodexLimits.ROLLOUT_MAX_RETRY_DELAY_MS);
+      delay = await waitForRetry(delay, deadline);
     }
   }
 }
@@ -41,8 +39,8 @@ export async function listDescendantThreads(
   rpc: JsonRpc,
   threadId: string,
 ): Promise<import("./rpc").RuntimeThread[]> {
-  const data: import("./rpc").RuntimeThread[] = [],
-    seen = new Set<string>();
+  const data: import("./rpc").RuntimeThread[] = [];
+  const seen = new Set<string>();
   let cursor: string | null = null;
   do {
     const page: {

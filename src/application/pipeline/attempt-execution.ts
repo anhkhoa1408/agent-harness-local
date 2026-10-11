@@ -1,3 +1,4 @@
+import { errorMessage } from "../utils/index";
 import {
   ApplicationErrorCode,
   EventType,
@@ -34,7 +35,7 @@ export async function executeStageAttempt(
 
   try {
     const result = await handlers[next.stage](
-      task!,
+      task,
       AbortSignal.any([
         abort.signal,
         AbortSignal.timeout(WorkerTiming.STAGE_TIMEOUT_MS),
@@ -67,7 +68,7 @@ export async function executeStageAttempt(
         });
       store.attempts.put(attempt.id, {
         ...attempt,
-        ...(store.attempts.get(attempt.id) as object),
+        ...store.attempts.get(attempt.id),
         status: TaskStatus.COMPLETED,
         output: result.output,
         nextStage: result.stage,
@@ -91,8 +92,8 @@ export async function executeStageAttempt(
     });
   } catch (error) {
     if (hasLostLease()) return;
-    const current = store.tasks.get(next.id),
-      message = error instanceof Error ? error.message : String(error);
+    const current = store.tasks.get(next.id);
+    const message = errorMessage(error, String);
     const unknown = message.includes(
       ApplicationErrorCode.RUNTIME_STATE_UNKNOWN,
     );
@@ -116,7 +117,7 @@ export async function executeStageAttempt(
         });
       store.attempts.put(attempt.id, {
         ...attempt,
-        ...(store.attempts.get(attempt.id) as object),
+        ...store.attempts.get(attempt.id),
         status: abort.signal.aborted
           ? TaskStatus.INTERRUPTED
           : TaskStatus.FAILED,
@@ -137,6 +138,5 @@ export async function executeStageAttempt(
         event(EventType.STAGE_STOPPED, { error: message }),
       );
     });
-  } finally {
   }
 }

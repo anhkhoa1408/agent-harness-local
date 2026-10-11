@@ -16,9 +16,9 @@ export function createReviewHandler(
     context;
   return async (task, signal) => {
     storyService.assertEvidence(task);
-    const plan = planOf(task),
-      before = await fingerprint(task, plan),
-      checks = (store.checks.get(task.id) ?? []) as CheckResult[];
+    const plan = planOf(task);
+    const before = await fingerprint(task, plan);
+    const checks = (store.checks.get(task.id) ?? []) as CheckResult[];
     await context.verificationIO.verifyImageEvidence(checks);
     const review = await executor.executeAgentStage(
       task,

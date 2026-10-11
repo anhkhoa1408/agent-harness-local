@@ -1,3 +1,4 @@
+import { delay } from "../utils/delay";
 import { randomUUID } from "node:crypto";
 import { bootIdentity } from "./boot";
 import type { RuntimePort } from "../../application/runtime";
@@ -6,7 +7,7 @@ export const systemRuntime: RuntimePort = {
   id: randomUUID,
   bootIdentity,
   pid: process.pid,
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  sleep: delay,
   every: (ms, work) => {
     const timer = setInterval(work, ms);
     return () => clearInterval(timer);

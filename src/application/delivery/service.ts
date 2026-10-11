@@ -1,3 +1,4 @@
+import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode } from "../constants/index";
 import type { Task, Plan } from "../../domain/contracts";
 import type { CheckResult } from "../../domain/evidence";
@@ -27,29 +28,31 @@ export function createDelivery(
   ): Promise<Delivery> {
     signal.throwIfAborted();
     if (!task.worktree) throw new Error(ApplicationErrorCode.WORKTREE_MISSING);
-    const path = task.worktree,
-      repo = validation.repository(store.repositories.get(task.repositoryId)),
-      plan =
-        options.plan ??
-        validation.plan(store.plans.get(`${task.id}:${task.planVersion}`)),
-      review = validation.outputs.review.parse(store.reviews.get(task.id)),
-      checks = store.checks.get(task.id) as CheckResult[];
-    const exclusions = evidenceExclusions(plan),
-      fingerprint = () =>
-        io.git.fingerprint(path, exclusions, task.sourceCommit),
-      before = await fingerprint();
+    const path = task.worktree;
+    const repo = validation.repository(
+      store.repositories.get(task.repositoryId),
+    );
+    const plan =
+      options.plan ??
+      validation.plan(store.plans.get(planKey(task.id, task.planVersion)));
+    const review = validation.outputs.review.parse(store.reviews.get(task.id));
+    const checks = store.checks.get(task.id) as CheckResult[];
+    const exclusions = evidenceExclusions(plan);
+    const fingerprint = () =>
+      io.git.fingerprint(path, exclusions, task.sourceCommit);
+    const before = await fingerprint();
     const errors = acceptanceErrors(task, plan, checks, review, before);
     if (errors.length) throw new Error(`acceptance_failed:${errors.join(",")}`);
     await io.artifacts.verifyImages(checks);
     if ((await io.git.branch(path)) !== task.branch)
       throw new Error(ApplicationErrorCode.BRANCH_COLLISION);
     const changed = [
-        ...(await io.git.changedFiles(path, task.sourceCommit)).split("\n"),
-        ...(await io.git.untrackedFiles(path)).split("\n"),
-      ]
-        .filter(Boolean)
-        .filter((p) => !exclusions.includes(p)),
-      allowed = plan.steps.flatMap((s) => s.files);
+      ...(await io.git.changedFiles(path, task.sourceCommit)).split("\n"),
+      ...(await io.git.untrackedFiles(path)).split("\n"),
+    ]
+      .filter(Boolean)
+      .filter((p) => !exclusions.includes(p));
+    const allowed = plan.steps.flatMap((s) => s.files);
     if (
       changed.some(
         (p) =>
@@ -60,12 +63,12 @@ export function createDelivery(
     const commitMessage =
       options.commitMessage ??
       `feat: ${task.title}\n\nHarness-Task: ${task.id}`;
-    const commitKey = `${options.effectPrefix ?? task.id}:commit:${before}`,
-      commitEffect = store.effects.get(commitKey) as {
-        state: string;
-        commit?: string;
-        parent: string;
-      } | null;
+    const commitKey = `${options.effectPrefix ?? task.id}:commit:${before}`;
+    const commitEffect = store.effects.get(commitKey) as {
+      state: string;
+      commit?: string;
+      parent: string;
+    } | null;
     let head = await io.git.head(path);
     if (commitEffect?.state === "confirmed") {
       if (head !== commitEffect.commit)
@@ -103,15 +106,15 @@ export function createDelivery(
     });
     if (task.deliveryMode === "local" || !repo.remote)
       return { mode: "local", commit: head, reportPath, prUrl: null };
-    const remote = repo.remote,
-      url = await io.git.remoteUrl(path, remote),
-      name = (options.repositoryName ?? io.repositoryName)(url),
-      github = options.github ?? io.github;
+    const remote = repo.remote;
+    const url = await io.git.remoteUrl(path, remote);
+    const name = (options.repositoryName ?? io.repositoryName)(url);
+    const github = options.github ?? io.github;
     const remoteHead = () => io.git.remoteHead(path, remote, task.branch);
-    const pushKey = `${task.id}:push:${head}:${task.branch}`,
-      pushEffect = store.effects.get(pushKey) as {
-        state: string;
-      } | null;
+    const pushKey = `${task.id}:push:${head}:${task.branch}`;
+    const pushEffect = store.effects.get(pushKey) as {
+      state: string;
+    } | null;
     const actual = await remoteHead();
     if (actual && actual !== head)
       throw new Error(ApplicationErrorCode.REMOTE_HEAD_CHANGED);

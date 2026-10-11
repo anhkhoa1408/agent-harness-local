@@ -1,10 +1,11 @@
+import { contained } from "../utils/contained-path";
 import { RepositoriesErrorCode } from "./constants/repositories-error-code";
 import { readFile, writeFile, mkdir, lstat, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import type { Repository, Task } from "../../domain/contracts";
 import { gitText } from "./inspect";
-import { contained } from "../context/rules";
+
 import { fingerprintWorktree } from "./fingerprint";
 
 type Sync = {
@@ -35,8 +36,8 @@ async function untouched(path: string, conflicts: string[]) {
   for (const file of [...files].sort().filter((f) => !conflicts.includes(f))) {
     hash.update(JSON.stringify(file));
     try {
-      const full = await contained(path, file),
-        info = await lstat(full);
+      const full = await contained(path, file);
+      const info = await lstat(full);
       hash.update(String(info.mode));
       hash.update(
         info.isSymbolicLink() ? await readlink(full) : await readFile(full),

@@ -1,5 +1,6 @@
 export class CodexLimits {
   private constructor() {}
+  static readonly RETRY_BACKOFF_FACTOR = 2;
   static readonly RPC_REQUEST_TIMEOUT_MS = 30_000;
   static readonly AGENT_INTERRUPT_TIMEOUT_MS = 10_000;
   static readonly RUNTIME_PAGE_SIZE = 100;

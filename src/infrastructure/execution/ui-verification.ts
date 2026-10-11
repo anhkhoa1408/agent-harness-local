@@ -1,3 +1,5 @@
+import { contentHash } from "../utils/content-hash";
+import { contained } from "../utils/contained-path";
 import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { ExecutionLimits } from "./constants/execution-limits";
 
@@ -9,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import type { Task, Plan } from "../validation/contracts";
 import { VisualReviewSchema } from "../validation/contracts";
 import type { CheckResult } from "../../domain/evidence";
-import { contained, contentHash } from "../context/rules";
+
 import { gitText } from "../repositories/inspect";
 
 export { evidenceExclusions } from "../../domain/evidence";

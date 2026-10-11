@@ -1,3 +1,4 @@
+import { contained } from "../utils/contained-path";
 import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { ExecutionLimits } from "./constants/execution-limits";
 
@@ -8,7 +9,7 @@ import { finished } from "node:stream/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CommandSpec } from "../../domain/contracts";
-import { contained } from "../context/rules";
+
 export type ProcessResult = {
   exitCode: number | null;
   signal: string | null;
@@ -25,9 +26,9 @@ export async function runProcess(
   const cwd = await contained(root, command.cwd);
   if (signal.aborted) throw new Error("interrupted");
   await mkdir(artifacts, { recursive: true });
-  const id = randomUUID(),
-    stdoutPath = join(artifacts, `${id}.stdout.log`),
-    stderrPath = join(artifacts, `${id}.stderr.log`);
+  const id = randomUUID();
+  const stdoutPath = join(artifacts, `${id}.stdout.log`);
+  const stderrPath = join(artifacts, `${id}.stderr.log`);
   const env: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
@@ -42,8 +43,8 @@ export async function runProcess(
       throw new Error(ExecutionErrorCode.UNSAFE_ENVIRONMENT);
     if (process.env[name] !== undefined) env[name] = process.env[name];
   }
-  const out = createWriteStream(stdoutPath, { mode: 0o600 }),
-    err = createWriteStream(stderrPath, { mode: 0o600 });
+  const out = createWriteStream(stdoutPath, { mode: 0o600 });
+  const err = createWriteStream(stderrPath, { mode: 0o600 });
   const child = spawn(command.executable, command.args, {
     cwd,
     env,
@@ -53,8 +54,8 @@ export async function runProcess(
   });
   child.stdout.pipe(out);
   child.stderr.pipe(err);
-  let timedOut = false,
-    killer: NodeJS.Timeout | undefined;
+  let timedOut = false;
+  let killer: NodeJS.Timeout | undefined;
   const kill = (sig: NodeJS.Signals) => {
     if (child.pid)
       try {

@@ -1,10 +1,11 @@
+import { contentHash } from "../utils/content-hash";
 import { mkdir, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DeliveryDependencies } from "../../application/delivery";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
-import { contentHash } from "../context/rules";
+
 import { verifyImageEvidence } from "../execution/ui-verification";
 import {
   githubCli,
@@ -58,8 +59,8 @@ export function deliveryIO(data: string): DeliveryDependencies {
       async checkpoint(task, name, value) {
         const folder = join(data, "artifacts", task.id, "checkpoints");
         await mkdir(folder, { recursive: true });
-        const path = join(folder, name),
-          temp = `${path}.${randomUUID()}.tmp`;
+        const path = join(folder, name);
+        const temp = `${path}.${randomUUID()}.tmp`;
         await writeFile(temp, JSON.stringify(value, null, 2), { mode: 0o600 });
         await rename(temp, path);
         return path;

@@ -1,3 +1,4 @@
+import { contained } from "../utils/contained-path";
 import { ExecutionLimits } from "./constants/execution-limits";
 import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { failureEvidence } from "./failure-evidence";
@@ -12,7 +13,7 @@ import {
 } from "./ui-verification";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
-import { contained } from "../context/rules";
+
 import type { VerificationPort } from "../../application/verification";
 export const verificationIO: VerificationPort = {
   failureEvidence,

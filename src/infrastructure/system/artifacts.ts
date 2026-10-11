@@ -1,7 +1,8 @@
+import { contained } from "../utils/contained-path";
 import { ApplicationErrorCode } from "../../application/constants/index";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { contained } from "../context/rules";
+
 import type { ArtifactReaderPort } from "../../application/artifacts";
 export function artifactReader(data: string): ArtifactReaderPort {
   return {

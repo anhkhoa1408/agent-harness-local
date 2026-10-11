@@ -52,8 +52,8 @@ export class WorkerRuntime {
     );
     if (!lease) throw new Error(ApplicationErrorCode.WORKER_ALREADY_RUNNING);
     const { store, handlers, storyService, planService } =
-        this.leases.scope(lease),
-      bootId = runtime.bootIdentity();
+      this.leases.scope(lease);
+    const bootId = runtime.bootIdentity();
     store.health.put("worker", { at: runtime.now(), owner: lease.owner });
     const heartbeat = runtime.every(
       WorkerLease.WORKER_HEARTBEAT_INTERVAL_MS,

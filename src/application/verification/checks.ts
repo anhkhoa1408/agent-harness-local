@@ -1,3 +1,4 @@
+import { errorMessage } from "../utils/index";
 import { ApplicationErrorCode } from "../constants/index";
 import { evidenceExclusions } from "../../domain/evidence";
 import type { Task, Plan } from "../../domain/contracts";
@@ -12,16 +13,16 @@ export async function runChecks(
   io: VerificationPort,
 ): Promise<CheckResult[]> {
   if (!task.worktree) throw new Error(ApplicationErrorCode.WORKTREE_MISSING);
-  const root = task.worktree,
-    excluded = evidenceExclusions(plan);
-  const fingerprint = await io.fingerprint(root, excluded, task.sourceCommit),
-    results: CheckResult[] = [];
+  const root = task.worktree;
+  const excluded = evidenceExclusions(plan);
+  const fingerprint = await io.fingerprint(root, excluded, task.sourceCommit);
+  const results: CheckResult[] = [];
   for (const spec of plan.checks) {
     signal.throwIfAborted();
-    let evidencePath = "",
-      stderrPath: string | undefined,
-      commandFailed = false,
-      exitCode: number | null = null;
+    let evidencePath = "";
+    let stderrPath: string | undefined;
+    let commandFailed = false;
+    let exitCode: number | null = null;
     try {
       await io.clearScreenshots(root, plan, spec.id);
       let report: string | null = null;
@@ -68,9 +69,7 @@ export async function runChecks(
         stderrPath,
         reason: commandFailed
           ? "check_command_failed_without_valid_report"
-          : error instanceof Error
-            ? error.message
-            : String(error),
+          : errorMessage(error, String),
       });
     }
   }

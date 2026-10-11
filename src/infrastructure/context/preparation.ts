@@ -1,3 +1,4 @@
+import { contentHash } from "../utils/content-hash";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
@@ -6,7 +7,7 @@ import type {
 } from "../../application/agent-execution";
 import { withSourceSnapshot } from "../repositories/inspect";
 import { resolveBundle, snapshotBundle } from "./skills";
-import { contentHash, repoRules } from "./rules";
+import { repoRules } from "./rules";
 export const contextIO: ContextPort = {
   sourceSnapshot: withSourceSnapshot,
   resolve: (stage, root, liquid) => resolveBundle(stage, root, [], liquid),

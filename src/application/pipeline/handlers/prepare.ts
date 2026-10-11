@@ -1,3 +1,4 @@
+import { planKey } from "../../../domain/utils/record-key";
 import { DomainErrorCode } from "../../../domain/constants/domain-error-code";
 import { PipelineStage } from "../../../domain/constants/pipeline-stage";
 import { TaskStatus } from "../../../domain/constants/task-status";
@@ -28,7 +29,7 @@ export function createPrepareHandler(
     const e = storyService.getExecution(task.id);
     if (e?.selection.mode === "separate_pr") {
       const approvedPlan = context.validation.plan(
-        store.plans.get(`${task.id}:${task.planVersion}`),
+        store.plans.get(planKey(task.id, task.planVersion)),
       );
       if (
         !canImplement(task, approvedPlan) ||
@@ -44,8 +45,8 @@ export function createPrepareHandler(
       } as const;
     }
     await executor.freezeTaskBundles(task);
-    const effective = storyService.getEffectiveTask(task),
-      plan = planOf(effective);
+    const effective = storyService.getEffectiveTask(task);
+    const plan = planOf(effective);
     if (!canImplement(effective, plan))
       throw new Error(DomainErrorCode.PLAN_NOT_APPROVED);
     const resumingStories =
@@ -132,8 +133,8 @@ export function createPrepareHandler(
       PipelineStage.REPAIR,
       PipelineStage.REVIEW,
     ] as const) {
-      const key = `${task.id}:${stage}`,
-        original = store.bundles.get(key) as Bundle;
+      const key = `${task.id}:${stage}`;
+      const original = store.bundles.get(key) as Bundle;
       if (!original) throw new Error(ApplicationErrorCode.CONTEXT_MISSING);
       const files = [
         ...original.files.filter(

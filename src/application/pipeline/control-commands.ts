@@ -1,3 +1,4 @@
+import { planKey } from "../../domain/utils/record-key";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import { TaskStatus } from "../../domain/constants/task-status";
 import { PipelineStage } from "../../domain/constants/pipeline-stage";
@@ -94,9 +95,9 @@ export function processControlCommand(
       }
     } else if (c.kind === "approve") {
       const plan = validation.plan(
-          store.plans.get(`${task.id}:${task.planVersion}`),
-        ),
-        version = (c.payload as { version: number })?.version;
+        store.plans.get(planKey(task.id, task.planVersion)),
+      );
+      const version = (c.payload as { version: number })?.version;
       if (
         planService
           .planComments(task.id)

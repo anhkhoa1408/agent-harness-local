@@ -1,3 +1,4 @@
+import { planKey } from "../../domain/utils/record-key";
 import { TaskStatus } from "../../domain/constants/task-status";
 import { ApplicationErrorCode, EventType } from "../constants/index";
 import { ValidationLimits } from "../../domain/constants/validation-limits";
@@ -8,7 +9,7 @@ import type { RuntimePort } from "../runtime";
 import { type Task, type StoryRun } from "../../domain/contracts";
 import { selectedStories, projectStoryPlan } from "../../domain/stories";
 import { evidenceExclusions } from "../../domain/evidence";
-import { storyKey } from "../../domain/story-key";
+import { storyKey } from "../../domain/utils/record-key";
 import type { ApplicationStore, StoryRepositoryPort } from "../ports";
 type StoryStatePort = {
   getExecution(
@@ -28,7 +29,7 @@ export async function prepareSeparateStory(
 ): Promise<StoryRun> {
   const e = stories.getExecution(task.id)!;
   const plan = validation.plan(
-    store.plans.get(`${task.id}:${e.selection.planVersion}`),
+    store.plans.get(planKey(task.id, e.selection.planVersion)),
   );
   const run = selectedStories(plan, e.selection)
     .map((s) => stories.listStoryRuns(task.id).find((r) => r.storyId === s.id)!)
@@ -153,8 +154,8 @@ export async function reconcileFeatureStories(
   signal: AbortSignal,
 ): Promise<void> {
   signal.throwIfAborted();
-  const task = store.tasks.get(featureId),
-    e = stories.getExecution(featureId);
+  const task = store.tasks.get(featureId);
+  const e = stories.getExecution(featureId);
   if (
     e?.selection.mode !== "separate_pr" ||
     task.reason !== "story_running" ||
@@ -165,12 +166,12 @@ export async function reconcileFeatureStories(
     for (const run of stories
       .listStoryRuns(featureId)
       .filter((r) => r.childTaskId && r.state !== TaskStatus.COMPLETED)) {
-      const child = store.tasks.get(run.childTaskId!),
-        delivery = store.deliveries.get(child.id) as {
-          commit: string;
-          prUrl: string | null;
-          reportPath: string;
-        } | null;
+      const child = store.tasks.get(run.childTaskId!);
+      const delivery = store.deliveries.get(child.id) as {
+        commit: string;
+        prUrl: string | null;
+        reportPath: string;
+      } | null;
       if (child.status === TaskStatus.COMPLETED && delivery) {
         store.storyRuns.put(storyKey(run), {
           ...run,
@@ -264,12 +265,12 @@ export async function assertSharedHead(
   const head = await repository.head(task.worktree);
   if (head === e.baselineCommit) return;
   if (delivery && e.aggregate) {
-    const plan = stories.getExecutionPlan(task),
-      fingerprint = await repository.fingerprintWorktree(
-        task.worktree,
-        evidenceExclusions(plan),
-        task.sourceCommit,
-      );
+    const plan = stories.getExecutionPlan(task);
+    const fingerprint = await repository.fingerprintWorktree(
+      task.worktree,
+      evidenceExclusions(plan),
+      task.sourceCommit,
+    );
     const effect = store.effects.get(`${task.id}:commit:${fingerprint}`) as {
       state: string;
       parent: string;

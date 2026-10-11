@@ -1,3 +1,4 @@
+import { errorMessage } from "../../application/utils/index";
 import { HttpStatus } from "./constants/http-status";
 import { ApplicationErrorCode } from "../../application/constants/index";
 import { z } from "zod";
@@ -26,7 +27,7 @@ export function httpErrorResponse(error: unknown): Response {
       },
       HttpStatus.BAD_REQUEST,
     );
-  const message = error instanceof Error ? error.message : "request_failed";
+  const message = errorMessage(error, "request_failed");
   if (message.includes("not_found"))
     return json({ error: "not_found" }, HttpStatus.NOT_FOUND);
   if (message.includes("conflict"))

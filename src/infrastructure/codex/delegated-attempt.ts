@@ -228,8 +228,8 @@ export class DelegatedStageAttempt {
         !matchesAgentSettings(audit, this.input, true)
       )
         throw new Error(CodexErrorCode.SUBAGENT_IDENTITY_OR_SETTINGS_MISMATCH);
-      const child = await this.readThreadState(this.nativeChildId),
-        turn = child.turns.at(-1);
+      const child = await this.readThreadState(this.nativeChildId);
+      const turn = child.turns.at(-1);
       if (turn?.status === "inProgress") {
         this.deadlineTimer ??= setTimeout(
           () => this.stopForContractViolation("subagent_incomplete"),
@@ -243,8 +243,8 @@ export class DelegatedStageAttempt {
         (i: { type: string; phase?: string; text?: string }) =>
           i.type === "agentMessage" && i.phase !== "commentary",
       );
-      const result = JSON.parse(texts.at(-1)?.text ?? ""),
-        parentResult = JSON.parse(this.parentReceiptText);
+      const result = JSON.parse(texts.at(-1)?.text ?? "");
+      const parentResult = JSON.parse(this.parentReceiptText);
       if (
         result.stage !== this.input.delegation!.stage ||
         result.attemptId !== this.input.delegation!.attemptId ||
@@ -299,8 +299,8 @@ export class DelegatedStageAttempt {
     }
   };
   private handleRuntimeMessage = (m: RpcMessage) => {
-    const p = m.params ?? {},
-      item = p.item;
+    const p = m.params ?? {};
+    const item = p.item;
     if (
       this.parent.previous.has(p.threadId) &&
       m.method === CodexRpcMethod.TURN_STARTED
