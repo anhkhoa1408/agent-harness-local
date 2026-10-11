@@ -1,3 +1,4 @@
+import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { Parser } from "tap-parser";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import type { CheckSpec } from "../../domain/contracts";
@@ -31,7 +32,8 @@ export async function parseEvidence(
       );
       parser.end(text);
     });
-  if (XMLValidator.validate(text) !== true) throw new Error("invalid_junit");
+  if (XMLValidator.validate(text) !== true)
+    throw new Error(ExecutionErrorCode.INVALID_JUNIT);
   const xml = new XMLParser({
     ignoreAttributes: false,
     processEntities: false,
@@ -53,7 +55,8 @@ export async function parseEvidence(
       } else walk(v);
     }
   }
-  if (!xml.testsuites && !xml.testsuite) throw new Error("invalid_junit");
+  if (!xml.testsuites && !xml.testsuite)
+    throw new Error(ExecutionErrorCode.INVALID_JUNIT);
   walk(xml);
   return { executed, failed, skipped };
 }

@@ -1,3 +1,4 @@
+import { DomainErrorCode } from "./constants/domain-error-code";
 import { validateStories } from "./stories";
 import { type Plan, type Task, type Review } from "./contracts";
 import type { CheckResult } from "./evidence";
@@ -103,13 +104,13 @@ export function acceptanceErrors(
     task.approvedPlanVersion !== plan.version ||
     task.sourceCommit !== plan.sourceCommit
   )
-    errors.push("plan_not_approved");
+    errors.push(DomainErrorCode.PLAN_NOT_APPROVED);
   if (
     review.taskId !== task.id ||
     review.planVersion !== plan.version ||
     review.fingerprint !== fingerprint
   )
-    errors.push("stale_review");
+    errors.push(DomainErrorCode.STALE_REVIEW);
   if (review.verdict !== "pass") errors.push("review_not_passed");
   if (
     review.findings.some(

@@ -1,3 +1,4 @@
+import { ApplicationErrorCode } from "../constants/index";
 import type { ApplicationStore } from "../ports";
 import type { ValidationPort } from "../validation";
 import type { ModelService } from "../models";
@@ -41,7 +42,7 @@ export class TaskService {
     await this.models.validateModels(task.models);
     return this.store.atomic(() => {
       if (!this.store.repositories.get(task.repositoryId))
-        throw new Error("repository_not_found");
+        throw new Error(ApplicationErrorCode.REPOSITORY_NOT_FOUND);
       return this.store.tasks.create(task);
     });
   }

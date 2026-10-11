@@ -1,13 +1,17 @@
+import { DeliveryLimits } from "./constants/delivery-limits";
+import { DeliveryErrorCode } from "./constants/delivery-error-code";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { GITHUB_CLI_MAX_BUFFER_BYTES } from "./limits";
+
 import type { GitHubPort } from "../../application/delivery";
 const exec = promisify(execFile);
 export const deliveryBranchMarker = (head: string) =>
   `<!-- agent-harness:branch:${head} -->`;
 async function executeGitHubCommand(args: string[]) {
   return (
-    await exec("gh", args, { maxBuffer: GITHUB_CLI_MAX_BUFFER_BYTES })
+    await exec("gh", args, {
+      maxBuffer: DeliveryLimits.GITHUB_CLI_MAX_BUFFER_BYTES,
+    })
   ).stdout.trim();
 }
 export const githubCli: GitHubPort = {
@@ -30,7 +34,8 @@ export const githubCli: GitHubPort = {
     ) as { url: string; headRefOid: string; state: string; body: string }[];
     if (!list.length) return null;
     const own = list.find((p) => p.body.includes(deliveryBranchMarker(head)));
-    if (!own || own.state !== "OPEN") throw new Error("pull_request_collision");
+    if (!own || own.state !== "OPEN")
+      throw new Error(DeliveryErrorCode.PULL_REQUEST_COLLISION);
     return { url: own.url, headCommit: own.headRefOid };
   },
   async createPullRequest(i) {
@@ -55,6 +60,7 @@ export function githubRepository(url: string) {
     /^(?:https:\/\/github\.com\/|git@github\.com:)([\w.-]+\/[\w.-]+?)(?:\.git)?$/.exec(
       url,
     );
-  if (!match) throw new Error("delivery_error:remote_not_github");
+  if (!match)
+    throw new Error(DeliveryErrorCode.DELIVERY_ERROR_REMOTE_NOT_GITHUB);
   return match[1];
 }

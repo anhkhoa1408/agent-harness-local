@@ -1,3 +1,5 @@
+import { TaskStatus } from "../../domain/constants/task-status";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import { stages, type Task } from "../../domain/contracts";
 import type { Handlers } from "../pipeline-contracts";
 import type { StageHandlerContext } from "./context";
@@ -15,7 +17,7 @@ export function unavailableHandlers(): Handlers {
       stage,
       async () => ({
         stage,
-        status: "blocked",
+        status: TaskStatus.BLOCKED,
         reason: "capability_unavailable",
         output: null,
       }),
@@ -40,10 +42,23 @@ export function createHandlers(context: StageHandlerContext): Handlers {
     stages.map((stage) => [
       stage,
       async (task: Task, signal: AbortSignal) => {
-        if (["implement", "repair", "verify", "review"].includes(stage))
+        if (
+          [
+            PipelineStage.IMPLEMENT,
+            PipelineStage.REPAIR,
+            PipelineStage.VERIFY,
+            PipelineStage.REVIEW,
+          ].some((value) => value === stage)
+        )
           await storyService.assertSharedHead(task);
         return handlers[stage](
-          ["implement", "repair", "verify", "review", "deliver"].includes(stage)
+          [
+            PipelineStage.IMPLEMENT,
+            PipelineStage.REPAIR,
+            PipelineStage.VERIFY,
+            PipelineStage.REVIEW,
+            PipelineStage.DELIVER,
+          ].some((value) => value === stage)
             ? storyService.getEffectiveTask(task)
             : task,
           signal,

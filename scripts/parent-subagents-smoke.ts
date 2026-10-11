@@ -1,3 +1,4 @@
+import { ModelDefaults } from "../src/domain/constants/model-defaults";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { strict as assert } from "node:assert";
@@ -11,7 +12,7 @@ import type {
   AgentEvent,
 } from "../src/infrastructure/codex/types";
 import { stageEnvelope } from "../src/application/agent-execution";
-import { PARENT_AGENT_MODEL } from "../src/infrastructure/codex/limits";
+
 const root = await mkdtemp(join(tmpdir(), "harness-refactor-native-"));
 const value = randomUUID();
 await writeFile(join(root, "input.txt"), value);
@@ -43,7 +44,7 @@ async function runStage(
   const deadline = setTimeout(() => controller.abort(), 90_000);
   const input: DelegatedStageInput = {
     cwd: root,
-    model: PARENT_AGENT_MODEL,
+    model: ModelDefaults.PARENT,
     write,
     executionMode: "auto",
     threadId: parentId,
@@ -103,8 +104,8 @@ try {
   assert.ok(
     (await client.listModels()).some(
       (m) =>
-        m.id === PARENT_AGENT_MODEL.model &&
-        m.efforts.includes(PARENT_AGENT_MODEL.effort),
+        m.id === ModelDefaults.PARENT.model &&
+        m.efforts.includes(ModelDefaults.PARENT.effort),
     ),
   );
   await runStage(

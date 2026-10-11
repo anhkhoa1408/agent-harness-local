@@ -1,3 +1,8 @@
+import { PersistenceErrorCode } from "./constants/persistence-error-code";
+import {
+  ApplicationErrorCode,
+  EventType,
+} from "../../application/constants/index";
 import {
   initializeTask,
   assertMutableTaskPatch,
@@ -20,7 +25,7 @@ export function createTaskRepository(
   function getTask(id: string): Task {
     const row = db.prepare("SELECT body FROM tasks WHERE id=?").get(id) as
       Row | undefined;
-    if (!row) throw new Error("task_not_found");
+    if (!row) throw new Error(PersistenceErrorCode.TASK_NOT_FOUND);
     return TaskSchema.parse(JSON.parse(row.body));
   }
   return {
@@ -31,7 +36,7 @@ export function createTaskRepository(
       const task = initializeTask(input, id, now);
       transaction(db, () => {
         db.prepare("INSERT INTO tasks VALUES(?,?,?)").run(id, 0, json(task));
-        appendEvent(id, "task.created", {});
+        appendEvent(id, EventType.TASK_CREATED, {});
       });
       return task;
     },
@@ -50,7 +55,7 @@ export function createTaskRepository(
       return transaction(db, () => {
         const current = getTask(id);
         if (current.revision !== expectedRevision)
-          throw new Error("revision_conflict");
+          throw new Error(ApplicationErrorCode.REVISION_CONFLICT);
         assertMutableTaskPatch(patch);
         const updated = TaskSchema.parse({
           ...current,
@@ -63,7 +68,8 @@ export function createTaskRepository(
             "UPDATE tasks SET revision=?,body=? WHERE id=? AND revision=?",
           )
           .run(updated.revision, json(updated), id, expectedRevision);
-        if (result.changes !== 1) throw new Error("revision_conflict");
+        if (result.changes !== 1)
+          throw new Error(ApplicationErrorCode.REVISION_CONFLICT);
         appendEvent(id, event.type, event.data);
         return updated;
       });

@@ -1,3 +1,5 @@
+import { ApplicationErrorCode } from "../../../application/constants/index";
+import { HttpStatus } from "../constants/http-status";
 import { z } from "zod";
 
 import { json } from "../http-response";
@@ -18,15 +20,18 @@ export function createRepositoriesRoute(
         const deletedTasks = repositoryService.remove(parts[1]);
         return json({ deletedTasks });
       } catch (error) {
-        if (error instanceof Error && error.message === "repository_busy")
+        if (
+          error instanceof Error &&
+          error.message === ApplicationErrorCode.REPOSITORY_BUSY
+        )
           return json(
             {
-              error: "repository_busy",
+              error: ApplicationErrorCode.REPOSITORY_BUSY,
               details: [
                 "Dừng task và xác nhận tiến trình đã dừng trước khi gỡ repository.",
               ],
             },
-            409,
+            HttpStatus.CONFLICT,
           );
         throw error;
       }
@@ -41,10 +46,14 @@ export function createRepositoriesRoute(
         return json({ path: await system.pickFolder() });
       } catch (error) {
         const code = error instanceof Error ? error.message : "";
-        if (code === "folder_picker_busy") return json({ error: code }, 409);
-        if (code === "folder_picker_unsupported")
+        if (code === ApplicationErrorCode.FOLDER_PICKER_BUSY)
+          return json({ error: code }, HttpStatus.CONFLICT);
+        if (code === ApplicationErrorCode.FOLDER_PICKER_UNSUPPORTED)
           return json({ error: code }, 501);
-        return json({ error: "folder_picker_failed" }, 503);
+        return json(
+          { error: ApplicationErrorCode.FOLDER_PICKER_FAILED },
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
       }
     }
     if (parts[0] === "repositories" && !parts[1]) {
@@ -57,7 +66,10 @@ export function createRepositoriesRoute(
             remote: z.string().nullable(),
           })
           .parse(await body());
-        return json(await repositoryService.registerRepository(input), 201);
+        return json(
+          await repositoryService.registerRepository(input),
+          HttpStatus.CREATED,
+        );
       }
     }
   };

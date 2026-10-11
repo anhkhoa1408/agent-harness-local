@@ -1,3 +1,4 @@
+import { PipelineStage } from "../../../domain/constants/pipeline-stage";
 import type { StageHandlerContext } from "../context";
 import type { StageHandler } from "../../pipeline-contracts";
 
@@ -6,7 +7,7 @@ export function createPlanHandler(context: StageHandlerContext): StageHandler {
   return async (task, signal) => {
     const output = await executor.executeAgentStage(
       task,
-      "plan",
+      PipelineStage.PLAN,
       context.validation.outputs.plan,
       {
         task: stageTask(task),

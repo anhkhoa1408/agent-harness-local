@@ -1,3 +1,8 @@
+import { ApplicationErrorCode } from "../../application/constants/index";
+import { CodexRpcMethod } from "./constants/codex-rpc-method";
+import { ModelDefaults } from "../../domain/constants/model-defaults";
+import { CodexLimits } from "./constants/codex-limits";
+import { CodexErrorCode } from "./constants/codex-error-code";
 import { isDeepStrictEqual } from "node:util";
 import type { DelegatedStageInput, AgentEvent, AgentRun } from "./types";
 import { JsonRpc, RpcRemoteError, type RpcMessage } from "./rpc";
@@ -8,7 +13,7 @@ import {
   verifyChildSpawn,
 } from "./protocol";
 import type { ParentSessionContext } from "./parent-session";
-import { PARENT_AGENT_MODEL, AGENT_TREE_STOP_SWEEPS } from "./limits";
+
 import { durableSpawnEvidence } from "./spawn-evidence";
 type LiveThread = { turnId?: string; status?: string; usage?: unknown };
 export class DelegatedStageAttempt {
@@ -50,15 +55,15 @@ export class DelegatedStageAttempt {
       this.resolveRun = resolve;
       this.rejectRun = reject;
       this.unsubscribeFailure = this.rpc.onFailure(() =>
-        this.rejectAttempt("runtime_state_unknown"),
+        this.rejectAttempt(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN),
       );
       this.unsubscribeMessages = this.rpc.onMessage(this.handleRuntimeMessage);
       this.signal.addEventListener("abort", this.onAbort, { once: true });
       this.rpc
-        .request("turn/start", {
+        .request(CodexRpcMethod.TURN_START, {
           threadId: this.parent.threadId,
-          model: PARENT_AGENT_MODEL.model,
-          effort: PARENT_AGENT_MODEL.effort,
+          model: ModelDefaults.PARENT.model,
+          effort: ModelDefaults.PARENT.effort,
           input: [
             { type: "text", text: JSON.stringify(this.parent.assignment) },
           ],
@@ -79,7 +84,7 @@ export class DelegatedStageAttempt {
             data: {
               threadId: this.parent.threadId,
               turnId: r.turn.id,
-              model: PARENT_AGENT_MODEL,
+              model: ModelDefaults.PARENT,
             },
           });
           if (this.signal.aborted) this.onAbort();
@@ -89,7 +94,7 @@ export class DelegatedStageAttempt {
           this.settleStart();
           if (error instanceof RpcRemoteError)
             this.stopForContractViolation(error.message);
-          else this.rejectAttempt("runtime_state_unknown");
+          else this.rejectAttempt(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
         });
     });
   }
@@ -108,7 +113,7 @@ export class DelegatedStageAttempt {
   private readThreadState = async (id: string) => {
     const read = await requestThreadWhenRolloutReady(
       this.rpc,
-      "thread/read",
+      CodexRpcMethod.THREAD_READ,
       { threadId: id, includeTurns: true },
       this.timeoutMs,
     );
@@ -126,16 +131,16 @@ export class DelegatedStageAttempt {
     this.stopping = true;
     if (this.deadlineTimer) clearTimeout(this.deadlineTimer);
     this.deadlineTimer = setTimeout(
-      () => this.rejectAttempt("runtime_state_unknown"),
+      () => this.rejectAttempt(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN),
       this.timeoutMs,
     );
     try {
       // A pending start may create a writer after a read reported no active turn.
       await this.startSettled;
       if (this.startFailure && !(this.startFailure instanceof RpcRemoteError))
-        throw new Error("runtime_state_unknown");
+        throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
       // Reconcile after stopping the parent so a spawn in flight cannot escape cancellation.
-      for (let sweep = 0; sweep < AGENT_TREE_STOP_SWEEPS; sweep++) {
+      for (let sweep = 0; sweep < CodexLimits.AGENT_TREE_STOP_SWEEPS; sweep++) {
         for (const t of await listDescendantThreads(
           this.rpc,
           this.parent.threadId,
@@ -151,7 +156,7 @@ export class DelegatedStageAttempt {
             const stopped = new Promise<void>((res, rej) => {
               const off = this.rpc.onMessage((m) => {
                 if (
-                  m.method === "turn/completed" &&
+                  m.method === CodexRpcMethod.TURN_COMPLETED &&
                   m.params?.threadId === id &&
                   m.params?.turn?.id === state.turnId
                 ) {
@@ -160,7 +165,7 @@ export class DelegatedStageAttempt {
                 }
               });
               this.rpc
-                .request("turn/interrupt", {
+                .request(CodexRpcMethod.TURN_INTERRUPT, {
                   threadId: id,
                   turnId: state.turnId,
                 })
@@ -171,7 +176,7 @@ export class DelegatedStageAttempt {
               // Listener lifetime is bounded by the cancellation deadline, even with a lost notification.
               const deadline = setTimeout(() => {
                 off();
-                rej(new Error("runtime_state_unknown"));
+                rej(new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN));
               }, this.timeoutMs);
               this.interruptListenerCleanup.push(() => {
                 off();
@@ -181,13 +186,13 @@ export class DelegatedStageAttempt {
             await stopped;
             await this.readThreadState(id);
             if (this.liveThreads.get(id)!.status === "inProgress")
-              throw new Error("runtime_state_unknown");
+              throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
           }),
         );
       }
       this.rejectAttempt(reason);
     } catch {
-      this.rejectAttempt("runtime_state_unknown");
+      this.rejectAttempt(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
     } finally {
       for (const f of this.interruptListenerCleanup) f();
     }
@@ -212,16 +217,17 @@ export class DelegatedStageAttempt {
     this.checking = true;
     this.verificationRequested = false;
     try {
-      if (!this.nativeChildId) throw new Error("subagent_evidence_missing");
+      if (!this.nativeChildId)
+        throw new Error(ApplicationErrorCode.SUBAGENT_EVIDENCE_MISSING);
       const audit = await this.childAudits.get(this.nativeChildId);
       if (this.spawnCalls.size !== 1)
-        throw new Error("subagent_evidence_missing");
+        throw new Error(ApplicationErrorCode.SUBAGENT_EVIDENCE_MISSING);
       if (
         !audit ||
         audit.thread.parentThreadId !== this.parent.threadId ||
         !matchesAgentSettings(audit, this.input, true)
       )
-        throw new Error("subagent_identity_or_settings_mismatch");
+        throw new Error(CodexErrorCode.SUBAGENT_IDENTITY_OR_SETTINGS_MISMATCH);
       const child = await this.readThreadState(this.nativeChildId),
         turn = child.turns.at(-1);
       if (turn?.status === "inProgress") {
@@ -231,7 +237,8 @@ export class DelegatedStageAttempt {
         );
         return;
       }
-      if (turn?.status !== "completed") throw new Error("subagent_failed");
+      if (turn?.status !== "completed")
+        throw new Error(CodexErrorCode.SUBAGENT_FAILED);
       const texts = turn.items.filter(
         (i: { type: string; phase?: string; text?: string }) =>
           i.type === "agentMessage" && i.phase !== "commentary",
@@ -246,7 +253,7 @@ export class DelegatedStageAttempt {
           attemptId: result.attemptId,
         })
       )
-        throw new Error("subagent_output_mismatch");
+        throw new Error(CodexErrorCode.SUBAGENT_OUTPUT_MISMATCH);
       const tree = (
         await listDescendantThreads(this.rpc, this.parent.threadId)
       ).filter((t) => !this.parent.previous.has(t.id));
@@ -257,7 +264,7 @@ export class DelegatedStageAttempt {
             t.parentThreadId !== this.parent.threadId,
         )
       )
-        throw new Error("subagent_limit_exceeded");
+        throw new Error(CodexErrorCode.SUBAGENT_LIMIT_EXCEEDED);
       if (this.stopping || this.finished || this.signal.aborted) {
         this.onAbort();
         return;
@@ -281,7 +288,7 @@ export class DelegatedStageAttempt {
     } catch (error) {
       this.stopForContractViolation(
         error instanceof SyntaxError
-          ? "agent_invalid_output"
+          ? CodexErrorCode.AGENT_INVALID_OUTPUT
           : (error as Error).message,
       );
     } finally {
@@ -294,7 +301,10 @@ export class DelegatedStageAttempt {
   private handleRuntimeMessage = (m: RpcMessage) => {
     const p = m.params ?? {},
       item = p.item;
-    if (this.parent.previous.has(p.threadId) && m.method === "turn/started") {
+    if (
+      this.parent.previous.has(p.threadId) &&
+      m.method === CodexRpcMethod.TURN_STARTED
+    ) {
       this.liveThreads.set(p.threadId, {
         turnId: p.turn.id,
         status: "inProgress",
@@ -305,7 +315,7 @@ export class DelegatedStageAttempt {
     if (!this.liveThreads.has(p.threadId)) return;
     if (
       p.threadId === this.parent.threadId &&
-      m.method === "item/completed" &&
+      m.method === CodexRpcMethod.ITEM_COMPLETED &&
       item?.type === "subAgentActivity" &&
       item.kind === "interacted" &&
       this.parent.previous.has(item.agentThreadId)
@@ -317,7 +327,7 @@ export class DelegatedStageAttempt {
     }
     if (
       p.threadId === this.parent.threadId &&
-      m.method === "item/started" &&
+      m.method === CodexRpcMethod.ITEM_STARTED &&
       item?.type === "collabAgentToolCall"
     ) {
       const old = (item.receiverThreadIds ?? []).filter((id: string) =>
@@ -343,7 +353,7 @@ export class DelegatedStageAttempt {
       item.name === "spawn_agent"
     ) {
       if (p.threadId !== this.parent.threadId) {
-        this.stopForContractViolation("subagent_limit_exceeded");
+        this.stopForContractViolation(CodexErrorCode.SUBAGENT_LIMIT_EXCEEDED);
         return;
       }
       try {
@@ -353,13 +363,17 @@ export class DelegatedStageAttempt {
           this.spawnCalls.size !== 1 ||
           !verifyChildSpawn(args, this.parent.assignment, this.input)
         )
-          this.stopForContractViolation("subagent_spawn_contract_violation");
+          this.stopForContractViolation(
+            CodexErrorCode.SUBAGENT_SPAWN_CONTRACT_VIOLATION,
+          );
       } catch {
-        this.stopForContractViolation("subagent_spawn_contract_violation");
+        this.stopForContractViolation(
+          CodexErrorCode.SUBAGENT_SPAWN_CONTRACT_VIOLATION,
+        );
       }
     }
     if (
-      m.method === "item/completed" &&
+      m.method === CodexRpcMethod.ITEM_COMPLETED &&
       item?.type === "subAgentActivity" &&
       item.kind === "started"
     ) {
@@ -369,7 +383,7 @@ export class DelegatedStageAttempt {
         this.nativeChildId ||
         this.parent.previous.has(item.agentThreadId)
       ) {
-        this.stopForContractViolation("subagent_limit_exceeded");
+        this.stopForContractViolation(CodexErrorCode.SUBAGENT_LIMIT_EXCEEDED);
         return;
       }
       this.nativeChildId = item.agentThreadId;
@@ -389,10 +403,10 @@ export class DelegatedStageAttempt {
           this.spawnCalls.size !== 1 ||
           !verifyChildSpawn(args, this.parent.assignment, this.input)
         )
-          throw new Error("subagent_spawn_contract_violation");
+          throw new Error(CodexErrorCode.SUBAGENT_SPAWN_CONTRACT_VIOLATION);
         return requestThreadWhenRolloutReady(
           this.rpc,
-          "thread/resume",
+          CodexRpcMethod.THREAD_RESUME,
           { threadId: id, excludeTurns: true },
           this.timeoutMs,
         );
@@ -406,7 +420,7 @@ export class DelegatedStageAttempt {
             !matchesAgentSettings(a, this.input, true)
           ) {
             this.stopForContractViolation(
-              "subagent_identity_or_settings_mismatch",
+              CodexErrorCode.SUBAGENT_IDENTITY_OR_SETTINGS_MISMATCH,
             );
             return;
           }
@@ -420,15 +434,19 @@ export class DelegatedStageAttempt {
           });
           void this.readVerifiedChildResult();
         })
-        .catch(() => this.stopForContractViolation("runtime_state_unknown"));
+        .catch(() =>
+          this.stopForContractViolation(
+            ApplicationErrorCode.RUNTIME_STATE_UNKNOWN,
+          ),
+        );
     }
-    if (m.method === "turn/started")
+    if (m.method === CodexRpcMethod.TURN_STARTED)
       this.liveThreads.set(p.threadId, {
         ...this.liveThreads.get(p.threadId),
         turnId: p.turn.id,
         status: "inProgress",
       });
-    if (m.method === "turn/completed") {
+    if (m.method === CodexRpcMethod.TURN_COMPLETED) {
       this.liveThreads.set(p.threadId, {
         ...this.liveThreads.get(p.threadId),
         turnId: p.turn.id,
@@ -448,22 +466,22 @@ export class DelegatedStageAttempt {
       }
       void this.readVerifiedChildResult();
     }
-    if (m.method === "thread/tokenUsage/updated")
+    if (m.method === CodexRpcMethod.THREAD_TOKEN_USAGE_UPDATED)
       this.liveThreads.get(p.threadId)!.usage = p.tokenUsage;
     if (
-      m.method === "item/completed" &&
+      m.method === CodexRpcMethod.ITEM_COMPLETED &&
       item?.type === "agentMessage" &&
       p.threadId === this.parent.threadId &&
       item.phase !== "commentary"
     )
       this.parentReceiptText = item.text;
-    if (m.method === "item/agentMessage/delta")
+    if (m.method === CodexRpcMethod.ITEM_AGENT_MESSAGE_DELTA)
       this.onEvent({
         type: "message",
         data: { threadId: p.threadId, text: p.delta },
       });
     if (
-      m.method === "item/started" &&
+      m.method === CodexRpcMethod.ITEM_STARTED &&
       p.threadId === this.parent.threadId &&
       ![
         "userMessage",
@@ -477,7 +495,10 @@ export class DelegatedStageAttempt {
       this.stopForContractViolation(
         "parent_tool_violation: runtime_state_unknown",
       );
-    if (m.method === "item/started" || m.method === "item/completed")
+    if (
+      m.method === CodexRpcMethod.ITEM_STARTED ||
+      m.method === CodexRpcMethod.ITEM_COMPLETED
+    )
       this.onEvent({ type: "tool", data: { method: m.method, ...p } });
   };
 }

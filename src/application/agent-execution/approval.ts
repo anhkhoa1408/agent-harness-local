@@ -1,8 +1,9 @@
+import { EventType, WorkerTiming } from "../constants/index";
 import type { ApplicationStore } from "../ports";
 import type { RuntimePort } from "../runtime";
 import type { Task } from "../../domain/contracts";
 import type { AgentExecutionPort, AgentEvent } from "../execution-contracts";
-import { APPROVAL_POLL_INTERVAL_MS } from "../limits";
+
 export class ApprovalBroker {
   private poll?: () => void;
   private readonly pending = new Set<string>();
@@ -15,23 +16,26 @@ export class ApprovalBroker {
   ) {}
   start() {
     const { store, client } = this;
-    this.poll = this.runtime.every(APPROVAL_POLL_INTERVAL_MS, () => {
-      for (const key of this.pending) {
-        const grant = store.approvals.get(key);
-        if (grant?.decision) {
-          this.pending.delete(key);
-          client
-            .respondToApproval(grant.requestId, { decision: grant.decision })
-            .catch(() => {});
+    this.poll = this.runtime.every(
+      WorkerTiming.APPROVAL_POLL_INTERVAL_MS,
+      () => {
+        for (const key of this.pending) {
+          const grant = store.approvals.get(key);
+          if (grant?.decision) {
+            this.pending.delete(key);
+            client
+              .respondToApproval(grant.requestId, { decision: grant.decision })
+              .catch(() => {});
+          }
         }
-      }
-    });
+      },
+    );
   }
   handleRequest(request: Extract<AgentEvent, { type: "approval" }>["data"]) {
     const { store, client, task } = this;
     if (task.executionMode === "auto") {
       void client.respondToApproval(request.requestId, { decision: "decline" });
-      store.events.add(task.id, "approval.auto_declined", {
+      store.events.add(task.id, EventType.APPROVAL_AUTO_DECLINED, {
         method: request.method,
       });
       return;
@@ -39,7 +43,7 @@ export class ApprovalBroker {
     const key = `${task.id}:${String(request.requestId)}`;
     if (!this.supports(request.method)) {
       void client.respondToApproval(request.requestId, { decision: "decline" });
-      store.events.add(task.id, "approval.unsupported", {
+      store.events.add(task.id, EventType.APPROVAL_UNSUPPORTED, {
         method: request.method,
       });
       return;
@@ -51,7 +55,7 @@ export class ApprovalBroker {
       decision: null,
     });
     this.pending.add(key);
-    store.events.add(task.id, "approval.requested", {
+    store.events.add(task.id, EventType.APPROVAL_REQUESTED, {
       id: key,
       method: request.method,
     });

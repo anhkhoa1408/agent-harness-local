@@ -1,3 +1,7 @@
+import { DomainErrorCode } from "../../domain/constants/domain-error-code";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
+import { TaskStatus } from "../../domain/constants/task-status";
+import { ApplicationErrorCode, EventType } from "../constants/index";
 import { type Task } from "../../domain/contracts";
 
 import { type CheckResult } from "../../domain/evidence";
@@ -14,7 +18,7 @@ export function createMutationHandler(
   return async (task: Task, signal: AbortSignal) => {
     const plan = planOf(task);
     if (!canImplement(task, plan) || !task.worktree)
-      throw new Error("plan_not_approved");
+      throw new Error(DomainErrorCode.PLAN_NOT_APPROVED);
     const result = await executor.executeAgentStage(
       task,
       task.stage as "implement" | "repair",
@@ -25,7 +29,7 @@ export function createMutationHandler(
         profile: store.profiles.get(
           `${task.repositoryId}:${task.sourceCommit}`,
         ),
-        ...(task.stage === "repair"
+        ...(task.stage === PipelineStage.REPAIR
           ? {
               failures: await context.verificationIO.failureEvidence(
                 (store.checks.get(task.id) ?? []) as CheckResult[],
@@ -46,13 +50,13 @@ export function createMutationHandler(
         {
           approvedPlanVersion: null,
           resumeStage: task.stage,
-          stage: "plan",
-          status: "queued",
+          stage: PipelineStage.PLAN,
+          status: TaskStatus.QUEUED,
           reason: result.reason,
         },
-        { type: "plan.invalidated", data: result },
+        { type: EventType.PLAN_INVALIDATED, data: result },
       );
-      return queuedStageResult("plan", result);
+      return queuedStageResult(PipelineStage.PLAN, result);
     }
     const changed = [
         ...(
@@ -76,7 +80,7 @@ export function createMutationHandler(
           ),
       )
     )
-      throw new Error("scope_changed_requires_plan");
-    return queuedStageResult("verify", result);
+      throw new Error(ApplicationErrorCode.SCOPE_CHANGED_REQUIRES_PLAN);
+    return queuedStageResult(PipelineStage.VERIFY, result);
   };
 }

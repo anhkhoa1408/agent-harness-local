@@ -1,3 +1,4 @@
+import { ApplicationErrorCode } from "../constants/index";
 import { evidenceExclusions } from "../../domain/evidence";
 import type { Task, Plan } from "../../domain/contracts";
 import type { CheckResult } from "../../domain/evidence";
@@ -10,7 +11,7 @@ export async function runChecks(
   artifacts: string,
   io: VerificationPort,
 ): Promise<CheckResult[]> {
-  if (!task.worktree) throw new Error("worktree_missing");
+  if (!task.worktree) throw new Error(ApplicationErrorCode.WORKTREE_MISSING);
   const root = task.worktree,
     excluded = evidenceExclusions(plan);
   const fingerprint = await io.fingerprint(root, excluded, task.sourceCommit),
@@ -27,7 +28,8 @@ export async function runChecks(
       if (spec.reportPath) {
         report = await io.reportPath(root, spec.reportPath);
         const tracked = await io.isTracked(root, spec.reportPath);
-        if (tracked) throw new Error("report_overwrites_source");
+        if (tracked)
+          throw new Error(ApplicationErrorCode.REPORT_OVERWRITES_SOURCE);
         await io.remove(report);
       }
       const run = await io.runProcess(spec, root, artifacts, signal);

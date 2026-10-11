@@ -1,4 +1,5 @@
-import { MAX_SOURCE_DOCUMENT_BYTES } from "../repositories/limits";
+import { RepositoryLimits } from "../repositories/constants/repository-limits";
+
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type { Stage } from "../../domain/contracts";
@@ -47,7 +48,9 @@ async function stackDocuments(root: string) {
           entry.name,
         )
       ) {
-        if ((await stat(path)).size <= MAX_SOURCE_DOCUMENT_BYTES)
+        if (
+          (await stat(path)).size <= RepositoryLimits.MAX_SOURCE_DOCUMENT_BYTES
+        )
           docs.push({
             path: relative(root, path),
             content: await readFile(path, "utf8"),

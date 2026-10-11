@@ -1,3 +1,7 @@
+import { PipelineStage } from "../../../domain/constants/pipeline-stage";
+import { DomainErrorCode } from "../../../domain/constants/domain-error-code";
+import { ApplicationErrorCode } from "../../constants/index";
+import { TaskStatus } from "../../../domain/constants/task-status";
 import { type CheckResult } from "../../../domain/evidence";
 
 import { nextAfterReview } from "../../../domain/transitions";
@@ -18,7 +22,7 @@ export function createReviewHandler(
     await context.verificationIO.verifyImageEvidence(checks);
     const review = await executor.executeAgentStage(
       task,
-      "review",
+      PipelineStage.REVIEW,
       context.validation.outputs.review,
       {
         task: stageTask(task),
@@ -39,9 +43,10 @@ export function createReviewHandler(
       review.planVersion !== plan.version ||
       review.fingerprint !== before
     )
-      throw new Error("stale_review");
+      throw new Error(DomainErrorCode.STALE_REVIEW);
     const after = await fingerprint(task, plan);
-    if (before !== after) throw new Error("review_snapshot_changed");
+    if (before !== after)
+      throw new Error(ApplicationErrorCode.REVIEW_SNAPSHOT_CHANGED);
     store.reviews.put(task.id, review);
     const errors = acceptanceErrors(task, plan, checks, review, after);
     store.acceptance.put(task.id, {
@@ -51,8 +56,8 @@ export function createReviewHandler(
     });
     if (review.verdict === "pass" && errors.length)
       return {
-        stage: "review",
-        status: "blocked",
+        stage: PipelineStage.REVIEW,
+        status: TaskStatus.BLOCKED,
         reason: errors.join(","),
         output: review,
       };

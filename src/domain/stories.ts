@@ -1,3 +1,4 @@
+import { DomainErrorCode } from "./constants/domain-error-code";
 import { type Plan, type Story, type StorySelection } from "./contracts";
 
 export function validateStories(plan: Plan): string[] {
@@ -33,7 +34,7 @@ export function validateStories(plan: Plan): string[] {
     visited = new Set<string>();
   function visit(id: string): void {
     if (visiting.has(id)) {
-      errors.push("story_cycle");
+      errors.push(DomainErrorCode.STORY_CYCLE);
       return;
     }
     if (visited.has(id)) return;
@@ -55,7 +56,8 @@ export function validateStories(plan: Plan): string[] {
 }
 export function selectedStories(plan: Plan, raw: StorySelection): Story[] {
   const selection = raw;
-  if (selection.planVersion !== plan.version) throw new Error("stale_plan");
+  if (selection.planVersion !== plan.version)
+    throw new Error(DomainErrorCode.STALE_PLAN);
   const errors = validateStories(plan);
   if (errors.length || !plan.stories)
     throw new Error(`invalid_stories:${errors.join(",")}`);
@@ -64,16 +66,16 @@ export function selectedStories(plan: Plan, raw: StorySelection): Story[] {
     ids.size !== selection.storyIds.length ||
     selection.storyIds.some((id) => !plan.stories!.some((s) => s.id === id))
   )
-    throw new Error("invalid_story_selection");
+    throw new Error(DomainErrorCode.INVALID_STORY_SELECTION);
   const remaining = plan.stories.filter((s) => ids.has(s.id)),
     ordered: Story[] = [];
   if (remaining.some((s) => s.dependsOn.some((id) => !ids.has(id))))
-    throw new Error("story_dependency_required");
+    throw new Error(DomainErrorCode.STORY_DEPENDENCY_REQUIRED);
   while (remaining.length) {
     const index = remaining.findIndex((s) =>
       s.dependsOn.every((id) => ordered.some((o) => o.id === id)),
     );
-    if (index < 0) throw new Error("story_cycle");
+    if (index < 0) throw new Error(DomainErrorCode.STORY_CYCLE);
     ordered.push(...remaining.splice(index, 1));
   }
   return ordered;
@@ -119,7 +121,7 @@ export function projectStoryPlan(
   baselineCommit: string,
 ): Plan {
   const story = plan.stories?.find((s) => s.id === storyId);
-  if (!story) throw new Error("story_not_found");
+  if (!story) throw new Error(DomainErrorCode.STORY_NOT_FOUND);
   return project(plan, [story], baselineCommit);
 }
 export function projectSelectedPlan(

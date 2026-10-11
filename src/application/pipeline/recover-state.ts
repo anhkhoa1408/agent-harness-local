@@ -1,3 +1,5 @@
+import { TaskStatus } from "../../domain/constants/task-status";
+import { ApplicationErrorCode, EventType } from "../constants/index";
 import type { ApplicationStore } from "../ports";
 import type { Attempt } from "../pipeline-contracts";
 
@@ -8,28 +10,33 @@ export function restoreInterruptedTasks(
 ) {
   // The previous worker's attempts ended; agent/process safety still uses exclusions below.
   for (const attempt of store.attempts.list() as Attempt[])
-    if (attempt.status === "running")
+    if (attempt.status === TaskStatus.RUNNING)
       store.attempts.put(attempt.id, {
         ...attempt,
-        status: "interrupted",
+        status: TaskStatus.INTERRUPTED,
         output: { error: "worker_restart_runtime_unknown" },
       });
   // Unknown runtimes survive process death. An explicit reconciliation is required before reuse.
-  for (const task of store.tasks.list().filter((t) => t.status === "running"))
+  for (const task of store.tasks
+    .list()
+    .filter((t) => t.status === TaskStatus.RUNNING))
     store.atomic(() => {
       const ownership = store.ownership.get(task.id) as {
         bootId: string | null;
       } | null;
       store.exclusions.put(task.id, {
         taskId: task.id,
-        reason: "runtime_state_unknown",
+        reason: ApplicationErrorCode.RUNTIME_STATE_UNKNOWN,
         bootId: ownership?.bootId ?? null,
       });
       store.tasks.update(
         task.id,
         task.revision,
-        { status: "interrupted", reason: "runtime_state_unknown" },
-        event("recovery.required"),
+        {
+          status: TaskStatus.INTERRUPTED,
+          reason: ApplicationErrorCode.RUNTIME_STATE_UNKNOWN,
+        },
+        event(EventType.RECOVERY_REQUIRED),
       );
     });
   for (const record of store.exclusions.list() as {
@@ -40,12 +47,16 @@ export function restoreInterruptedTasks(
       store.atomic(() => {
         const task = store.tasks.get(record.taskId);
         store.exclusions.delete(task.id);
-        if (!["completed", "cancelled"].includes(task.status))
+        if (
+          ![TaskStatus.COMPLETED, TaskStatus.CANCELLED].some(
+            (value) => value === task.status,
+          )
+        )
           store.tasks.update(
             task.id,
             task.revision,
-            { status: "paused", reason: "host_restart_confirmed" },
-            event("recovery.stopped"),
+            { status: TaskStatus.PAUSED, reason: "host_restart_confirmed" },
+            event(EventType.RECOVERY_STOPPED),
           );
       });
   }

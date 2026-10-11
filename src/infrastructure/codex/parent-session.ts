@@ -1,3 +1,8 @@
+import { ApplicationErrorCode } from "../../application/constants/index";
+import { CodexRpcMethod } from "./constants/codex-rpc-method";
+import { ModelDefaults } from "../../domain/constants/model-defaults";
+import { CodexLimits } from "./constants/codex-limits";
+import { CodexErrorCode } from "./constants/codex-error-code";
 import { JsonRpc } from "./rpc";
 import type { DelegatedStageInput, AgentEvent } from "./types";
 import {
@@ -6,13 +11,7 @@ import {
   stageAssignment,
 } from "../context/prompts";
 import { listDescendantThreads, matchesAgentSettings } from "./protocol";
-import {
-  PARENT_AGENT_MODEL,
-  AGENT_SETTINGS_SETTLE_TIMEOUT_MS,
-  ROLLOUT_INITIAL_RETRY_DELAY_MS,
-  ROLLOUT_MAX_RETRY_DELAY_MS,
-} from "./limits";
-export { PARENT_AGENT_MODEL } from "./limits";
+
 export type ParentSessionContext = {
   threadId: string;
   response: import("./rpc").ThreadResponse;
@@ -31,17 +30,19 @@ export class ParentAgentSession {
     if (signal.aborted) throw new Error("interrupted");
     const preflightRequest = (method: string, params: unknown) =>
       rpc.request(method, params).catch(() => {
-        throw new Error("runtime_state_unknown");
+        throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
       });
     let response = await preflightRequest(
-      input.threadId ? "thread/resume" : "thread/start",
+      input.threadId
+        ? CodexRpcMethod.THREAD_RESUME
+        : CodexRpcMethod.THREAD_START,
       {
         ...(input.threadId
           ? { threadId: input.threadId }
           : { experimentalRawEvents: true }),
         cwd: input.cwd,
         runtimeWorkspaceRoots: [input.cwd],
-        model: PARENT_AGENT_MODEL.model,
+        model: ModelDefaults.PARENT.model,
         sandbox: input.write ? "workspace-write" : "read-only",
         approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
         developerInstructions: parentInstructions,
@@ -52,19 +53,22 @@ export class ParentAgentSession {
       },
     );
     const threadId = response.thread.id as string;
-    onEvent({ type: "parent", data: { threadId, model: PARENT_AGENT_MODEL } });
+    onEvent({
+      type: "parent",
+      data: { threadId, model: ModelDefaults.PARENT },
+    });
     if (
       response.thread.status?.type === "active" ||
       response.thread.turns?.some(
         (t: { status: string }) => t.status === "inProgress",
       )
     )
-      throw new Error("runtime_state_unknown");
+      throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
     const previous = new Set(
       (await listDescendantThreads(rpc, threadId)).map((t) => t.id),
     );
     for (const id of previous) {
-      const read = await preflightRequest("thread/read", {
+      const read = await preflightRequest(CodexRpcMethod.THREAD_READ, {
         threadId: id,
         includeTurns: true,
       });
@@ -73,16 +77,16 @@ export class ParentAgentSession {
           (t: { status: string }) => t.status === "inProgress",
         )
       )
-        throw new Error("runtime_state_unknown");
+        throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
     }
     if (signal.aborted) throw new Error("interrupted");
     if (input.threadId) {
       // Rejoining a loaded thread can retain its existing permissions despite resume overrides.
-      await preflightRequest("thread/settings/update", {
+      await preflightRequest(CodexRpcMethod.THREAD_SETTINGS_UPDATE, {
         threadId,
         cwd: input.cwd,
-        model: PARENT_AGENT_MODEL.model,
-        effort: PARENT_AGENT_MODEL.effort,
+        model: ModelDefaults.PARENT.model,
+        effort: ModelDefaults.PARENT.effort,
         approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
         sandboxPolicy: input.write
           ? {
@@ -95,16 +99,17 @@ export class ParentAgentSession {
           : { type: "readOnly", networkAccess: false },
       });
       // The settings acknowledgement can precede application to the loaded session.
-      const deadline = Date.now() + AGENT_SETTINGS_SETTLE_TIMEOUT_MS;
-      let delay = ROLLOUT_INITIAL_RETRY_DELAY_MS;
+      const deadline =
+        Date.now() + CodexLimits.AGENT_SETTINGS_SETTLE_TIMEOUT_MS;
+      let delay = CodexLimits.ROLLOUT_INITIAL_RETRY_DELAY_MS;
       for (;;) {
         if (signal.aborted) throw new Error("interrupted");
-        response = await preflightRequest("thread/resume", {
+        response = await preflightRequest(CodexRpcMethod.THREAD_RESUME, {
           threadId,
           excludeTurns: true,
         });
         if (response.thread.status?.type === "active")
-          throw new Error("runtime_state_unknown");
+          throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
         if (
           matchesAgentSettings(response, input, false) ||
           Date.now() >= deadline
@@ -113,11 +118,11 @@ export class ParentAgentSession {
         await new Promise((resolve) =>
           setTimeout(resolve, Math.min(delay, deadline - Date.now())),
         );
-        delay = Math.min(delay * 2, ROLLOUT_MAX_RETRY_DELAY_MS);
+        delay = Math.min(delay * 2, CodexLimits.ROLLOUT_MAX_RETRY_DELAY_MS);
       }
     }
     if (!matchesAgentSettings(response, input, false))
-      throw new Error("subagent_capability_unavailable");
+      throw new Error(CodexErrorCode.SUBAGENT_CAPABILITY_UNAVAILABLE);
     if (signal.aborted) throw new Error("interrupted");
     const assignment = stageAssignment(input),
       receiptSchema = parentReceiptSchema(input);

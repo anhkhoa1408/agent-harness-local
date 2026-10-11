@@ -1,3 +1,5 @@
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
+import { ApplicationErrorCode, EventType } from "../constants/index";
 import type { Task, AiStage, Stage } from "../../domain/contracts";
 import {
   parentAgentModel as parentModel,
@@ -92,7 +94,8 @@ export class StageAgentExecutor {
       prompt: typeof context === "string" ? context : JSON.stringify(context),
       outputSchema: schema.jsonSchema(),
       executionMode: task.executionMode,
-      write: stage === "implement" || stage === "repair",
+      write:
+        stage === PipelineStage.IMPLEMENT || stage === PipelineStage.REPAIR,
       threadId: parent?.threadId,
       delegation: {
         stage: runtimeStage,
@@ -151,7 +154,7 @@ export class StageAgentExecutor {
             runtime({ threadId: event.data.threadId, parentModel });
           } else if (event.type === "child") {
             runtime({ child: event.data });
-            store.events.add(task.id, "subagent.started", {
+            store.events.add(task.id, EventType.SUBAGENT_STARTED, {
               stage: runtimeStage,
               attemptId,
               ...event.data,
@@ -163,7 +166,7 @@ export class StageAgentExecutor {
               parentModel,
               state: "running",
             });
-            store.events.add(task.id, "agent.started", {
+            store.events.add(task.id, EventType.AGENT_STARTED, {
               stage: runtimeStage,
               model,
               ...event.data,
@@ -172,7 +175,8 @@ export class StageAgentExecutor {
         },
         signal,
       );
-      if (!run.child) throw new Error("subagent_evidence_missing");
+      if (!run.child)
+        throw new Error(ApplicationErrorCode.SUBAGENT_EVIDENCE_MISSING);
       runtime({
         threadId: run.threadId,
         turnId: run.turnId,
@@ -185,7 +189,7 @@ export class StageAgentExecutor {
       runtime({
         state:
           error instanceof Error &&
-          error.message.includes("runtime_state_unknown")
+          error.message.includes(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN)
             ? "unknown"
             : "stopped",
       });

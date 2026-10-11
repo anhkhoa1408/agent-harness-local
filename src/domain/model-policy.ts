@@ -1,3 +1,5 @@
+import { PipelineStage } from "./constants/pipeline-stage";
+import { ModelDefaults } from "./constants/model-defaults";
 import {
   aiStages,
   type AiStage,
@@ -7,13 +9,18 @@ import {
 export type ModelInfo = { id: string; efforts: string[]; isDefault: boolean };
 // Edit these defaults to change the pipeline policy. No runtime fallback.
 export const stageEffort = (stage: AiStage): "high" | "medium" =>
-  stage === "plan" ? "high" : "medium";
+  stage === PipelineStage.PLAN
+    ? ModelDefaults.PLANNING_EFFORT
+    : ModelDefaults.EXECUTION_EFFORT;
 export function defaultModels(): ModelMap {
   return Object.fromEntries(
     aiStages.map((stage) => [
       stage,
       {
-        model: stage === "plan" ? "gpt-6-astra" : "gpt-6-luna",
+        model:
+          stage === PipelineStage.PLAN
+            ? ModelDefaults.PLANNER_MODEL
+            : ModelDefaults.WORKER_MODEL,
         effort: stageEffort(stage),
       },
     ]),
@@ -45,4 +52,4 @@ export function resolveModel(
   return { ...choice };
 }
 
-export const parentAgentModel = { model: "gpt-6-luna", effort: "medium" };
+export const parentAgentModel = ModelDefaults.PARENT;

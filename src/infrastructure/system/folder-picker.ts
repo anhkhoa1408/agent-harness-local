@@ -1,7 +1,6 @@
-import {
-  FOLDER_PICKER_TIMEOUT_MS,
-  CLI_STATUS_MAX_BUFFER_BYTES,
-} from "./limits";
+import { SystemLimits } from "./constants/system-limits";
+import { ApplicationErrorCode } from "../../application/constants/index";
+
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -17,14 +16,15 @@ export function createFolderPicker(
   platform: string = process.platform,
   run: () => Promise<{ stdout: string }> = () =>
     exec("/usr/bin/osascript", ["-e", script], {
-      timeout: FOLDER_PICKER_TIMEOUT_MS,
-      maxBuffer: CLI_STATUS_MAX_BUFFER_BYTES,
+      timeout: SystemLimits.FOLDER_PICKER_TIMEOUT_MS,
+      maxBuffer: SystemLimits.CLI_STATUS_MAX_BUFFER_BYTES,
     }),
 ) {
   let busy = false;
   return async (): Promise<string | null> => {
-    if (platform !== "darwin") throw new Error("folder_picker_unsupported");
-    if (busy) throw new Error("folder_picker_busy");
+    if (platform !== "darwin")
+      throw new Error(ApplicationErrorCode.FOLDER_PICKER_UNSUPPORTED);
+    if (busy) throw new Error(ApplicationErrorCode.FOLDER_PICKER_BUSY);
     busy = true;
     try {
       const { stdout } = await run();
@@ -32,7 +32,7 @@ export function createFolderPicker(
       if (!path) return null;
       return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
     } catch {
-      throw new Error("folder_picker_failed");
+      throw new Error(ApplicationErrorCode.FOLDER_PICKER_FAILED);
     } finally {
       busy = false;
     }

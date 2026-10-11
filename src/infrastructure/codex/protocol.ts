@@ -1,11 +1,10 @@
+import { CodexLimits } from "./constants/codex-limits";
+import { CodexRpcMethod } from "./constants/codex-rpc-method";
+import { ApplicationErrorCode } from "../../application/constants/index";
+import { ModelDefaults } from "../../domain/constants/model-defaults";
 import type { DelegatedStageInput } from "./types";
 import { JsonRpc, RpcRemoteError } from "./rpc";
-import {
-  ROLLOUT_INITIAL_RETRY_DELAY_MS,
-  ROLLOUT_MAX_RETRY_DELAY_MS,
-  RUNTIME_PAGE_SIZE,
-} from "./limits";
-import { PARENT_AGENT_MODEL } from "./limits";
+
 export async function requestThreadWhenRolloutReady(
   rpc: JsonRpc,
   method: string,
@@ -13,7 +12,7 @@ export async function requestThreadWhenRolloutReady(
   timeoutMs: number,
 ) {
   const deadline = Date.now() + timeoutMs;
-  let delay = ROLLOUT_INITIAL_RETRY_DELAY_MS;
+  let delay = CodexLimits.ROLLOUT_INITIAL_RETRY_DELAY_MS;
   for (;;) {
     try {
       return await rpc.request(method, params);
@@ -34,7 +33,7 @@ export async function requestThreadWhenRolloutReady(
       await new Promise((resolve) =>
         setTimeout(resolve, Math.min(delay, deadline - Date.now())),
       );
-      delay = Math.min(delay * 2, ROLLOUT_MAX_RETRY_DELAY_MS);
+      delay = Math.min(delay * 2, CodexLimits.ROLLOUT_MAX_RETRY_DELAY_MS);
     }
   }
 }
@@ -53,18 +52,19 @@ export async function listDescendantThreads(
       .request<{
         data: import("./rpc").RuntimeThread[];
         nextCursor?: string | null;
-      }>("thread/list", {
+      }>(CodexRpcMethod.THREAD_LIST, {
         ancestorThreadId: threadId,
         sourceKinds: ["subAgent", "subAgentThreadSpawn"],
-        limit: RUNTIME_PAGE_SIZE,
+        limit: CodexLimits.RUNTIME_PAGE_SIZE,
         ...(cursor ? { cursor } : {}),
       })
       .catch(() => {
-        throw new Error("runtime_state_unknown");
+        throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
       });
     data.push(...page.data);
     cursor = page.nextCursor ?? null;
-    if (cursor && seen.has(cursor)) throw new Error("runtime_state_unknown");
+    if (cursor && seen.has(cursor))
+      throw new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN);
     if (cursor) seen.add(cursor);
   } while (cursor);
   return data;
@@ -74,7 +74,7 @@ export function matchesAgentSettings(
   input: DelegatedStageInput,
   child: boolean,
 ) {
-  const choice = child ? input.model : PARENT_AGENT_MODEL;
+  const choice = child ? input.model : ModelDefaults.PARENT;
   return (
     response.model === choice.model &&
     (!child || response.reasoningEffort === choice.effort) &&

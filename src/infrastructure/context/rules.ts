@@ -1,3 +1,4 @@
+import { ContextErrorCode } from "./constants/context-error-code";
 import { realpath, readFile, stat } from "node:fs/promises";
 import { resolve, relative, dirname, join, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
@@ -25,7 +26,7 @@ export async function contained(root: string, path: string): Promise<string> {
   const actual = resolve(existing, ...suffix),
     rel = relative(base, actual);
   if (rel === ".." || rel.startsWith("../") || isAbsolute(rel))
-    throw new Error("path_outside_root");
+    throw new Error(ContextErrorCode.PATH_OUTSIDE_ROOT);
   return actual;
 }
 export async function contextFile(

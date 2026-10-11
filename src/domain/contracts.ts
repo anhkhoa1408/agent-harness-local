@@ -1,47 +1,12 @@
-export const stages = [
-  "discover",
-  "analyze",
-  "plan",
-  "prepare",
-  "implement",
-  "verify",
-  "review",
-  "repair",
-  "deliver",
-] as const;
+import { PipelineStage } from "./constants/pipeline-stage";
+import { TaskStatus } from "./constants/task-status";
+export const stages = PipelineStage.ALL;
 
-export const aiStages = [
-  "discover",
-  "analyze",
-  "plan",
-  "implement",
-  "review",
-  "repair",
-] as const;
+export const aiStages = PipelineStage.AI;
 
-export type Stage =
-  | "discover"
-  | "analyze"
-  | "plan"
-  | "prepare"
-  | "implement"
-  | "verify"
-  | "review"
-  | "repair"
-  | "deliver";
+export type Stage = (typeof stages)[number];
 
-export const statuses = [
-  "queued",
-  "running",
-  "waiting_input",
-  "waiting_approval",
-  "blocked",
-  "paused",
-  "interrupted",
-  "completed",
-  "cancelled",
-  "failed",
-] as const;
+export const statuses = TaskStatus.ALL;
 export type Status = (typeof statuses)[number];
 
 export type AiStage = (typeof aiStages)[number];

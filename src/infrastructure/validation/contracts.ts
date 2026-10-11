@@ -1,3 +1,4 @@
+import { ValidationLimits } from "../../domain/constants/validation-limits";
 import {
   stages,
   aiStages,
@@ -5,19 +6,7 @@ import {
   type AiStage,
 } from "../../domain/contracts";
 export * from "../../domain/contracts";
-import {
-  MAX_TITLE_CHARACTERS,
-  MAX_REQUIREMENT_CHARACTERS,
-  MIN_CHECK_TIMEOUT_MS,
-  MAX_CHECK_TIMEOUT_MS,
-  MAX_SCREENSHOT_ID_CHARACTERS,
-  MAX_VIEWPORT_PIXELS,
-  MAX_SELECTED_SCREENSHOTS,
-  MAX_VISUAL_EVIDENCE_CHARACTERS,
-  MAX_STORY_ID_CHARACTERS,
-  MAX_PLAN_COMMENT_CHARACTERS,
-  MAX_COMMAND_ID_CHARACTERS,
-} from "../../domain/limits";
+
 import { z } from "zod";
 export const StageSchema = z.enum(stages);
 export const StatusSchema = z.enum(statuses);
@@ -37,8 +26,12 @@ export const NewTaskSchema = z.object({
   featureId: z.string().optional(),
   storyId: z.string().optional(),
   repositoryId: z.string().min(1),
-  title: z.string().trim().min(1).max(MAX_TITLE_CHARACTERS),
-  requirement: z.string().trim().min(1).max(MAX_REQUIREMENT_CHARACTERS),
+  title: z.string().trim().min(1).max(ValidationLimits.MAX_TITLE_CHARACTERS),
+  requirement: z
+    .string()
+    .trim()
+    .min(1)
+    .max(ValidationLimits.MAX_REQUIREMENT_CHARACTERS),
   sourceCommit: z.string().regex(/^[a-f0-9]{40,64}$/),
   targetBranch: z.string().min(1),
   deliveryMode: z.enum(["github", "local"]),
@@ -61,7 +54,7 @@ export const TaskSchema = NewTaskSchema.extend({
   updatedAt: z.number(),
 });
 export const ControlCommandSchema = z.object({
-  id: z.string().min(1).max(MAX_COMMAND_ID_CHARACTERS),
+  id: z.string().min(1).max(ValidationLimits.MAX_COMMAND_ID_CHARACTERS),
   taskId: z.string().min(1),
   kind: z.enum([
     "start",
@@ -95,8 +88,8 @@ export const CommandSpecSchema = z.object({
   timeoutMs: z
     .number()
     .int()
-    .min(MIN_CHECK_TIMEOUT_MS)
-    .max(MAX_CHECK_TIMEOUT_MS),
+    .min(ValidationLimits.MIN_CHECK_TIMEOUT_MS)
+    .max(ValidationLimits.MAX_CHECK_TIMEOUT_MS),
   reportPath: z.string().nullable(),
 });
 export const RepoProfileSchema = z.object({
@@ -123,19 +116,27 @@ export const UiVerificationSchema = z.object({
         id: z
           .string()
           .regex(/^[a-zA-Z0-9_-]+$/)
-          .max(MAX_SCREENSHOT_ID_CHARACTERS),
+          .max(ValidationLimits.MAX_SCREENSHOT_ID_CHARACTERS),
         checkId: z.string().min(1),
         path: z.string().min(1),
         criterionIds: z.array(z.string().min(1)).min(1),
         viewport: z.object({
-          width: z.number().int().min(1).max(MAX_VIEWPORT_PIXELS),
-          height: z.number().int().min(1).max(MAX_VIEWPORT_PIXELS),
+          width: z
+            .number()
+            .int()
+            .min(1)
+            .max(ValidationLimits.MAX_VIEWPORT_PIXELS),
+          height: z
+            .number()
+            .int()
+            .min(1)
+            .max(ValidationLimits.MAX_VIEWPORT_PIXELS),
         }),
         referencePath: z.string().min(1).nullable(),
       }),
     )
     .min(1)
-    .max(MAX_SELECTED_SCREENSHOTS),
+    .max(ValidationLimits.MAX_SELECTED_SCREENSHOTS),
 });
 export const VisualReviewSchema = z.object({
   screenshots: z
@@ -143,16 +144,20 @@ export const VisualReviewSchema = z.object({
       z.object({
         id: z.string(),
         passed: z.boolean(),
-        evidence: z.string().trim().min(1).max(MAX_VISUAL_EVIDENCE_CHARACTERS),
+        evidence: z
+          .string()
+          .trim()
+          .min(1)
+          .max(ValidationLimits.MAX_VISUAL_EVIDENCE_CHARACTERS),
       }),
     )
-    .max(MAX_SELECTED_SCREENSHOTS),
+    .max(ValidationLimits.MAX_SELECTED_SCREENSHOTS),
 });
 export const StorySchema = z.object({
   id: z
     .string()
     .min(1)
-    .max(MAX_STORY_ID_CHARACTERS)
+    .max(ValidationLimits.MAX_STORY_ID_CHARACTERS)
     .regex(/^[a-zA-Z0-9_-]+$/),
   title: z.string().min(1),
   outcome: z.string().min(1),
@@ -238,5 +243,9 @@ export const ReviewSchema = z.object({
 export const PlanCommentInputSchema = z.object({
   version: z.number().int().positive(),
   target: z.string().min(1),
-  text: z.string().trim().min(1).max(MAX_PLAN_COMMENT_CHARACTERS),
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(ValidationLimits.MAX_PLAN_COMMENT_CHARACTERS),
 });

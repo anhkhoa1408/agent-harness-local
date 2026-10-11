@@ -1,3 +1,4 @@
+import { RepositoriesErrorCode } from "./constants/repositories-error-code";
 import { readFile, writeFile, mkdir, lstat, readlink } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -57,7 +58,7 @@ export async function synchronizeBase(
 ): Promise<{ sourceCommit: string; baseCommit: string }> {
   signal.throwIfAborted();
   if ((await gitText(path, ["branch", "--show-current"])) !== task.branch)
-    throw new Error("worktree_collision");
+    throw new Error(RepositoriesErrorCode.WORKTREE_COLLISION);
   if (!repo.remote)
     return { sourceCommit: task.sourceCommit, baseCommit: task.sourceCommit };
   await mkdir(root, { recursive: true });
@@ -72,11 +73,12 @@ export async function synchronizeBase(
     writeFile(statePath, JSON.stringify(state), { mode: 0o600 });
   if (state?.sourceCommit && state.source === task.sourceCommit) {
     if ((await gitText(path, ["rev-parse", "HEAD"])) !== state.sourceCommit)
-      throw new Error("prepare_head_changed");
+      throw new Error(RepositoriesErrorCode.PREPARE_HEAD_CHANGED);
     return { sourceCommit: state.sourceCommit, baseCommit: state.baseCommit };
   }
   if (!state || state.source !== task.sourceCommit) {
-    if (state && !state.sourceCommit) throw new Error("prepare_source_changed");
+    if (state && !state.sourceCommit)
+      throw new Error(RepositoriesErrorCode.PREPARE_SOURCE_CHANGED);
     await gitText(
       repo.root,
       [
@@ -98,7 +100,7 @@ export async function synchronizeBase(
       (await gitText(path, ["merge-base", before, baseCommit])) === baseCommit;
     if (included) return { sourceCommit: task.sourceCommit, baseCommit };
     if (await gitText(path, ["status", "--porcelain"]))
-      throw new Error("prepare_dirty_worktree");
+      throw new Error(RepositoriesErrorCode.PREPARE_DIRTY_WORKTREE);
     state = { source: task.sourceCommit, baseCommit, before };
     await save();
   }
@@ -112,7 +114,8 @@ export async function synchronizeBase(
     await save();
     return { sourceCommit: head, baseCommit: state.baseCommit };
   }
-  if (head !== state.before) throw new Error("prepare_head_changed");
+  if (head !== state.before)
+    throw new Error(RepositoriesErrorCode.PREPARE_HEAD_CHANGED);
   let mergeHead: string | null = null;
   try {
     mergeHead = await gitText(path, ["rev-parse", "--verify", "MERGE_HEAD"]);
@@ -121,7 +124,7 @@ export async function synchronizeBase(
   }
   if (!mergeHead) {
     if (await gitText(path, ["status", "--porcelain"]))
-      throw new Error("prepare_dirty_worktree");
+      throw new Error(RepositoriesErrorCode.PREPARE_DIRTY_WORKTREE);
     try {
       await gitText(path, ["merge", "--no-edit", state.baseCommit], signal);
     } catch (error) {
@@ -136,7 +139,7 @@ export async function synchronizeBase(
   }
   if (mergeHead) {
     if (mergeHead !== state.baseCommit)
-      throw new Error("prepare_merge_collision");
+      throw new Error(RepositoriesErrorCode.PREPARE_MERGE_COLLISION);
     state.conflicts ??= (
       await gitText(path, ["diff", "--name-only", "--diff-filter=U", "-z"])
     )
@@ -146,16 +149,19 @@ export async function synchronizeBase(
     state.index ??= await gitText(path, ["ls-files", "--stage", "-z"]);
     await save();
     if ((await untouched(path, state.conflicts)) !== state.untouchedHash)
-      throw new Error("conflict_scope_changed");
+      throw new Error(RepositoriesErrorCode.CONFLICT_SCOPE_CHANGED);
     if (state.resolvedFingerprint) {
       if (
         (await fingerprintWorktree(path, [], state.source)) !==
         state.resolvedFingerprint
       )
-        throw new Error("conflict_resolution_changed");
+        throw new Error(RepositoriesErrorCode.CONFLICT_RESOLUTION_CHANGED);
     } else {
       if (state.conflicts.length) {
-        if (!resolve) throw new Error("prepare_conflicts_need_resolution");
+        if (!resolve)
+          throw new Error(
+            RepositoriesErrorCode.PREPARE_CONFLICTS_NEED_RESOLUTION,
+          );
         await resolve(state.conflicts);
       }
       signal.throwIfAborted();
@@ -164,12 +170,12 @@ export async function synchronizeBase(
         (await gitText(path, ["ls-files", "--stage", "-z"])) !== state.index ||
         (await gitText(path, ["rev-parse", "HEAD"])) !== state.before
       )
-        throw new Error("conflict_scope_changed");
+        throw new Error(RepositoriesErrorCode.CONFLICT_SCOPE_CHANGED);
       for (const file of state.conflicts) {
         try {
           const text = await readFile(await contained(path, file), "utf8");
           if (/^(?:<{7}|={7}|>{7})(?: |$)/m.test(text))
-            throw new Error("conflict_markers_remaining");
+            throw new Error(RepositoriesErrorCode.CONFLICT_MARKERS_REMAINING);
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
         }
@@ -187,12 +193,12 @@ export async function synchronizeBase(
         .filter(Boolean)
         .some((f) => !state!.conflicts!.includes(f))
     )
-      throw new Error("conflict_scope_changed");
+      throw new Error(RepositoriesErrorCode.CONFLICT_SCOPE_CHANGED);
     signal.throwIfAborted();
     if (state.conflicts.length)
       await gitText(path, ["add", "--", ...state.conflicts]);
     if (await gitText(path, ["diff", "--name-only", "--diff-filter=U"]))
-      throw new Error("prepare_conflicts_unresolved");
+      throw new Error(RepositoriesErrorCode.PREPARE_CONFLICTS_UNRESOLVED);
     await gitText(path, ["commit", "--no-edit"], signal);
   }
   state.sourceCommit = await gitText(path, ["rev-parse", "HEAD"]);

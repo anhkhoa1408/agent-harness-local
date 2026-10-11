@@ -1,3 +1,5 @@
+import { ApplicationErrorCode } from "../../../application/constants/index";
+import { HttpStatus } from "../constants/http-status";
 import { json } from "../http-response";
 import type { HttpRouteContext, HttpResourceRoute } from "../route-context";
 export function createArtifactsRoute(
@@ -11,10 +13,22 @@ export function createArtifactsRoute(
       try {
         file = await artifactService.read(parts[1]);
       } catch (error) {
-        if (error instanceof Error && error.message === "artifact_not_found")
-          return json({ error: "artifact_not_found" }, 404);
-        if (error instanceof Error && error.message === "artifact_too_large")
-          return json({ error: "artifact_too_large" }, 400);
+        if (
+          error instanceof Error &&
+          error.message === ApplicationErrorCode.ARTIFACT_NOT_FOUND
+        )
+          return json(
+            { error: ApplicationErrorCode.ARTIFACT_NOT_FOUND },
+            HttpStatus.NOT_FOUND,
+          );
+        if (
+          error instanceof Error &&
+          error.message === ApplicationErrorCode.ARTIFACT_TOO_LARGE
+        )
+          return json(
+            { error: ApplicationErrorCode.ARTIFACT_TOO_LARGE },
+            HttpStatus.BAD_REQUEST,
+          );
         throw error;
       }
       const screenshot = file.screenshot;

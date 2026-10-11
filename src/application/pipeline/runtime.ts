@@ -1,13 +1,17 @@
+import { WorkerLease } from "../../domain/constants/worker-lease";
+import {
+  ApplicationErrorCode,
+  EventType,
+  WorkerTiming,
+} from "../constants/index";
+import { TaskStatus } from "../../domain/constants/task-status";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import type { ApplicationStore } from "../ports";
 import type { RuntimePort, Lease } from "../runtime";
 import type { ValidationPort } from "../validation";
 import type { PlanService } from "../planning";
 import { StoryService, storyKey } from "../stories";
-import { WORKER_POLL_INTERVAL_MS } from "../limits";
-import {
-  WORKER_LEASE_TTL_MS,
-  WORKER_HEARTBEAT_INTERVAL_MS,
-} from "../../domain/limits";
+
 import { applyEffortPolicy } from "../../domain/model-policy";
 import type { Task } from "../../domain/contracts";
 import type {
@@ -44,23 +48,32 @@ export class WorkerRuntime {
     const lease = this.leases.claim(
       runtime.id(),
       runtime.now(),
-      WORKER_LEASE_TTL_MS,
+      WorkerLease.WORKER_LEASE_TTL_MS,
     );
-    if (!lease) throw new Error("worker_already_running");
+    if (!lease) throw new Error(ApplicationErrorCode.WORKER_ALREADY_RUNNING);
     const { store, handlers, storyService, planService } =
         this.leases.scope(lease),
       bootId = runtime.bootIdentity();
     store.health.put("worker", { at: runtime.now(), owner: lease.owner });
-    const heartbeat = runtime.every(WORKER_HEARTBEAT_INTERVAL_MS, () => {
-      if (!this.leases.renew(lease, runtime.now(), WORKER_LEASE_TTL_MS)) {
-        this.lost = true;
-        this.active?.abort.abort();
-      } else
-        store.health.put("worker", {
-          at: runtime.now(),
-          owner: lease.owner,
-        });
-    });
+    const heartbeat = runtime.every(
+      WorkerLease.WORKER_HEARTBEAT_INTERVAL_MS,
+      () => {
+        if (
+          !this.leases.renew(
+            lease,
+            runtime.now(),
+            WorkerLease.WORKER_LEASE_TTL_MS,
+          )
+        ) {
+          this.lost = true;
+          this.active?.abort.abort();
+        } else
+          store.health.put("worker", {
+            at: runtime.now(),
+            owner: lease.owner,
+          });
+      },
+    );
     const stop = () => this.active?.abort.abort();
     signal.addEventListener("abort", stop);
     restoreInterruptedTasks(store, bootId);
@@ -83,7 +96,7 @@ export class WorkerRuntime {
           .filter(
             (t) =>
               t.splitIntoStories &&
-              t.status === "blocked" &&
+              t.status === TaskStatus.BLOCKED &&
               t.reason === "story_running",
           ))
           await storyService.reconcileFeatureStories(feature.id, signal);
@@ -92,7 +105,7 @@ export class WorkerRuntime {
             const next = store.tasks
               .list()
               .reverse()
-              .find((t) => t.status === "queued");
+              .find((t) => t.status === TaskStatus.QUEUED);
             if (!next) return null;
             const abort = new AbortController();
             const attempt: Attempt = {
@@ -108,7 +121,7 @@ export class WorkerRuntime {
                 next.sourceCommit,
               stage: next.stage,
               leaseEpoch: lease.epoch,
-              status: "running",
+              status: TaskStatus.RUNNING,
               output: null,
               model:
                 applyEffortPolicy(next.models)[
@@ -123,11 +136,12 @@ export class WorkerRuntime {
               next.id,
               next.revision,
               {
-                status: "running",
+                status: TaskStatus.RUNNING,
                 repairCount:
-                  next.repairCount + (next.stage === "repair" ? 1 : 0),
+                  next.repairCount +
+                  (next.stage === PipelineStage.REPAIR ? 1 : 0),
               },
-              event("stage.started", {
+              event(EventType.STAGE_STARTED, {
                 attemptId: attempt.id,
                 stage: next.stage,
                 model: attempt.model,
@@ -140,11 +154,16 @@ export class WorkerRuntime {
             if (
               run &&
               !run.childTaskId &&
-              ["implement", "repair", "verify", "review"].includes(next.stage)
+              [
+                PipelineStage.IMPLEMENT,
+                PipelineStage.REPAIR,
+                PipelineStage.VERIFY,
+                PipelineStage.REVIEW,
+              ].some((value) => value === next.stage)
             )
               store.storyRuns.put(storyKey(run), {
                 ...run,
-                state: "running",
+                state: TaskStatus.RUNNING,
                 baselineCommit: attempt.baselineCommit!,
                 updatedAt: runtime.now(),
               });
@@ -175,7 +194,7 @@ export class WorkerRuntime {
             );
           }
         }
-        await runtime.sleep(WORKER_POLL_INTERVAL_MS);
+        await runtime.sleep(WorkerTiming.WORKER_POLL_INTERVAL_MS);
       }
       const pending = this.active;
       if (pending) {

@@ -1,3 +1,5 @@
+import { HttpStatus } from "../constants/http-status";
+import { ApplicationErrorCode } from "../../../application/constants/index";
 import { z } from "zod";
 import { json } from "../http-response";
 import type { HttpRouteContext, HttpResourceRoute } from "../route-context";
@@ -9,7 +11,10 @@ export function createTasksRoute(context: HttpRouteContext): HttpResourceRoute {
     if (!parts[1]) {
       if (method === "GET") return json(dashboard.tasks());
       if (method === "POST")
-        return json(await taskService.createTask(await body()), 201);
+        return json(
+          await taskService.createTask(await body()),
+          HttpStatus.CREATED,
+        );
     }
     const task = dashboard.task(parts[1]);
     if (parts[2] === "events" && method === "GET") {
@@ -25,10 +30,10 @@ export function createTasksRoute(context: HttpRouteContext): HttpResourceRoute {
       return json(
         result,
         "error" in result
-          ? result.error === "revision_conflict"
-            ? 409
-            : 503
-          : 202,
+          ? result.error === ApplicationErrorCode.REVISION_CONFLICT
+            ? HttpStatus.CONFLICT
+            : HttpStatus.SERVICE_UNAVAILABLE
+          : HttpStatus.ACCEPTED,
       );
     }
     if (!parts[2] && method === "GET")

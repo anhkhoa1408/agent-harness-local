@@ -1,6 +1,10 @@
+import { TaskStatus } from "../../domain/constants/task-status";
+import { ApplicationErrorCode, EventType } from "../constants/index";
+import { ValidationLimits } from "../../domain/constants/validation-limits";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import type { ValidationPort } from "../validation";
 import type { RuntimePort } from "../runtime";
-import { MAX_TITLE_CHARACTERS } from "../../domain/limits";
+
 import { type Task, type StoryRun } from "../../domain/contracts";
 import { selectedStories, projectStoryPlan } from "../../domain/stories";
 import { evidenceExclusions } from "../../domain/evidence";
@@ -28,8 +32,8 @@ export async function prepareSeparateStory(
   );
   const run = selectedStories(plan, e.selection)
     .map((s) => stories.listStoryRuns(task.id).find((r) => r.storyId === s.id)!)
-    .find((r) => r.state !== "completed");
-  if (!run) throw new Error("stories_complete");
+    .find((r) => r.state !== TaskStatus.COMPLETED);
+  if (!run) throw new Error(ApplicationErrorCode.STORIES_COMPLETE);
   if (run.childTaskId) return run;
   const repo = validation.repository(store.repositories.get(task.repositoryId));
   const story = plan.stories!.find((s) => s.id === run.storyId)!;
@@ -53,7 +57,7 @@ export async function prepareSeparateStory(
       const previous = stories
         .listStoryRuns(task.id)
         .find((r) => r.storyId === id);
-      if (previous?.state !== "completed" || !previous.commit)
+      if (previous?.state !== TaskStatus.COMPLETED || !previous.commit)
         throw new Error(`story_dependency_not_integrated:${id}`);
       try {
         await repository.assertAncestor(
@@ -74,7 +78,10 @@ export async function prepareSeparateStory(
     if (current.childTaskId) return current;
     const child = store.tasks.create({
       repositoryId: task.repositoryId,
-      title: `${task.title}: ${story.title}`.slice(0, MAX_TITLE_CHARACTERS),
+      title: `${task.title}: ${story.title}`.slice(
+        0,
+        ValidationLimits.MAX_TITLE_CHARACTERS,
+      ),
       requirement: `Implement ONLY story ${story.id}: ${story.outcome}. Acceptance: ${plan.criteria
         .filter((c) => story.criterionIds.includes(c.id))
         .map((c) => c.description)
@@ -99,9 +106,13 @@ export async function prepareSeparateStory(
       store.tasks.update(
         child.id,
         child.revision,
-        { planVersion: 1, approvedPlanVersion: 1, stage: "prepare" },
         {
-          type: "story.plan_inherited",
+          planVersion: 1,
+          approvedPlanVersion: 1,
+          stage: PipelineStage.PREPARE,
+        },
+        {
+          type: EventType.STORY_PLAN_INHERITED,
           data: {
             featureId: task.id,
             version: plan.version,
@@ -115,7 +126,7 @@ export async function prepareSeparateStory(
     }
     const updated = {
       ...run,
-      state: "running" as const,
+      state: TaskStatus.RUNNING,
       childTaskId: child.id,
       baselineCommit: source,
       updatedAt: runtime.now(),
@@ -125,7 +136,7 @@ export async function prepareSeparateStory(
       ...e,
       activeStoryId: story.id,
     });
-    store.events.add(task.id, "story.child_created", {
+    store.events.add(task.id, EventType.STORY_CHILD_CREATED, {
       storyId: story.id,
       childTaskId: child.id,
     });
@@ -147,78 +158,97 @@ export async function reconcileFeatureStories(
   if (
     e?.selection.mode !== "separate_pr" ||
     task.reason !== "story_running" ||
-    task.status !== "blocked"
+    task.status !== TaskStatus.BLOCKED
   )
     return;
   store.atomic(() => {
     for (const run of stories
       .listStoryRuns(featureId)
-      .filter((r) => r.childTaskId && r.state !== "completed")) {
+      .filter((r) => r.childTaskId && r.state !== TaskStatus.COMPLETED)) {
       const child = store.tasks.get(run.childTaskId!),
         delivery = store.deliveries.get(child.id) as {
           commit: string;
           prUrl: string | null;
           reportPath: string;
         } | null;
-      if (child.status === "completed" && delivery) {
+      if (child.status === TaskStatus.COMPLETED && delivery) {
         store.storyRuns.put(storyKey(run), {
           ...run,
-          state: "completed",
+          state: TaskStatus.COMPLETED,
           commit: delivery.commit,
           prUrl: delivery.prUrl,
           checkpointPath: delivery.reportPath,
           updatedAt: runtime.now(),
         });
-        store.events.add(task.id, "story.completed", {
+        store.events.add(task.id, EventType.STORY_COMPLETED, {
           storyId: run.storyId,
           childTaskId: child.id,
           commit: delivery.commit,
         });
         const all = stories
           .listStoryRuns(featureId)
-          .every((r) => r.state === "completed");
+          .every((r) => r.state === TaskStatus.COMPLETED);
         store.tasks.update(
           task.id,
           task.revision,
           {
-            stage: all ? "deliver" : "prepare",
+            stage: all ? PipelineStage.DELIVER : PipelineStage.PREPARE,
             status: all
-              ? "completed"
+              ? TaskStatus.COMPLETED
               : e.selection.continueAutomatically
-                ? "queued"
-                : "paused",
+                ? TaskStatus.QUEUED
+                : TaskStatus.PAUSED,
             reason:
               all || e.selection.continueAutomatically
                 ? null
                 : "story_checkpoint",
           },
-          { type: "feature.progress", data: { storyId: run.storyId } },
+          { type: EventType.FEATURE_PROGRESS, data: { storyId: run.storyId } },
         );
         return;
       }
       if (
-        ["blocked", "interrupted", "failed", "cancelled"].includes(child.status)
+        [
+          TaskStatus.BLOCKED,
+          TaskStatus.INTERRUPTED,
+          TaskStatus.FAILED,
+          TaskStatus.CANCELLED,
+        ].some((value) => value === child.status)
       ) {
         store.storyRuns.put(storyKey(run), {
           ...run,
-          state: child.status === "interrupted" ? "interrupted" : "blocked",
+          state:
+            child.status === TaskStatus.INTERRUPTED
+              ? TaskStatus.INTERRUPTED
+              : TaskStatus.BLOCKED,
           updatedAt: runtime.now(),
         });
         store.tasks.update(
           task.id,
           task.revision,
-          { status: "blocked", reason: `story_child_attention:${child.id}` },
-          { type: "story.attention", data: { childTaskId: child.id } },
+          {
+            status: TaskStatus.BLOCKED,
+            reason: `story_child_attention:${child.id}`,
+          },
+          { type: EventType.STORY_ATTENTION, data: { childTaskId: child.id } },
         );
         return;
       }
     }
-    if (stories.listStoryRuns(featureId).every((r) => r.state === "completed"))
+    if (
+      stories
+        .listStoryRuns(featureId)
+        .every((r) => r.state === TaskStatus.COMPLETED)
+    )
       store.tasks.update(
         task.id,
         task.revision,
-        { stage: "deliver", status: "completed", reason: null },
-        { type: "feature.completed", data: {} },
+        {
+          stage: PipelineStage.DELIVER,
+          status: TaskStatus.COMPLETED,
+          reason: null,
+        },
+        { type: EventType.FEATURE_COMPLETED, data: {} },
       );
   });
 }
@@ -255,5 +285,5 @@ export async function assertSharedHead(
     )
       return;
   }
-  throw new Error("story_head_changed");
+  throw new Error(ApplicationErrorCode.STORY_HEAD_CHANGED);
 }

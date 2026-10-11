@@ -1,3 +1,4 @@
+import { ApplicationErrorCode } from "../constants/index";
 import type { Task, Plan } from "../../domain/contracts";
 import type { ApplicationStore } from "../ports";
 import type { ValidationPort } from "../validation";
@@ -33,7 +34,8 @@ export async function createStoryCheckpoint(
       (await io.git.headParent(task.worktree!)) === effect.parent &&
       (await io.git.headMessage(task.worktree!)) ===
         `feat: ${task.title}\n\nHarness-Task: ${task.id}\nHarness-Story: ${storyId}`;
-    if (!known && !pending) throw new Error("story_head_changed");
+    if (!known && !pending)
+      throw new Error(ApplicationErrorCode.STORY_HEAD_CHANGED);
   }
   const delivery = await createDelivery(store, io, validation, {
     plan,

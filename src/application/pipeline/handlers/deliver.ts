@@ -1,3 +1,5 @@
+import { PipelineStage } from "../../../domain/constants/pipeline-stage";
+import { TaskStatus } from "../../../domain/constants/task-status";
 import { createStoryCheckpoint, createDelivery } from "../../delivery";
 
 import type { StageHandlerContext } from "../context";
@@ -43,8 +45,8 @@ export function createDeliverHandler(
     )(task, signal);
     store.deliveries.put(task.id, delivery);
     return {
-      stage: "deliver",
-      status: "completed",
+      stage: PipelineStage.DELIVER,
+      status: TaskStatus.COMPLETED,
       reason: null,
       output: delivery,
     };

@@ -1,3 +1,6 @@
+import { ApplicationErrorCode } from "../constants/index";
+import { WorkerLease } from "../../domain/constants/worker-lease";
+import { TaskStatus } from "../../domain/constants/task-status";
 import type { ApplicationStore } from "../ports";
 import type { StoryService } from "../stories";
 import type { PlanService } from "../planning";
@@ -7,7 +10,7 @@ import {
   pipelineProgress,
   type ProgressAttempt,
 } from "../../domain/pipeline-progress";
-import { WORKER_LEASE_TTL_MS } from "../../domain/limits";
+
 export interface TaskDiffPort {
   diff(root: string, source: string): Promise<string>;
 }
@@ -36,9 +39,12 @@ export class DashboardService {
     const task = this.task(taskId),
       command = this.validation.command({ ...(raw as object), taskId });
     if (command.expectedRevision !== task.revision)
-      return { error: "revision_conflict" as const };
+      return { error: ApplicationErrorCode.REVISION_CONFLICT };
     const health = this.store.health.get("worker");
-    if (!health || this.runtime.now() - health.at > WORKER_LEASE_TTL_MS)
+    if (
+      !health ||
+      this.runtime.now() - health.at > WorkerLease.WORKER_LEASE_TTL_MS
+    )
       return { error: "worker_unavailable" as const };
     return { accepted: this.store.commands.enqueue(command) };
   }
@@ -79,7 +85,7 @@ export class DashboardService {
         (r) =>
           r.taskId === task.id &&
           !r.decision &&
-          task.status === "running" &&
+          task.status === TaskStatus.RUNNING &&
           task.executionMode !== "auto",
       ),
       artifacts: (
@@ -99,7 +105,7 @@ export class DashboardService {
     return {
       app: "ready",
       worker:
-        lease && this.runtime.now() - lease.at < WORKER_LEASE_TTL_MS
+        lease && this.runtime.now() - lease.at < WorkerLease.WORKER_LEASE_TTL_MS
           ? "online"
           : "offline",
       heartbeat: lease?.at ?? null,
@@ -111,7 +117,7 @@ export class DashboardService {
     );
     return this.store.approvals.list().flatMap((approval) => {
       const task = tasks.get(approval.taskId);
-      return task?.status === "running" &&
+      return task?.status === TaskStatus.RUNNING &&
         task.executionMode !== "auto" &&
         !approval.decision
         ? [{ id: approval.id, taskId: task.id, taskTitle: task.title }]

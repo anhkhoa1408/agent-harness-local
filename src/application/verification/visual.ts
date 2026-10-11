@@ -1,3 +1,4 @@
+import { ApplicationErrorCode } from "../constants/index";
 import type { Task, Plan, VisualReview } from "../../domain/contracts";
 import type { CheckResult } from "../../domain/evidence";
 type Image = { path: string; sha256: string };
@@ -20,7 +21,7 @@ export function visualChecks(
     new Set(verdict.screenshots.map((s) => s.id)).size !== shots.length ||
     shots.some((s) => !verdict.screenshots.some((v) => v.id === s.id))
   )
-    throw new Error("ui_verdict_incomplete");
+    throw new Error(ApplicationErrorCode.UI_VERDICT_INCOMPLETE);
   return shots.map((shot) => {
     const finding = verdict.screenshots.find((s) => s.id === shot.id)!;
     return {

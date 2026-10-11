@@ -1,9 +1,5 @@
-import {
-  GIT_MAX_BUFFER_BYTES,
-  GIT_COMMAND_TIMEOUT_MS,
-  MAX_SOURCE_DOCUMENT_BYTES,
-  MAX_SOURCE_CONTEXT_BYTES,
-} from "./limits";
+import { RepositoryLimits } from "./constants/repository-limits";
+
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -28,9 +24,9 @@ export async function gitText(
 ): Promise<string> {
   return (
     await exec("git", ["-C", root, ...args], {
-      maxBuffer: GIT_MAX_BUFFER_BYTES,
+      maxBuffer: RepositoryLimits.GIT_MAX_BUFFER_BYTES,
       signal,
-      timeout: GIT_COMMAND_TIMEOUT_MS,
+      timeout: RepositoryLimits.GIT_COMMAND_TIMEOUT_MS,
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     })
   ).stdout.trim();
@@ -111,13 +107,13 @@ export async function sourceDocuments(
       await gitText(repo.root, ["cat-file", "-s", `${repo.head}:${path}`]),
     );
     if (
-      size > MAX_SOURCE_DOCUMENT_BYTES ||
-      total + size > MAX_SOURCE_CONTEXT_BYTES
+      size > RepositoryLimits.MAX_SOURCE_DOCUMENT_BYTES ||
+      total + size > RepositoryLimits.MAX_SOURCE_CONTEXT_BYTES
     )
       continue;
     const content = (
       await exec("git", ["-C", repo.root, "show", `${repo.head}:${path}`], {
-        maxBuffer: GIT_MAX_BUFFER_BYTES,
+        maxBuffer: RepositoryLimits.GIT_MAX_BUFFER_BYTES,
       })
     ).stdout;
     if (content.includes("\0")) continue;

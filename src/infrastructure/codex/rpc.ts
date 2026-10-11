@@ -1,4 +1,6 @@
-import { RPC_REQUEST_TIMEOUT_MS } from "./limits";
+import { CodexErrorCode } from "./constants/codex-error-code";
+import { CodexLimits } from "./constants/codex-limits";
+
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 export type RuntimeThread = {
@@ -66,19 +68,26 @@ export class JsonRpc {
         if (m.error) entry.reject(new RpcRemoteError(m.error.message));
         else entry.resolve(m.result);
       } catch {
-        this.fail(new Error("runtime_invalid_message"));
+        this.fail(new Error(CodexErrorCode.RUNTIME_INVALID_MESSAGE));
       }
     });
-    this.reader.on("close", () => this.fail(new Error("runtime_disconnected")));
-    output.on("error", () => this.fail(new Error("runtime_disconnected")));
-    input.on("error", () => this.fail(new Error("runtime_disconnected")));
+    this.reader.on("close", () =>
+      this.fail(new Error(CodexErrorCode.RUNTIME_DISCONNECTED)),
+    );
+    output.on("error", () =>
+      this.fail(new Error(CodexErrorCode.RUNTIME_DISCONNECTED)),
+    );
+    input.on("error", () =>
+      this.fail(new Error(CodexErrorCode.RUNTIME_DISCONNECTED)),
+    );
   }
   request<T = ThreadResponse>(
     method: string,
     params: unknown,
-    timeoutMs = RPC_REQUEST_TIMEOUT_MS,
+    timeoutMs = CodexLimits.RPC_REQUEST_TIMEOUT_MS,
   ): Promise<T> {
-    if (this.closed) return Promise.reject(new Error("runtime_disconnected"));
+    if (this.closed)
+      return Promise.reject(new Error(CodexErrorCode.RUNTIME_DISCONNECTED));
     const id = ++this.sequence;
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -112,7 +121,7 @@ export class JsonRpc {
     };
   }
   private send(message: unknown) {
-    if (this.closed) throw new Error("runtime_disconnected");
+    if (this.closed) throw new Error(CodexErrorCode.RUNTIME_DISCONNECTED);
     this.input.write(JSON.stringify(message) + "\n");
   }
   fail(error: Error) {
@@ -126,7 +135,7 @@ export class JsonRpc {
     for (const listener of this.failures) listener(error);
   }
   close() {
-    this.fail(new Error("runtime_disconnected"));
+    this.fail(new Error(CodexErrorCode.RUNTIME_DISCONNECTED));
     this.reader.close();
     this.listeners.clear();
     this.failures.clear();

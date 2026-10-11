@@ -1,3 +1,4 @@
+import { ApplicationErrorCode } from "../constants/index";
 import {
   defaultModels,
   applyEffortPolicy,
@@ -48,7 +49,7 @@ export class ModelService {
         (m) => m.id === parent.model && m.efforts.includes(parent.effort),
       )
     )
-      throw new Error("parent_model_unavailable");
+      throw new Error(ApplicationErrorCode.PARENT_MODEL_UNAVAILABLE);
     return resolveModel(role, models, {}, catalog);
   }
 }
