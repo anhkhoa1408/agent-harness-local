@@ -1,4 +1,4 @@
-import { TaskStatus } from "./constants/task-status";
+import { StoryRunState } from "./constants/story-run-state";
 import { DomainErrorCode } from "./constants/domain-error-code";
 import type { Plan, StoryRun } from "./contracts";
 import { projectStoryPlan } from "./stories";
@@ -16,7 +16,7 @@ export function assertCompletedStoryScopeUnchanged(
   plan: Plan,
   runs: StoryRun[],
 ) {
-  for (const run of runs.filter((r) => r.state === TaskStatus.COMPLETED)) {
+  for (const run of runs.filter((r) => r.state === StoryRunState.COMPLETED)) {
     if (
       !plan.stories?.some((s) => s.id === run.storyId) ||
       comparable(

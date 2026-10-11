@@ -45,7 +45,7 @@ export function processControlCommand(
     if (c.kind === "pause" || c.kind === "cancel") {
       for (const run of storyService
         .listStoryRuns(task.id)
-        .filter((r) => r.childTaskId && r.state !== TaskStatus.COMPLETED)) {
+        .filter((r) => r.childTaskId && r.state !== StoryRunState.COMPLETED)) {
         const child = store.tasks.get(run.childTaskId!);
         if (
           ![TaskStatus.COMPLETED, TaskStatus.CANCELLED].some(
@@ -87,7 +87,7 @@ export function processControlCommand(
         if (
           run &&
           run.state !== StoryRunState.COMPLETED &&
-          run.state !== "pending"
+          run.state !== StoryRunState.PENDING
         )
           store.storyRuns.put(storyKey(run), {
             ...run,
@@ -208,7 +208,7 @@ export function processControlCommand(
         e?.selection.mode === "separate_pr"
           ? storyService
               .listStoryRuns(task.id)
-              .find((r) => r.childTaskId && r.state !== TaskStatus.COMPLETED)
+              .find((r) => r.childTaskId && r.state !== StoryRunState.COMPLETED)
           : undefined;
       if (pending) {
         const child = store.tasks.get(pending.childTaskId!);

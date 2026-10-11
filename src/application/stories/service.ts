@@ -96,7 +96,7 @@ export class StoryService {
           featureId: task.id,
           planVersion: plan.version,
           storyId: story.id,
-          state: "pending",
+          state: StoryRunState.PENDING,
           baselineCommit: task.sourceCommit,
           ...prior,
           updatedAt: this.runtime.now(),
@@ -108,7 +108,9 @@ export class StoryService {
         (s) =>
           !runs.some(
             (r) =>
-              retain && r.storyId === s.id && r.state === TaskStatus.COMPLETED,
+              retain &&
+              r.storyId === s.id &&
+              r.state === StoryRunState.COMPLETED,
           ),
       );
       store.storyExecutions.put(task.id, {
@@ -199,7 +201,7 @@ export class StoryService {
       const next = selectedStories(plan, e.selection).find(
         (s) =>
           !this.listStoryRuns(task.id).some(
-            (r) => r.storyId === s.id && r.state === TaskStatus.COMPLETED,
+            (r) => r.storyId === s.id && r.state === StoryRunState.COMPLETED,
           ),
       );
       store.storyExecutions.put(task.id, {

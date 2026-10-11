@@ -35,7 +35,7 @@ export async function prepareSeparateStory(
   );
   const run = selectedStories(plan, e.selection)
     .map((s) => stories.listStoryRuns(task.id).find((r) => r.storyId === s.id)!)
-    .find((r) => r.state !== TaskStatus.COMPLETED);
+    .find((r) => r.state !== StoryRunState.COMPLETED);
   if (!run) throw new Error(ApplicationErrorCode.STORIES_COMPLETE);
   if (run.childTaskId) return run;
   const repo = validation.repository(store.repositories.get(task.repositoryId));
@@ -60,7 +60,7 @@ export async function prepareSeparateStory(
       const previous = stories
         .listStoryRuns(task.id)
         .find((r) => r.storyId === id);
-      if (previous?.state !== TaskStatus.COMPLETED || !previous.commit)
+      if (previous?.state !== StoryRunState.COMPLETED || !previous.commit)
         throw new Error(`story_dependency_not_integrated:${id}`);
       try {
         await repository.assertAncestor(
@@ -129,7 +129,7 @@ export async function prepareSeparateStory(
     }
     const updated = {
       ...run,
-      state: TaskStatus.RUNNING,
+      state: StoryRunState.RUNNING,
       childTaskId: child.id,
       baselineCommit: source,
       updatedAt: runtime.now(),
@@ -167,7 +167,7 @@ export async function reconcileFeatureStories(
   store.atomic(() => {
     for (const run of stories
       .listStoryRuns(featureId)
-      .filter((r) => r.childTaskId && r.state !== TaskStatus.COMPLETED)) {
+      .filter((r) => r.childTaskId && r.state !== StoryRunState.COMPLETED)) {
       const child = store.tasks.get(run.childTaskId!);
       const delivery = store.deliveries.get(child.id) as {
         commit: string;
@@ -190,7 +190,7 @@ export async function reconcileFeatureStories(
         });
         const all = stories
           .listStoryRuns(featureId)
-          .every((r) => r.state === TaskStatus.COMPLETED);
+          .every((r) => r.state === StoryRunState.COMPLETED);
         store.tasks.update(
           task.id,
           task.revision,
@@ -221,7 +221,7 @@ export async function reconcileFeatureStories(
         store.storyRuns.put(storyKey(run), {
           ...run,
           state:
-            child.status === StoryRunState.INTERRUPTED
+            child.status === TaskStatus.INTERRUPTED
               ? StoryRunState.INTERRUPTED
               : StoryRunState.BLOCKED,
           updatedAt: runtime.now(),
@@ -241,7 +241,7 @@ export async function reconcileFeatureStories(
     if (
       stories
         .listStoryRuns(featureId)
-        .every((r) => r.state === TaskStatus.COMPLETED)
+        .every((r) => r.state === StoryRunState.COMPLETED)
     )
       store.tasks.update(
         task.id,
