@@ -1,7 +1,7 @@
 import { agentProfiles, loadProfile } from "./agents";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { Stage } from "../../domain/contracts";
+import { aiStages, type Stage } from "../../domain/contracts";
 import { contained, contextFile, contentHash, repoRules } from "./rules";
 import type { Bundle } from "../../application/agent-execution";
 export type { Bundle } from "../../application/agent-execution";
@@ -45,7 +45,13 @@ export async function resolveBundle(
     ...(await agentProfiles(stage, repoRoot, packageRoot)),
     ...(await repoRules(repoRoot, relevantPaths, liquidTask)),
   ];
-  for (const id of registry[stage] ?? []) {
+  const skillIds = [
+    ...(aiStages.some((s) => s === stage)
+      ? ["context-mode/context-mode/SKILL.md"]
+      : []),
+    ...(registry[stage] ?? []),
+  ];
+  for (const id of skillIds) {
     try {
       files.push(
         await contextFile(

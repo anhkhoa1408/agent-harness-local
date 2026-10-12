@@ -31,6 +31,23 @@
       "writing-plans/agents/openai.yaml": "de6a2f3d9de78d9c5027512ab1abab998f9acbef70960ecdbad525f4dce2e1bb"
     }
   },
+  "context-mode": {
+    "source": "https://github.com/mksglu/context-mode",
+    "distribution": "context-mode",
+    "version": "1.0.169",
+    "adaptedFiles": ["context-mode/SKILL.md"],
+    "adaptation": "Compact Harness routing with runtime availability fallback, frozen instructions and stage output contracts. Utility skills and license are unchanged.",
+    "upstreamFiles": {
+      "context-mode/SKILL.md": "ce26cb01de7a116eab256f916620935f029e850771f3fb6cb7d40a3ce8d1f7ff"
+    },
+    "files": {
+      "LICENSE": "92f11a867c41c9e575ccb978ff205ae2011c244a14aa3c576e914e537105caa0",
+      "context-mode/SKILL.md": "cd0e38e2bb0c86da2b0c528ed0cd9c64f504b8f7b42236f26dc739ee0ebe7564",
+      "ctx-index/SKILL.md": "5e49548597a6496e8cdb9a901b66c11a7b1db0ebcd341d3ad3d10cd05f1cd385",
+      "ctx-search/SKILL.md": "01fa13ff339912159f50aa5bc6d6d8f3c7291e8510616b01a4934ca78bb02c0c",
+      "ctx-stats/SKILL.md": "3babe498983749f769a39f3635be8685efb56a36c0fa2f520c53dbb81dda1da6"
+    }
+  },
   "mattpocock-skills": {
     "source": "https://github.com/mattpocock/skills",
     "distribution": "openai-curated-remote",

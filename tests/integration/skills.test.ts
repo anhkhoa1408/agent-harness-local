@@ -18,6 +18,9 @@ test("snapshots remain unchanged after bundled skill edits and include scoped ne
   const root = await mkdtemp(join(tmpdir(), "harness-skills-"));
   try {
     await cp("agents", join(root, "agents"), { recursive: true });
+    await cp("skills/context-mode", join(root, "skills/context-mode"), {
+      recursive: true,
+    });
     const skills = join(root, "skills/superpowers"),
       repo = join(root, "repo");
     await mkdir(join(skills, "test-driven-development"), { recursive: true });
@@ -79,6 +82,9 @@ test("missing required skill and conditional Lighthouse rule block instead of di
   const root = await mkdtemp(join(tmpdir(), "harness-rules-"));
   try {
     await cp("agents", join(root, "agents"), { recursive: true });
+    await cp("skills/context-mode", join(root, "skills/context-mode"), {
+      recursive: true,
+    });
     await writeFile(join(root, "AGENTS.md"), "Base.");
     await expect(
       resolveBundle("discover", root, [], false, root),
