@@ -1,3 +1,5 @@
+import { TaskReason } from "../../domain/constants/task-reason";
+import { ApplicationErrorCode } from "../../application/constants/index";
 import type { DatabaseSync } from "node:sqlite";
 import { transaction } from "./database";
 
@@ -10,7 +12,7 @@ export function createRepositoryRegistry(db: DatabaseSync) {
             .prepare("SELECT 1 FROM records WHERE kind='repository' AND id=?")
             .get(repositoryId)
         )
-          throw new Error("repository_not_found");
+          throw new Error(ApplicationErrorCode.REPOSITORY_NOT_FOUND);
         const tasks = db
           .prepare(
             "SELECT id,body FROM tasks WHERE json_extract(body,'$.repositoryId')=?",
@@ -36,9 +38,9 @@ export function createRepositoryRegistry(db: DatabaseSync) {
             exclusion ||
             activeCommand ||
             (latestAttempt?.status === "running" &&
-              state.reason !== "host_restart_confirmed")
+              state.reason !== TaskReason.HOST_RESTART_CONFIRMED)
           )
-            throw new Error("repository_busy");
+            throw new Error(ApplicationErrorCode.REPOSITORY_BUSY);
         }
         for (const { id } of tasks) {
           db.prepare("DELETE FROM events WHERE task_id=?").run(id);

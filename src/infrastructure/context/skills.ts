@@ -1,8 +1,10 @@
+import { contentHash } from "../utils/content-hash";
+import { contained } from "../utils/contained-path";
 import { agentProfiles, loadProfile } from "./agents";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { Stage } from "../../domain/contracts";
-import { contained, contextFile, contentHash, repoRules } from "./rules";
+import { contextFile, repoRules } from "./rules";
 import type { Bundle } from "../../application/agent-execution";
 export type { Bundle } from "../../application/agent-execution";
 const registry: Partial<Record<Stage, string[]>> = {

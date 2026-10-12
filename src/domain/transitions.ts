@@ -1,9 +1,13 @@
+import { TaskReason } from "./constants/task-reason";
+import { PipelineStage } from "./constants/pipeline-stage";
+import { DomainErrorCode } from "./constants/domain-error-code";
+import { TaskStatus } from "./constants/task-status";
 import type { Task, Plan, Review } from "./contracts";
 import { validatePlan } from "./acceptance";
 export function stageAfterPreparation(task: Task): "implement" | "repair" {
-  return task.resumeStage === "repair" || task.repairCount > 0
-    ? "repair"
-    : "implement";
+  return task.resumeStage === PipelineStage.REPAIR || task.repairCount > 0
+    ? PipelineStage.REPAIR
+    : PipelineStage.IMPLEMENT;
 }
 export function canImplement(task: Task, plan: Plan): boolean {
   return (
@@ -25,15 +29,16 @@ export function approvePlan(
     plan.version !== expectedVersion ||
     task.sourceCommit !== plan.sourceCommit
   )
-    throw new Error("stale_plan");
-  if (task.status !== "waiting_approval") throw new Error("invalid_status");
+    throw new Error(DomainErrorCode.STALE_PLAN);
+  if (task.status !== TaskStatus.WAITING_APPROVAL)
+    throw new Error(DomainErrorCode.INVALID_STATUS);
   const errors = validatePlan(plan);
   if (errors.length) throw new Error(`invalid_plan:${errors.join(",")}`);
   return {
     ...task,
     approvedPlanVersion: plan.version,
-    stage: "prepare",
-    status: "queued",
+    stage: PipelineStage.PREPARE,
+    status: TaskStatus.QUEUED,
     reason: null,
   };
 }
@@ -46,21 +51,21 @@ export function nextAfterReview(
     review.findings.some((f) => f.status === "disputed")
   )
     return {
-      stage: "review",
-      status: "waiting_input",
-      reason: "review_dispute",
+      stage: PipelineStage.REVIEW,
+      status: TaskStatus.WAITING_INPUT,
+      reason: TaskReason.REVIEW_DISPUTE,
       repairCount: task.repairCount,
     };
   if (review.verdict === "pass")
     return {
-      stage: "deliver",
-      status: "queued",
+      stage: PipelineStage.DELIVER,
+      status: TaskStatus.QUEUED,
       reason: null,
       repairCount: task.repairCount,
     };
   return {
-    stage: "repair",
-    status: "queued",
+    stage: PipelineStage.REPAIR,
+    status: TaskStatus.QUEUED,
     reason: null,
     repairCount: task.repairCount,
   };

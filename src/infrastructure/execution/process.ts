@@ -1,4 +1,7 @@
-import { PROCESS_KILL_GRACE_MS } from "./limits";
+import { contained } from "../utils/contained-path";
+import { ExecutionErrorCode } from "./constants/execution-error-code";
+import { ExecutionLimits } from "./constants/execution-limits";
+
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
@@ -6,7 +9,7 @@ import { finished } from "node:stream/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CommandSpec } from "../../domain/contracts";
-import { contained } from "../context/rules";
+
 export type ProcessResult = {
   exitCode: number | null;
   signal: string | null;
@@ -23,9 +26,9 @@ export async function runProcess(
   const cwd = await contained(root, command.cwd);
   if (signal.aborted) throw new Error("interrupted");
   await mkdir(artifacts, { recursive: true });
-  const id = randomUUID(),
-    stdoutPath = join(artifacts, `${id}.stdout.log`),
-    stderrPath = join(artifacts, `${id}.stderr.log`);
+  const id = randomUUID();
+  const stdoutPath = join(artifacts, `${id}.stdout.log`);
+  const stderrPath = join(artifacts, `${id}.stderr.log`);
   const env: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
@@ -37,11 +40,11 @@ export async function runProcess(
   };
   for (const name of command.envNames) {
     if (/^(NODE_OPTIONS|LD_|DYLD_)/.test(name))
-      throw new Error("unsafe_environment");
+      throw new Error(ExecutionErrorCode.UNSAFE_ENVIRONMENT);
     if (process.env[name] !== undefined) env[name] = process.env[name];
   }
-  const out = createWriteStream(stdoutPath, { mode: 0o600 }),
-    err = createWriteStream(stderrPath, { mode: 0o600 });
+  const out = createWriteStream(stdoutPath, { mode: 0o600 });
+  const err = createWriteStream(stderrPath, { mode: 0o600 });
   const child = spawn(command.executable, command.args, {
     cwd,
     env,
@@ -51,8 +54,8 @@ export async function runProcess(
   });
   child.stdout.pipe(out);
   child.stderr.pipe(err);
-  let timedOut = false,
-    killer: NodeJS.Timeout | undefined;
+  let timedOut = false;
+  let killer: NodeJS.Timeout | undefined;
   const kill = (sig: NodeJS.Signals) => {
     if (child.pid)
       try {
@@ -63,7 +66,10 @@ export async function runProcess(
   };
   const stop = () => {
     kill("SIGTERM");
-    killer ??= setTimeout(() => kill("SIGKILL"), PROCESS_KILL_GRACE_MS);
+    killer ??= setTimeout(
+      () => kill("SIGKILL"),
+      ExecutionLimits.PROCESS_KILL_GRACE_MS,
+    );
   };
   signal.addEventListener("abort", stop, { once: true });
   const timer = setTimeout(() => {
@@ -82,7 +88,10 @@ export async function runProcess(
       });
     });
     // A child may exit while a grandchild still holds its pipes. Bound that cleanup too.
-    killer ??= setTimeout(() => kill("SIGKILL"), PROCESS_KILL_GRACE_MS);
+    killer ??= setTimeout(
+      () => kill("SIGKILL"),
+      ExecutionLimits.PROCESS_KILL_GRACE_MS,
+    );
     await Promise.all([finished(out), finished(err)]);
     kill("SIGKILL");
     return { ...result, stdoutPath, stderrPath, timedOut };

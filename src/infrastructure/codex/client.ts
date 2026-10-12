@@ -1,3 +1,9 @@
+import { ExecutionMode } from "../../domain/constants/execution-mode";
+import { CodexPermissions } from "./constants/codex-permissions";
+import { CodexRpcMethod } from "./constants/codex-rpc-method";
+import { CodexLimits } from "./constants/codex-limits";
+import { CodexErrorCode } from "./constants/codex-error-code";
+import { ApplicationErrorCode } from "../../application/constants/index";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { ModelInfo } from "../../domain/model-policy";
 import { JsonRpc, RpcRemoteError } from "./rpc";
@@ -10,7 +16,7 @@ import type {
   AgentRun,
 } from "./types";
 export type { AgentClient, AgentInput, AgentEvent, AgentRun } from "./types";
-import { RUNTIME_PAGE_SIZE, AGENT_INTERRUPT_TIMEOUT_MS } from "./limits";
+
 export class CodexClient implements AgentClient {
   constructor(
     private rpc: JsonRpc,
@@ -47,8 +53,8 @@ export class CodexClient implements AgentClient {
           isDefault?: boolean;
         }>;
         nextCursor?: string | null;
-      }>("model/list", {
-        limit: RUNTIME_PAGE_SIZE,
+      }>(CodexRpcMethod.MODEL_LIST, {
+        limit: CodexLimits.RUNTIME_PAGE_SIZE,
         includeHidden: false,
         ...(cursor ? { cursor } : {}),
       });
@@ -61,7 +67,8 @@ export class CodexClient implements AgentClient {
           isDefault: !!m.isDefault,
         });
       cursor = page.nextCursor ?? null;
-      if (cursor && seen.has(cursor)) throw new Error("runtime_catalog_cycle");
+      if (cursor && seen.has(cursor))
+        throw new Error(CodexErrorCode.RUNTIME_CATALOG_CYCLE);
       if (cursor) seen.add(cursor);
     } while (cursor);
     return models;
@@ -76,7 +83,7 @@ export class CodexClient implements AgentClient {
       input,
       onEvent,
       signal,
-      this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS,
+      this.options.interruptTimeoutMs ?? CodexLimits.AGENT_INTERRUPT_TIMEOUT_MS,
     );
   }
   async runDirectTurn(
@@ -86,23 +93,30 @@ export class CodexClient implements AgentClient {
   ): Promise<AgentRun> {
     if (signal.aborted) throw new Error("interrupted");
     const thread = await this.rpc.request(
-      input.threadId ? "thread/resume" : "thread/start",
+      input.threadId
+        ? CodexRpcMethod.THREAD_RESUME
+        : CodexRpcMethod.THREAD_START,
       {
         ...(input.threadId ? { threadId: input.threadId } : {}),
         cwd: input.cwd,
         model: input.model.model,
-        sandbox: input.write ? "workspace-write" : "read-only",
-        approvalPolicy: input.executionMode === "auto" ? "never" : "on-request",
+        sandbox: input.write
+          ? CodexPermissions.SANDBOX_WORKSPACE_WRITE
+          : CodexPermissions.SANDBOX_READ_ONLY,
+        approvalPolicy:
+          input.executionMode === ExecutionMode.AUTO
+            ? CodexPermissions.APPROVAL_NEVER
+            : CodexPermissions.APPROVAL_ON_REQUEST,
         developerInstructions: input.instructions,
       },
     );
     const threadId = thread.thread.id as string;
     return new Promise<AgentRun>((resolve, reject) => {
-      let turnId = "",
-        lastText = "",
-        usage: unknown = null,
-        finished = false,
-        interrupting = false;
+      let turnId = "";
+      let lastText = "";
+      let usage: unknown = null;
+      let finished = false;
+      let interrupting = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const cleanup = () => {
         if (timer) clearTimeout(timer);
@@ -120,15 +134,16 @@ export class CodexClient implements AgentClient {
         if (!turnId || interrupting || finished) return;
         interrupting = true;
         timer = setTimeout(
-          () => fail(new Error("runtime_state_unknown")),
-          this.options.interruptTimeoutMs ?? AGENT_INTERRUPT_TIMEOUT_MS,
+          () => fail(new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN)),
+          this.options.interruptTimeoutMs ??
+            CodexLimits.AGENT_INTERRUPT_TIMEOUT_MS,
         );
         this.interruptTurn(threadId, turnId).catch(() =>
-          fail(new Error("runtime_state_unknown")),
+          fail(new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN)),
         );
       };
       const offFailure = this.rpc.onFailure(() =>
-        fail(new Error("runtime_state_unknown")),
+        fail(new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN)),
       );
       const offMessage = this.rpc.onMessage((m) => {
         const p = m.params ?? {};
@@ -140,14 +155,21 @@ export class CodexClient implements AgentClient {
           });
           return;
         }
-        if (m.method === "thread/tokenUsage/updated") usage = p.tokenUsage;
-        if (m.method === "item/completed" && p.item?.type === "agentMessage")
+        if (m.method === CodexRpcMethod.THREAD_TOKEN_USAGE_UPDATED)
+          usage = p.tokenUsage;
+        if (
+          m.method === CodexRpcMethod.ITEM_COMPLETED &&
+          p.item?.type === "agentMessage"
+        )
           lastText = p.item.text;
-        if (m.method === "item/agentMessage/delta")
+        if (m.method === CodexRpcMethod.ITEM_AGENT_MESSAGE_DELTA)
           onEvent({ type: "message", data: { text: p.delta } });
-        if (m.method === "item/started" || m.method === "item/completed")
+        if (
+          m.method === CodexRpcMethod.ITEM_STARTED ||
+          m.method === CodexRpcMethod.ITEM_COMPLETED
+        )
           onEvent({ type: "tool", data: { method: m.method, ...p } });
-        if (m.method === "turn/completed") {
+        if (m.method === CodexRpcMethod.TURN_COMPLETED) {
           const id = p.turn?.id ?? p.turnId;
           if (turnId && id !== turnId) return;
           turnId = id;
@@ -166,13 +188,13 @@ export class CodexClient implements AgentClient {
             onEvent({ type: "completed", data: { threadId, turnId } });
             resolve({ threadId, turnId, result, usage });
           } catch {
-            fail(new Error("agent_invalid_output"));
+            fail(new Error(CodexErrorCode.AGENT_INVALID_OUTPUT));
           }
         }
       });
       signal.addEventListener("abort", abort, { once: true });
       this.rpc
-        .request("turn/start", {
+        .request(CodexRpcMethod.TURN_START, {
           threadId,
           model: input.model.model,
           effort: input.model.effort,
@@ -188,7 +210,7 @@ export class CodexClient implements AgentClient {
           fail(
             error instanceof RpcRemoteError
               ? error
-              : new Error("runtime_state_unknown"),
+              : new Error(ApplicationErrorCode.RUNTIME_STATE_UNKNOWN),
           ),
         );
     });
@@ -197,7 +219,7 @@ export class CodexClient implements AgentClient {
     this.rpc.respond(id, result);
   }
   async interruptTurn(threadId: string, turnId: string) {
-    await this.rpc.request("turn/interrupt", { threadId, turnId });
+    await this.rpc.request(CodexRpcMethod.TURN_INTERRUPT, { threadId, turnId });
   }
   async close() {
     this.rpc.close();
@@ -212,7 +234,9 @@ export async function connectCodex(
     shell: false,
   });
   const rpc = new JsonRpc(child.stdout, child.stdin);
-  child.on("error", () => rpc.fail(new Error("codex_unavailable")));
+  child.on("error", () =>
+    rpc.fail(new Error(ApplicationErrorCode.CODEX_UNAVAILABLE)),
+  );
   // Drain stderr without exposing credential-bearing runtime diagnostics to browser logs.
   child.stderr.on("data", () => {});
   const client = new CodexClient(rpc, { process: child });

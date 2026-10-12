@@ -1,3 +1,4 @@
+import { RepositoriesErrorCode } from "./constants/repositories-error-code";
 import { mkdir, writeFile, readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import type { Repository, Task } from "../../domain/contracts";
@@ -9,8 +10,8 @@ export async function prepareWorktree(
 ): Promise<string> {
   await mkdir(root, { recursive: true });
   root = await realpath(root);
-  const path = join(root, task.id),
-    intentPath = join(root, `${task.id}.intent.json`);
+  const path = join(root, task.id);
+  const intentPath = join(root, `${task.id}.intent.json`);
   const intent = {
     taskId: task.id,
     repository: repo.root,
@@ -26,7 +27,7 @@ export async function prepareWorktree(
       old.branch !== intent.branch ||
       old.path !== intent.path
     )
-      throw new Error("worktree_collision");
+      throw new Error(RepositoriesErrorCode.WORKTREE_COLLISION);
     await gitText(repo.root, [
       "merge-base",
       "--is-ancestor",
@@ -44,7 +45,7 @@ export async function prepareWorktree(
       existing.includes(`worktree ${path}\n`) ||
       existing.includes(`branch refs/heads/${task.branch}\n`)
     )
-      throw new Error("worktree_collision");
+      throw new Error(RepositoriesErrorCode.WORKTREE_COLLISION);
     await writeFile(intentPath, JSON.stringify(intent), {
       flag: "wx",
       mode: 0o600,
@@ -56,7 +57,7 @@ export async function prepareWorktree(
     .find((x) => x.split("\n")[0] === `worktree ${path}`);
   if (record) {
     if (!record.includes(`branch refs/heads/${task.branch}`))
-      throw new Error("worktree_collision");
+      throw new Error(RepositoriesErrorCode.WORKTREE_COLLISION);
     await gitText(path, [
       "merge-base",
       "--is-ancestor",

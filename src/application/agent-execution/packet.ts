@@ -1,3 +1,4 @@
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import type { Bundle, DelegatedStageInput } from "../execution-contracts";
 export function stageEnvelope(
   input: DelegatedStageInput,
@@ -20,6 +21,6 @@ export function composeInstructions(bundle: Bundle): string {
     ...bundle.files.map(
       (f) => `SOURCE ${f.id} (${f.path}, SHA256 ${f.sha256})\n${f.content}`,
     ),
-    `EXPLICIT USER/HARNESS ADAPTATIONS (override conflicting skill workflow):\n${bundle.adaptations}${bundle.stage === "repair" ? "\nRepair has no fixed round or fix-count limit. Never stop or request input/replan solely because three fixes or repair rounds failed. Reassess the root cause and continue evidence-based debugging within the approved plan. Ask for input only for a concrete missing decision; preserve approval, scope, runtime and environment gates, and obey pause/cancel." : ""}`,
+    `EXPLICIT USER/HARNESS ADAPTATIONS (override conflicting skill workflow):\n${bundle.adaptations}${bundle.stage === PipelineStage.REPAIR ? "\nRepair has no fixed round or fix-count limit. Never stop or request input/replan solely because three fixes or repair rounds failed. Reassess the root cause and continue evidence-based debugging within the approved plan. Ask for input only for a concrete missing decision; preserve approval, scope, runtime and environment gates, and obey pause/cancel." : ""}`,
   ].join("\n\n");
 }

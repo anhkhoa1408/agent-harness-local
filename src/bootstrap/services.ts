@@ -18,8 +18,8 @@ export function createServices(
   data = ".harness",
   catalog: ModelCatalogPort = { listModels: async () => [] },
 ) {
-  const repositories = createRepositories(store),
-    git = createStoryGit();
+  const repositories = createRepositories(store);
+  const git = createStoryGit();
   const models = new ModelService(
     {
       get: () =>

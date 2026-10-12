@@ -1,3 +1,4 @@
+import { PersistenceErrorCode } from "./constants/persistence-error-code";
 import { transaction } from "./database";
 import {
   ControlCommandSchema,
@@ -20,7 +21,8 @@ export function createCommandQueue(
           .prepare("SELECT body FROM commands WHERE id=?")
           .get(command.id) as Row | undefined;
         if (old) {
-          if (old.body !== body) throw new Error("command_conflict");
+          if (old.body !== body)
+            throw new Error(PersistenceErrorCode.COMMAND_CONFLICT);
           return false;
         }
         getTask(command.taskId);

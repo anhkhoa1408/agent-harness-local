@@ -60,3 +60,15 @@ Delivery/checkpoint orchestration dùng semantic Git, GitHub và artifact ports.
 `tests/support/dependencies.ts` dùng TypeScript compiler API resolve relative/alias imports, re-export, dynamic import, CommonJS require và import types. `tests/unit/backend-boundaries.test.ts` audit toàn domain/application/infrastructure/presentation/bootstrap, cả vòng phụ thuộc type, không dùng danh sách ngoại lệ. Fixtures trong clean-dependencies test chứng minh checker bắt vi phạm, gồm chặn presentation import trực tiếp Node builtins và các package SQLite/Git/GitHub đã nhận diện; framework/request validation vẫn được phép.
 
 Node 24.18 là runtime bắt buộc. Chạy `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:e2e`. E2E dùng fixture; `scripts/parent-subagents-smoke.ts` dùng Codex thật trong Git repo tạm riêng. Báo cáo cập nhật tại [verification](verification/2026-10-09-clean-architecture.md). Rollback theo commit đã kiểm chứng; không chạy hai phiên bản worker cùng dữ liệu.
+
+## Constants, utils và performance (refactor v2)
+
+Cập nhật được duyệt ngày 2026-10-11: constants dùng class với `static readonly` và constructor private. Đây là ngoại lệ có chủ đích cho quy tắc class dành cho state/lifecycle; hàm policy và service instance không chuyển thành constants.
+
+- Constants nằm trong `constants/` của layer/module sở hữu. Domain giữ stage/task/check/attempt/story state, execution mode, policy defaults và validation limits. Application chia sẻ timing, event/error contracts qua public `constants/index.ts`. Adapter sở hữu RPC methods/permissions, record kinds, HTTP status, PNG header và I/O limits.
+- `domain/contracts` giữ export danh sách stage/status tương thích với consumer hiện có; giá trị lấy từ class constants, không có bản sao literal. String constants dùng literal types, danh sách giữ tuple order để Zod/type unions không thay đổi.
+- Utils thuần: record keys ở domain; error-message fallback ở application (qua public `utils/index.ts`). Hash, path containment và delay ở infrastructure. Retry helper chỉ chờ và tính delay kế tiếp; từng caller giữ điều kiện retry, deadline, cancellation và loại lỗi.
+- Hash tiếp tục nhận đúng text UTF-8; ảnh vẫn hash chuỗi base64. Không chuẩn hóa key hoặc đổi bytes đã lưu.
+- Dashboard nhóm attempts theo task trong từng request, giữ insertion order. Không cache giữa requests. Record repository tạo bốn prepared statements trên connection do store sở hữu; transaction, nested savepoint và fencing vẫn đi qua store.
+
+Đo mẫu bằng `node --import tsx scripts/backend-refactor-benchmark.mjs [checkout]`. Script đo projection trong bộ nhớ và SQLite `:memory:`; số đo không đại diện toàn bộ HTTP/Git/Codex latency. Kết quả và giới hạn tại [verification refactor v2](verification/2026-10-11-backend-refactor-v2.md).

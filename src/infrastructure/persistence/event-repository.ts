@@ -1,4 +1,4 @@
-import { EVENT_PAGE_SIZE } from "./limits";
+import { PersistenceLimits } from "./constants/persistence-limits";
 
 import { type Event } from "../../domain/contracts";
 import type { DatabaseSync } from "node:sqlite";
@@ -21,7 +21,7 @@ export function createEventRepository(db: DatabaseSync) {
       return (
         db
           .prepare(
-            `SELECT seq,task_id,type,data,at FROM events WHERE task_id=? AND seq>? ORDER BY seq LIMIT ${EVENT_PAGE_SIZE}`,
+            `SELECT seq,task_id,type,data,at FROM events WHERE task_id=? AND seq>? ORDER BY seq LIMIT ${PersistenceLimits.EVENT_PAGE_SIZE}`,
           )
           .all(taskId, after) as {
           seq: number;

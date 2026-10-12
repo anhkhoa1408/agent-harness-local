@@ -1,3 +1,6 @@
+import { AttemptStatus } from "./constants/attempt-status";
+import { PipelineStage } from "./constants/pipeline-stage";
+import { TaskStatus } from "./constants/task-status";
 import { stages, type Stage, type Status, type Task } from "./contracts";
 export type ProgressAttempt = {
   taskId: string;
@@ -13,6 +16,33 @@ export type StageNode = {
   label: string;
 };
 export type TaskWithProgress = Task & { pipeline: StageNode[] };
+type ProgressOutput = {
+  needsReplan?: boolean;
+  verdict?: string;
+  version?: number;
+} | null;
+
+function attemptNeedsWork(attempt: ProgressAttempt, output: ProgressOutput) {
+  return (
+    (attempt.nextStage === PipelineStage.PLAN &&
+      [PipelineStage.IMPLEMENT, PipelineStage.REPAIR].some(
+        (value) => value === attempt.stage,
+      )) ||
+    (attempt.nextStage === PipelineStage.REPAIR &&
+      [PipelineStage.VERIFY, PipelineStage.REVIEW].some(
+        (value) => value === attempt.stage,
+      )) ||
+    output?.needsReplan === true ||
+    (attempt.stage === PipelineStage.REVIEW &&
+      output?.verdict &&
+      output.verdict !== "pass") ||
+    (attempt.stage === PipelineStage.VERIFY &&
+      !attempt.nextStage &&
+      Array.isArray(output) &&
+      output.some((c) => c.status !== "passed"))
+  );
+}
+
 export function pipelineProgress(
   task: Task,
   attempts: ProgressAttempt[],
@@ -32,49 +62,47 @@ export function pipelineProgress(
   };
   // Store returns attempts in insertion order, including subsequent retries.
   for (const attempt of attempts.filter((a) => a.taskId === task.id)) {
-    if (attempt.stage === "analyze") reset(stages.slice(2));
-    if (attempt.stage === "plan") reset(stages.slice(3));
-    if (["implement", "repair"].includes(attempt.stage))
-      reset(["verify", "review", "deliver"]);
-    if (attempt.stage === "verify") reset(["review", "deliver"]);
-    if (attempt.stage === "review") reset(["deliver"]);
+    if (attempt.stage === PipelineStage.ANALYZE)
+      reset(stages.slice(stages.indexOf(PipelineStage.PLAN)));
+    if (attempt.stage === PipelineStage.PLAN)
+      reset(stages.slice(stages.indexOf(PipelineStage.PREPARE)));
+    if (
+      [PipelineStage.IMPLEMENT, PipelineStage.REPAIR].some(
+        (value) => value === attempt.stage,
+      )
+    )
+      reset([
+        PipelineStage.VERIFY,
+        PipelineStage.REVIEW,
+        PipelineStage.DELIVER,
+      ]);
+    if (attempt.stage === PipelineStage.VERIFY)
+      reset([PipelineStage.REVIEW, PipelineStage.DELIVER]);
+    if (attempt.stage === PipelineStage.REVIEW) reset([PipelineStage.DELIVER]);
     const current = node(attempt.stage);
-    const output = attempt.output as {
-      needsReplan?: boolean;
-      verdict?: string;
-      version?: number;
-    } | null;
-    const needsWork =
-      (attempt.nextStage === "plan" &&
-        ["implement", "repair"].includes(attempt.stage)) ||
-      (attempt.nextStage === "repair" &&
-        ["verify", "review"].includes(attempt.stage)) ||
-      output?.needsReplan === true ||
-      (attempt.stage === "review" &&
-        output?.verdict &&
-        output.verdict !== "pass") ||
-      (attempt.stage === "verify" &&
-        !attempt.nextStage &&
-        Array.isArray(output) &&
-        output.some((c) => c.status !== "passed"));
+    const output = attempt.output as ProgressOutput;
+    const needsWork = attemptNeedsWork(attempt, output);
     const approvedPlan =
-      attempt.stage === "plan" &&
+      attempt.stage === PipelineStage.PLAN &&
       output?.version != null &&
       task.approvedPlanVersion === output.version;
     if (
-      attempt.status === "completed" &&
+      attempt.status === AttemptStatus.COMPLETED &&
       !needsWork &&
       (approvedPlan ||
-        !["blocked", "waiting_input", "waiting_approval", "failed"].includes(
-          attempt.nextStatus ?? "",
-        ))
+        ![
+          TaskStatus.BLOCKED,
+          TaskStatus.WAITING_INPUT,
+          TaskStatus.WAITING_APPROVAL,
+          TaskStatus.FAILED,
+        ].some((value) => value === (attempt.nextStatus ?? "")))
     ) {
       current.state = "done";
       current.label = "Đã xong";
     } else if (
-      attempt.status === "failed" ||
+      attempt.status === AttemptStatus.FAILED ||
       needsWork ||
-      attempt.nextStatus === "blocked"
+      attempt.nextStatus === TaskStatus.BLOCKED
     ) {
       current.state = "attention";
       current.label = "Cần xử lý";
@@ -83,25 +111,27 @@ export function pipelineProgress(
       current.label = "Chưa hoàn tất";
     }
   }
-  if (task.status === "completed") {
-    if (node("repair").state === "pending")
-      Object.assign(node("repair"), {
+  if (task.status === TaskStatus.COMPLETED) {
+    if (node(PipelineStage.REPAIR).state === "pending")
+      Object.assign(node(PipelineStage.REPAIR), {
         state: "skipped",
         label: "Không cần sửa",
       });
     if (
-      node("implement").state === "pending" &&
-      node("repair").state === "done"
+      node(PipelineStage.IMPLEMENT).state === "pending" &&
+      node(PipelineStage.REPAIR).state === "done"
     )
-      Object.assign(node("implement"), {
+      Object.assign(node(PipelineStage.IMPLEMENT), {
         state: "skipped",
         label: "Thay bằng vòng sửa",
       });
     return nodes;
   }
   // A command can invalidate approval before the next attempt is recorded.
-  if (task.stage === "analyze") reset(stages.slice(2));
-  if (task.stage === "plan") reset(stages.slice(3));
+  if (task.stage === PipelineStage.ANALYZE)
+    reset(stages.slice(stages.indexOf(PipelineStage.PLAN)));
+  if (task.stage === PipelineStage.PLAN)
+    reset(stages.slice(stages.indexOf(PipelineStage.PREPARE)));
   const current = node(task.stage);
   const labels: Record<Status, string> = {
     queued: "Sắp chạy",
@@ -117,11 +147,13 @@ export function pipelineProgress(
   };
   current.label = labels[task.status];
   current.state =
-    task.status === "queued"
+    task.status === TaskStatus.QUEUED
       ? "pending"
-      : task.status === "cancelled"
+      : task.status === TaskStatus.CANCELLED
         ? "stopped"
-        : ["blocked", "failed", "interrupted"].includes(task.status)
+        : [TaskStatus.BLOCKED, TaskStatus.FAILED, TaskStatus.INTERRUPTED].some(
+              (value) => value === task.status,
+            )
           ? "attention"
           : "current";
   return nodes;

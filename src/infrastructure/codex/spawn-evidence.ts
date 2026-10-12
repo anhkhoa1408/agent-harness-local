@@ -1,7 +1,8 @@
-import {
-  ROLLOUT_INITIAL_RETRY_DELAY_MS,
-  ROLLOUT_MAX_RETRY_DELAY_MS,
-} from "./limits";
+import { waitForRetry } from "./utils/retry-delay";
+import { CodexErrorCode } from "./constants/codex-error-code";
+import { CodexLimits } from "./constants/codex-limits";
+import { ApplicationErrorCode } from "../../application/constants/index";
+
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 
@@ -13,13 +14,13 @@ export async function durableSpawnEvidence(
   callId: string,
   timeoutMs: number,
 ): Promise<Map<string, unknown>> {
-  if (!path) throw new Error("subagent_capability_unavailable");
+  if (!path) throw new Error(CodexErrorCode.SUBAGENT_CAPABILITY_UNAVAILABLE);
   const deadline = Date.now() + timeoutMs;
-  let delay = ROLLOUT_INITIAL_RETRY_DELAY_MS;
+  let delay = CodexLimits.ROLLOUT_INITIAL_RETRY_DELAY_MS;
   for (;;) {
     const calls = new Map<string, unknown>();
-    const stream = createReadStream(path, { encoding: "utf8" }),
-      lines = createInterface({ input: stream, crlfDelay: Infinity });
+    const stream = createReadStream(path, { encoding: "utf8" });
+    const lines = createInterface({ input: stream, crlfDelay: Infinity });
     try {
       for await (const line of lines) {
         let record;
@@ -42,10 +43,8 @@ export async function durableSpawnEvidence(
       stream.destroy();
     }
     if (calls.has(callId)) return calls;
-    if (Date.now() >= deadline) throw new Error("subagent_evidence_missing");
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.min(delay, deadline - Date.now())),
-    );
-    delay = Math.min(delay * 2, ROLLOUT_MAX_RETRY_DELAY_MS);
+    if (Date.now() >= deadline)
+      throw new Error(ApplicationErrorCode.SUBAGENT_EVIDENCE_MISSING);
+    delay = await waitForRetry(delay, deadline);
   }
 }

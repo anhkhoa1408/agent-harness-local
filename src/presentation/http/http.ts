@@ -1,5 +1,8 @@
+import { HttpStatus } from "./constants/http-status";
+import { HttpLimits } from "./constants/http-limits";
+import { HttpErrorCode } from "./constants/http-error-code";
 import type { HttpRouteContext } from "./route-context";
-import { MAX_REQUEST_BODY_SIZE } from "./limits";
+
 import { authorize } from "./local-session";
 import { json, httpErrorResponse } from "./http-response";
 import { createSystemRoute } from "./routes/system";
@@ -17,18 +20,21 @@ export function createHttpHandler(context: HttpRouteContext) {
   ];
   return async (request: Request): Promise<Response> => {
     if (!authorize(request, context.sessions))
-      return json({ error: "origin_or_session_invalid" }, 403);
-    const url = new URL(request.url),
-      parts = url.pathname
-        .slice("/api/".length)
-        .split("/")
-        .map(decodeURIComponent);
+      return json({ error: "origin_or_session_invalid" }, HttpStatus.FORBIDDEN);
+    const url = new URL(request.url);
+    const parts = url.pathname
+      .slice("/api/".length)
+      .split("/")
+      .map(decodeURIComponent);
     const body = async () => {
-      if (Number(request.headers.get("content-length")) > MAX_REQUEST_BODY_SIZE)
-        throw new Error("body_too_large");
+      if (
+        Number(request.headers.get("content-length")) >
+        HttpLimits.MAX_REQUEST_BODY_SIZE
+      )
+        throw new Error(HttpErrorCode.BODY_TOO_LARGE);
       const text = await request.text();
-      if (text.length > MAX_REQUEST_BODY_SIZE)
-        throw new Error("body_too_large");
+      if (text.length > HttpLimits.MAX_REQUEST_BODY_SIZE)
+        throw new Error(HttpErrorCode.BODY_TOO_LARGE);
       return JSON.parse(text);
     };
     try {
@@ -36,7 +42,7 @@ export function createHttpHandler(context: HttpRouteContext) {
         const response = await route(request, url, parts, body);
         if (response) return response;
       }
-      return json({ error: "not_found" }, 404);
+      return json({ error: "not_found" }, HttpStatus.NOT_FOUND);
     } catch (error) {
       return httpErrorResponse(error);
     }

@@ -1,3 +1,0 @@
-export const APPROVAL_POLL_INTERVAL_MS = 100;
-export const WORKER_POLL_INTERVAL_MS = 25;
-export const STAGE_TIMEOUT_MS = 30 * 60 * 1000;

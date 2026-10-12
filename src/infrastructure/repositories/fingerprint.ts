@@ -14,14 +14,14 @@ export async function fingerprintWorktree(
     .split("\0")
     .filter(Boolean);
   const tracked = (await gitText(path, ["ls-files", "-z"]))
-      .split("\0")
-      .filter(Boolean),
-    untracked = (
-      await gitText(path, ["ls-files", "--others", "--exclude-standard", "-z"])
-    )
-      .split("\0")
-      .filter(Boolean)
-      .filter((p) => !excluded.includes(p));
+    .split("\0")
+    .filter(Boolean);
+  const untracked = (
+    await gitText(path, ["ls-files", "--others", "--exclude-standard", "-z"])
+  )
+    .split("\0")
+    .filter(Boolean)
+    .filter((p) => !excluded.includes(p));
   const hash = createHash("sha256");
   hash.update(base);
   for (const file of [

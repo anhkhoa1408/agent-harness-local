@@ -1,9 +1,6 @@
-import {
-  CODEX_LOGIN_TIMEOUT_MS,
-  CODEX_LOGIN_STATUS_TIMEOUT_MS,
-  CLI_STATUS_MAX_BUFFER_BYTES,
-  MAX_LOGIN_OUTPUT_CHARACTERS,
-} from "../system/limits";
+import { SystemLimits } from "../system/constants/system-limits";
+import { ApplicationErrorCode } from "../../application/constants/index";
+
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -25,22 +22,25 @@ export class CodexLogin implements LoginService {
   } | null = null;
   constructor(
     private binary = process.env.CODEX_BIN ?? "codex",
-    private timeoutMs = CODEX_LOGIN_TIMEOUT_MS,
+    private timeoutMs = SystemLimits.CODEX_LOGIN_TIMEOUT_MS,
   ) {}
 
   async status(): Promise<LoginState> {
     if (this.pending || this.starting) return { ...this.current };
     try {
       await exec(this.binary, ["login", "status"], {
-        timeout: CODEX_LOGIN_STATUS_TIMEOUT_MS,
-        maxBuffer: CLI_STATUS_MAX_BUFFER_BYTES,
+        timeout: SystemLimits.CODEX_LOGIN_STATUS_TIMEOUT_MS,
+        maxBuffer: SystemLimits.CLI_STATUS_MAX_BUFFER_BYTES,
       });
       if (this.pending) return { ...this.current };
       this.current = state("authenticated");
     } catch (error) {
       if (this.pending) return { ...this.current };
       if ((error as NodeJS.ErrnoException).code === "ENOENT")
-        this.current = state("unavailable", "codex_unavailable");
+        this.current = state(
+          "unavailable",
+          ApplicationErrorCode.CODEX_UNAVAILABLE,
+        );
       else if (this.current.status !== "error")
         this.current = state("signed_out");
     }
@@ -71,7 +71,7 @@ export class CodexLogin implements LoginService {
     const receive = (chunk: Buffer) => {
       output = (output + chunk.toString())
         .replace(/\x1b\[[0-9;]*m/g, "")
-        .slice(-MAX_LOGIN_OUTPUT_CHARACTERS);
+        .slice(-SystemLimits.MAX_LOGIN_OUTPUT_CHARACTERS);
       const match =
         /https:\/\/auth\.openai\.com\/oauth\/authorize\?[^\s]+(?=\s)/.exec(
           output,
@@ -107,7 +107,10 @@ export class CodexLogin implements LoginService {
     timer.unref();
     const closed = new Promise<void>((resolve) => {
       child.once("error", () => {
-        this.current = state("unavailable", "codex_unavailable");
+        this.current = state(
+          "unavailable",
+          ApplicationErrorCode.CODEX_UNAVAILABLE,
+        );
       });
       child.once("close", (code) => {
         clearTimeout(timer);

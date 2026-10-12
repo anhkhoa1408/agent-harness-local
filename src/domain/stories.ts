@@ -1,10 +1,11 @@
+import { DomainErrorCode } from "./constants/domain-error-code";
 import { type Plan, type Story, type StorySelection } from "./contracts";
 
 export function validateStories(plan: Plan): string[] {
   if (!plan.stories) return [];
-  const stories = plan.stories,
-    errors: string[] = [],
-    ids = new Set(stories.map((s) => s.id));
+  const stories = plan.stories;
+  const errors: string[] = [];
+  const ids = new Set(stories.map((s) => s.id));
   if (ids.size !== stories.length) errors.push("story_duplicate_id");
   for (const s of stories) {
     if (s.dependsOn.some((id) => !ids.has(id) || id === s.id))
@@ -29,11 +30,11 @@ export function validateStories(plan: Plan): string[] {
     for (const item of source)
       if (stories.filter((s) => s[key].includes(item.id)).length !== 1)
         errors.push(`story_coverage:${item.id}`);
-  const visiting = new Set<string>(),
-    visited = new Set<string>();
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
   function visit(id: string): void {
     if (visiting.has(id)) {
-      errors.push("story_cycle");
+      errors.push(DomainErrorCode.STORY_CYCLE);
       return;
     }
     if (visited.has(id)) return;
@@ -55,7 +56,8 @@ export function validateStories(plan: Plan): string[] {
 }
 export function selectedStories(plan: Plan, raw: StorySelection): Story[] {
   const selection = raw;
-  if (selection.planVersion !== plan.version) throw new Error("stale_plan");
+  if (selection.planVersion !== plan.version)
+    throw new Error(DomainErrorCode.STALE_PLAN);
   const errors = validateStories(plan);
   if (errors.length || !plan.stories)
     throw new Error(`invalid_stories:${errors.join(",")}`);
@@ -64,23 +66,23 @@ export function selectedStories(plan: Plan, raw: StorySelection): Story[] {
     ids.size !== selection.storyIds.length ||
     selection.storyIds.some((id) => !plan.stories!.some((s) => s.id === id))
   )
-    throw new Error("invalid_story_selection");
-  const remaining = plan.stories.filter((s) => ids.has(s.id)),
-    ordered: Story[] = [];
+    throw new Error(DomainErrorCode.INVALID_STORY_SELECTION);
+  const remaining = plan.stories.filter((s) => ids.has(s.id));
+  const ordered: Story[] = [];
   if (remaining.some((s) => s.dependsOn.some((id) => !ids.has(id))))
-    throw new Error("story_dependency_required");
+    throw new Error(DomainErrorCode.STORY_DEPENDENCY_REQUIRED);
   while (remaining.length) {
     const index = remaining.findIndex((s) =>
       s.dependsOn.every((id) => ordered.some((o) => o.id === id)),
     );
-    if (index < 0) throw new Error("story_cycle");
+    if (index < 0) throw new Error(DomainErrorCode.STORY_CYCLE);
     ordered.push(...remaining.splice(index, 1));
   }
   return ordered;
 }
 function project(plan: Plan, stories: Story[], baselineCommit: string): Plan {
-  const criterionIds = new Set(stories.flatMap((s) => s.criterionIds)),
-    stepIds = new Set(stories.flatMap((s) => s.stepIds));
+  const criterionIds = new Set(stories.flatMap((s) => s.criterionIds));
+  const stepIds = new Set(stories.flatMap((s) => s.stepIds));
   const criteria = plan.criteria.filter((c) => criterionIds.has(c.id));
   const checkIds = new Set(criteria.flatMap((c) => c.checkIds));
   const screenshots =
@@ -119,7 +121,7 @@ export function projectStoryPlan(
   baselineCommit: string,
 ): Plan {
   const story = plan.stories?.find((s) => s.id === storyId);
-  if (!story) throw new Error("story_not_found");
+  if (!story) throw new Error(DomainErrorCode.STORY_NOT_FOUND);
   return project(plan, [story], baselineCommit);
 }
 export function projectSelectedPlan(

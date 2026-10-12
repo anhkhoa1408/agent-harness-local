@@ -1,3 +1,5 @@
+import { ApplicationErrorCode } from "../../../application/constants/index";
+import { HttpStatus } from "../constants/http-status";
 import { readSession } from "../local-session";
 import { json } from "../http-response";
 import type { HttpRouteContext, HttpResourceRoute } from "../route-context";
@@ -26,8 +28,12 @@ export function createSystemRoute(
         return json({ models: await system.models(), auth: "connected" });
       } catch {
         return json(
-          { models: [], auth: "unavailable", error: "codex_unavailable" },
-          503,
+          {
+            models: [],
+            auth: "unavailable",
+            error: ApplicationErrorCode.CODEX_UNAVAILABLE,
+          },
+          HttpStatus.SERVICE_UNAVAILABLE,
         );
       }
     }

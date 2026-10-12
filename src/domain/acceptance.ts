@@ -1,3 +1,5 @@
+import { CheckStatus } from "./constants/check-status";
+import { DomainErrorCode } from "./constants/domain-error-code";
 import { validateStories } from "./stories";
 import { type Plan, type Task, type Review } from "./contracts";
 import type { CheckResult } from "./evidence";
@@ -68,8 +70,8 @@ export function validatePlan(plan: Plan): string[] {
     )
       errors.push(`ui_path:${shot.id}`);
   }
-  const visited = new Set<string>(),
-    active = new Set<string>();
+  const visited = new Set<string>();
+  const active = new Set<string>();
   function visit(id: string) {
     if (active.has(id)) {
       errors.push("dependency_cycle");
@@ -103,13 +105,13 @@ export function acceptanceErrors(
     task.approvedPlanVersion !== plan.version ||
     task.sourceCommit !== plan.sourceCommit
   )
-    errors.push("plan_not_approved");
+    errors.push(DomainErrorCode.PLAN_NOT_APPROVED);
   if (
     review.taskId !== task.id ||
     review.planVersion !== plan.version ||
     review.fingerprint !== fingerprint
   )
-    errors.push("stale_review");
+    errors.push(DomainErrorCode.STALE_REVIEW);
   if (review.verdict !== "pass") errors.push("review_not_passed");
   if (
     review.findings.some(
@@ -126,7 +128,7 @@ export function acceptanceErrors(
           c.taskId === task.id &&
           c.planVersion === plan.version &&
           c.fingerprint === fingerprint &&
-          c.status === "passed" &&
+          c.status === CheckStatus.PASSED &&
           c.evidencePath,
       )
     )
@@ -149,7 +151,7 @@ export function acceptanceErrors(
           c.taskId === task.id &&
           c.planVersion === plan.version &&
           c.fingerprint === fingerprint &&
-          c.status === "passed" &&
+          c.status === CheckStatus.PASSED &&
           c.evidencePath &&
           c.imageEvidence?.length,
       )

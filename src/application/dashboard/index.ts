@@ -1,16 +1,31 @@
-import type { ApplicationStore } from "../ports";
+import { ExecutionMode } from "../../domain/constants/execution-mode";
+import { planKey } from "../../domain/utils/record-key";
+import { ApplicationErrorCode } from "../constants/index";
+import { WorkerLease } from "../../domain/constants/worker-lease";
+import { TaskStatus } from "../../domain/constants/task-status";
+import type { Attempt } from "../pipeline-contracts";
+import type { Task } from "../../domain/contracts";
+import type { ApplicationStore, ApprovalRecord } from "../ports";
 import type { StoryService } from "../stories";
 import type { PlanService } from "../planning";
 import type { RuntimePort } from "../runtime";
 import type { ValidationPort } from "../validation";
-import {
-  pipelineProgress,
-  type ProgressAttempt,
-} from "../../domain/pipeline-progress";
-import { WORKER_LEASE_TTL_MS } from "../../domain/limits";
+import { pipelineProgress } from "../../domain/pipeline-progress";
+
 export interface TaskDiffPort {
   diff(root: string, source: string): Promise<string>;
 }
+function isPendingApproval(
+  task: Task | undefined,
+  approval: ApprovalRecord,
+): task is Task {
+  return (
+    task?.status === TaskStatus.RUNNING &&
+    task.executionMode !== ExecutionMode.AUTO &&
+    !approval.decision
+  );
+}
+
 export class DashboardService {
   constructor(
     private readonly store: ApplicationStore,
@@ -24,21 +39,31 @@ export class DashboardService {
     return this.store.tasks.get(id);
   }
   tasks() {
-    const attempts = this.store.attempts.list();
-    return this.store.tasks
-      .list()
-      .map((task) => ({ ...task, pipeline: pipelineProgress(task, attempts) }));
+    const attemptsByTask = new Map<string, Attempt[]>();
+    for (const attempt of this.store.attempts.list()) {
+      const { taskId } = attempt;
+      const attempts = attemptsByTask.get(taskId);
+      if (attempts) attempts.push(attempt);
+      else attemptsByTask.set(taskId, [attempt]);
+    }
+    return this.store.tasks.list().map((task) => ({
+      ...task,
+      pipeline: pipelineProgress(task, attemptsByTask.get(task.id) ?? []),
+    }));
   }
   events(taskId: string, after: number) {
     return this.store.events.list(taskId, after);
   }
   acceptCommand(taskId: string, raw: unknown) {
-    const task = this.task(taskId),
-      command = this.validation.command({ ...(raw as object), taskId });
+    const task = this.task(taskId);
+    const command = this.validation.command({ ...(raw as object), taskId });
     if (command.expectedRevision !== task.revision)
-      return { error: "revision_conflict" as const };
+      return { error: ApplicationErrorCode.REVISION_CONFLICT };
     const health = this.store.health.get("worker");
-    if (!health || this.runtime.now() - health.at > WORKER_LEASE_TTL_MS)
+    if (
+      !health ||
+      this.runtime.now() - health.at > WorkerLease.WORKER_LEASE_TTL_MS
+    )
       return { error: "worker_unavailable" as const };
     return { accepted: this.store.commands.enqueue(command) };
   }
@@ -58,11 +83,8 @@ export class DashboardService {
         execution: storyService.getExecution(task.id),
         runs: storyService.listStoryRuns(task.id),
       },
-      pipeline: pipelineProgress(
-        task,
-        store.attempts.list() as ProgressAttempt[],
-      ),
-      plan: store.plans.get(`${task.id}:${task.planVersion}`),
+      pipeline: pipelineProgress(task, store.attempts.list()),
+      plan: store.plans.get(planKey(task.id, task.planVersion)),
       comments: planService.planComments(task.id),
       analysis: store.analyses.get(task.id),
       checks: store.checks.get(task.id),
@@ -70,25 +92,11 @@ export class DashboardService {
       acceptance: store.acceptance.get(task.id),
       delivery: store.deliveries.get(task.id),
       runtime: store.runtimes.get(task.id),
-      approvals: (
-        store.approvals.list() as Array<{
-          taskId: string;
-          decision?: unknown;
-        }>
-      ).filter(
-        (r) =>
-          r.taskId === task.id &&
-          !r.decision &&
-          task.status === "running" &&
-          task.executionMode !== "auto",
-      ),
-      artifacts: (
-        store.artifacts.list() as Array<{
-          taskId: string;
-          id: string;
-          type: string;
-        }>
-      )
+      approvals: store.approvals
+        .list()
+        .filter((r) => r.taskId === task.id && isPendingApproval(task, r)),
+      artifacts: store.artifacts
+        .list()
         .filter((r) => r.taskId === task.id)
         .map((r) => ({ id: r.id, type: r.type })),
       diff,
@@ -99,7 +107,7 @@ export class DashboardService {
     return {
       app: "ready",
       worker:
-        lease && this.runtime.now() - lease.at < WORKER_LEASE_TTL_MS
+        lease && this.runtime.now() - lease.at < WorkerLease.WORKER_LEASE_TTL_MS
           ? "online"
           : "offline",
       heartbeat: lease?.at ?? null,
@@ -111,9 +119,7 @@ export class DashboardService {
     );
     return this.store.approvals.list().flatMap((approval) => {
       const task = tasks.get(approval.taskId);
-      return task?.status === "running" &&
-        task.executionMode !== "auto" &&
-        !approval.decision
+      return isPendingApproval(task, approval)
         ? [{ id: approval.id, taskId: task.id, taskTitle: task.title }]
         : [];
     });

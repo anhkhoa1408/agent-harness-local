@@ -1,6 +1,9 @@
+import { contained } from "../utils/contained-path";
+import { ExecutionLimits } from "./constants/execution-limits";
+import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { failureEvidence } from "./failure-evidence";
 import { readFile, stat, rm } from "node:fs/promises";
-import { MAX_EVIDENCE_FILE_BYTES } from "./limits";
+
 import { runProcess } from "./process";
 import { parseEvidence } from "./check-evidence";
 import {
@@ -10,7 +13,7 @@ import {
 } from "./ui-verification";
 import { gitText } from "../repositories/inspect";
 import { fingerprintWorktree } from "../repositories/fingerprint";
-import { contained } from "../context/rules";
+
 import type { VerificationPort } from "../../application/verification";
 export const verificationIO: VerificationPort = {
   failureEvidence,
@@ -20,8 +23,8 @@ export const verificationIO: VerificationPort = {
   isTracked: (root, path) => gitText(root, ["ls-files", "--", path]),
   remove: (path) => rm(path, { force: true }),
   async readReport(path) {
-    if ((await stat(path)).size > MAX_EVIDENCE_FILE_BYTES)
-      throw new Error("report_too_large");
+    if ((await stat(path)).size > ExecutionLimits.MAX_EVIDENCE_FILE_BYTES)
+      throw new Error(ExecutionErrorCode.REPORT_TOO_LARGE);
     return readFile(path, "utf8");
   },
   runProcess,

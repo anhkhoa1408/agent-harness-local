@@ -1,3 +1,10 @@
+import { TaskReason } from "../../domain/constants/task-reason";
+import { StoryRunState } from "../../domain/constants/story-run-state";
+import { planKey } from "../../domain/utils/record-key";
+import { ApplicationErrorCode, EventType } from "../constants/index";
+import { TaskStatus } from "../../domain/constants/task-status";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
+import { DomainErrorCode } from "../../domain/constants/domain-error-code";
 import { PlanService } from "../planning";
 import { StoryService, storyKey } from "../stories";
 
@@ -28,15 +35,23 @@ export function processControlCommand(
   try {
     const task = store.tasks.get(c.taskId);
     if (task.revision !== c.expectedRevision)
-      throw new Error("revision_conflict");
-    if (["completed", "cancelled"].includes(task.status))
-      throw new Error("terminal_task");
+      throw new Error(ApplicationErrorCode.REVISION_CONFLICT);
+    if (
+      [TaskStatus.COMPLETED, TaskStatus.CANCELLED].some(
+        (value) => value === task.status,
+      )
+    )
+      throw new Error(ApplicationErrorCode.TERMINAL_TASK);
     if (c.kind === "pause" || c.kind === "cancel") {
       for (const run of storyService
         .listStoryRuns(task.id)
-        .filter((r) => r.childTaskId && r.state !== "completed")) {
+        .filter((r) => r.childTaskId && r.state !== StoryRunState.COMPLETED)) {
         const child = store.tasks.get(run.childTaskId!);
-        if (!["completed", "cancelled"].includes(child.status))
+        if (
+          ![TaskStatus.COMPLETED, TaskStatus.CANCELLED].some(
+            (value) => value === child.status,
+          )
+        )
           store.commands.enqueue({
             id: `${c.id}:child:${child.id}`,
             taskId: child.id,
@@ -46,14 +61,16 @@ export function processControlCommand(
           });
       }
       if (active?.taskId === task.id) {
-        active.stop = c.kind === "pause" ? "paused" : "cancelled";
+        active.stop =
+          c.kind === "pause" ? TaskStatus.PAUSED : TaskStatus.CANCELLED;
         active.abort.abort();
       } else
         store.tasks.update(
           task.id,
           task.revision,
           {
-            status: c.kind === "pause" ? "paused" : "cancelled",
+            status:
+              c.kind === "pause" ? TaskStatus.PAUSED : TaskStatus.CANCELLED,
             resumeStage: task.stage,
             reason: null,
           },
@@ -67,24 +84,28 @@ export function processControlCommand(
               ? r.childTaskId === task.id
               : r.storyId === storyService.getExecution(task.id)?.activeStoryId,
           );
-        if (run && run.state !== "completed" && run.state !== "pending")
+        if (
+          run &&
+          run.state !== StoryRunState.COMPLETED &&
+          run.state !== StoryRunState.PENDING
+        )
           store.storyRuns.put(storyKey(run), {
             ...run,
-            state: "interrupted",
+            state: StoryRunState.INTERRUPTED,
             updatedAt: runtime.now(),
           });
       }
     } else if (c.kind === "approve") {
       const plan = validation.plan(
-          store.plans.get(`${task.id}:${task.planVersion}`),
-        ),
-        version = (c.payload as { version: number })?.version;
+        store.plans.get(planKey(task.id, task.planVersion)),
+      );
+      const version = (c.payload as { version: number })?.version;
       if (
         planService
           .planComments(task.id)
           .some((c) => c.version === plan.version)
       )
-        throw new Error("plan_feedback_requires_revision");
+        throw new Error(ApplicationErrorCode.PLAN_FEEDBACK_REQUIRES_REVISION);
       const approved = approvePlan(task, plan, version);
       store.atomic(() => {
         if (task.splitIntoStories)
@@ -97,11 +118,11 @@ export function processControlCommand(
           task.revision,
           {
             approvedPlanVersion: approved.approvedPlanVersion,
-            stage: "prepare",
-            status: "queued",
+            stage: PipelineStage.PREPARE,
+            status: TaskStatus.QUEUED,
             reason: null,
           },
-          event("plan.approved", {
+          event(EventType.PLAN_APPROVED, {
             version,
             selection: (c.payload as { selection?: unknown }).selection,
           }),
@@ -112,10 +133,11 @@ export function processControlCommand(
     } else if (c.kind === "revise") {
       planService.requestPlanRevision(task.id, c.payload);
     } else if (c.kind === "answer") {
-      if (task.status !== "waiting_input") throw new Error("invalid_status");
+      if (task.status !== TaskStatus.WAITING_INPUT)
+        throw new Error(DomainErrorCode.INVALID_STATUS);
       const answer = (c.payload as { answer: string })?.answer;
       if (typeof answer !== "string" || !answer.trim())
-        throw new Error("answer_required");
+        throw new Error(ApplicationErrorCode.ANSWER_REQUIRED);
       store.atomic(() => {
         store.answers.put(`${task.id}:${task.revision}`, {
           answer,
@@ -127,8 +149,8 @@ export function processControlCommand(
           {
             requirement: task.requirement + `\nUser clarification: ${answer}`,
             approvedPlanVersion: null,
-            stage: "analyze",
-            status: "queued",
+            stage: PipelineStage.ANALYZE,
+            status: TaskStatus.QUEUED,
             reason: null,
           },
           event("requirement.answered"),
@@ -143,13 +165,14 @@ export function processControlCommand(
         approval.decision ||
         !["accept", "decline"].includes(payload.decision)
       )
-        throw new Error("approval_request_expired");
+        throw new Error(ApplicationErrorCode.APPROVAL_REQUEST_EXPIRED);
       store.approvals.put(payload.id, {
         ...approval,
         decision: payload.decision,
       });
     } else if (c.kind === "configure") {
-      if (task.status === "running") throw new Error("stage_boundary_required");
+      if (task.status === TaskStatus.RUNNING)
+        throw new Error(ApplicationErrorCode.STAGE_BOUNDARY_REQUIRED);
       const p = c.payload as {
         models?: unknown;
         deliveryMode?: unknown;
@@ -166,23 +189,34 @@ export function processControlCommand(
         task.id,
         task.revision,
         patch,
-        event("task.configured"),
+        event(EventType.TASK_CONFIGURED),
       );
     } else if (c.kind === "resume" || c.kind === "start") {
-      if (!["paused", "interrupted", "blocked", "queued"].includes(task.status))
-        throw new Error("invalid_status");
-      if (task.reason === "runtime_state_unknown")
-        throw new Error("runtime_reconciliation_required");
+      if (
+        ![
+          TaskStatus.PAUSED,
+          TaskStatus.INTERRUPTED,
+          TaskStatus.BLOCKED,
+          TaskStatus.QUEUED,
+        ].some((value) => value === task.status)
+      )
+        throw new Error(DomainErrorCode.INVALID_STATUS);
+      if (task.reason === ApplicationErrorCode.RUNTIME_STATE_UNKNOWN)
+        throw new Error(ApplicationErrorCode.RUNTIME_RECONCILIATION_REQUIRED);
       const e = storyService.getExecution(task.id);
       const pending =
         e?.selection.mode === "separate_pr"
           ? storyService
               .listStoryRuns(task.id)
-              .find((r) => r.childTaskId && r.state !== "completed")
+              .find((r) => r.childTaskId && r.state !== StoryRunState.COMPLETED)
           : undefined;
       if (pending) {
         const child = store.tasks.get(pending.childTaskId!);
-        if (["paused", "interrupted", "blocked"].includes(child.status))
+        if (
+          [TaskStatus.PAUSED, TaskStatus.INTERRUPTED, TaskStatus.BLOCKED].some(
+            (value) => value === child.status,
+          )
+        )
           store.commands.enqueue({
             id: `${c.id}:child:${child.id}`,
             taskId: child.id,
@@ -193,21 +227,21 @@ export function processControlCommand(
         store.tasks.update(
           task.id,
           task.revision,
-          { status: "blocked", reason: "story_running" },
-          event("task.resumed"),
+          { status: TaskStatus.BLOCKED, reason: TaskReason.STORY_RUNNING },
+          event(EventType.TASK_RESUMED),
         );
       } else
         store.tasks.update(
           task.id,
           task.revision,
-          { status: "queued", reason: null },
-          event("task.resumed"),
+          { status: TaskStatus.QUEUED, reason: null },
+          event(EventType.TASK_RESUMED),
         );
-    } else throw new Error("approval_request_expired");
+    } else throw new Error(ApplicationErrorCode.APPROVAL_REQUEST_EXPIRED);
     store.commands.finish(c.id, { ok: true });
   } catch (error) {
     store.commands.finish(c.id, { error: String(error) });
-    store.events.add(c.taskId, "command.rejected", {
+    store.events.add(c.taskId, EventType.COMMAND_REJECTED, {
       commandId: c.id,
       error: String(error),
     });

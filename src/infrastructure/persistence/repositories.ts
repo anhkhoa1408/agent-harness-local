@@ -1,3 +1,4 @@
+import { RecordKind } from "./constants/record-kind";
 import type { ApplicationStore } from "../../application/ports";
 import type { Store } from "./store";
 // Closures retain the supplied (possibly fenced) store and its transaction scope.
@@ -29,109 +30,83 @@ export function createRepositories(store: Store): ApplicationStore {
       finish: (...args) => store.finishCommand(...args),
     },
     registry: { remove: (id) => store.removeRepository(id) },
-    plans:
-      records<NonNullable<ReturnType<ApplicationStore["plans"]["get"]>>>(
-        "plan",
-      ),
-    repositories:
-      records<NonNullable<ReturnType<ApplicationStore["repositories"]["get"]>>>(
-        "repository",
-      ),
-    settings:
-      records<NonNullable<ReturnType<ApplicationStore["settings"]["get"]>>>(
-        "settings",
-      ),
-    profiles:
-      records<NonNullable<ReturnType<ApplicationStore["profiles"]["get"]>>>(
-        "profile",
-      ),
-    planComments:
-      records<NonNullable<ReturnType<ApplicationStore["planComments"]["get"]>>>(
-        "plan-comment",
-      ),
-    storyRuns:
-      records<NonNullable<ReturnType<ApplicationStore["storyRuns"]["get"]>>>(
-        "story-run",
-      ),
-    storyExecutions:
-      records<
-        NonNullable<ReturnType<ApplicationStore["storyExecutions"]["get"]>>
-      >("story-execution"),
-    storyEvidence:
-      records<
-        NonNullable<ReturnType<ApplicationStore["storyEvidence"]["get"]>>
-      >("story-evidence"),
-    checks:
-      records<NonNullable<ReturnType<ApplicationStore["checks"]["get"]>>>(
-        "checks",
-      ),
-    reviews:
-      records<NonNullable<ReturnType<ApplicationStore["reviews"]["get"]>>>(
-        "review",
-      ),
-    acceptance:
-      records<NonNullable<ReturnType<ApplicationStore["acceptance"]["get"]>>>(
-        "acceptance",
-      ),
-    deliveries:
-      records<NonNullable<ReturnType<ApplicationStore["deliveries"]["get"]>>>(
-        "delivery",
-      ),
-    effects:
-      records<NonNullable<ReturnType<ApplicationStore["effects"]["get"]>>>(
-        "effect",
-      ),
-    artifacts:
-      records<NonNullable<ReturnType<ApplicationStore["artifacts"]["get"]>>>(
-        "artifact",
-      ),
-    analyses:
-      records<NonNullable<ReturnType<ApplicationStore["analyses"]["get"]>>>(
-        "analysis",
-      ),
-    bundles:
-      records<NonNullable<ReturnType<ApplicationStore["bundles"]["get"]>>>(
-        "bundle",
-      ),
-    attempts:
-      records<NonNullable<ReturnType<ApplicationStore["attempts"]["get"]>>>(
-        "attempt",
-      ),
-    runtimes:
-      records<NonNullable<ReturnType<ApplicationStore["runtimes"]["get"]>>>(
-        "runtime",
-      ),
-    parents:
-      records<NonNullable<ReturnType<ApplicationStore["parents"]["get"]>>>(
-        "parent",
-      ),
-    approvals:
-      records<NonNullable<ReturnType<ApplicationStore["approvals"]["get"]>>>(
-        "approval",
-      ),
-    health:
-      records<NonNullable<ReturnType<ApplicationStore["health"]["get"]>>>(
-        "health",
-      ),
-    ownership:
-      records<NonNullable<ReturnType<ApplicationStore["ownership"]["get"]>>>(
-        "ownership",
-      ),
-    exclusions:
-      records<NonNullable<ReturnType<ApplicationStore["exclusions"]["get"]>>>(
-        "exclusion",
-      ),
-    preparations:
-      records<NonNullable<ReturnType<ApplicationStore["preparations"]["get"]>>>(
-        "preparation",
-      ),
-    answers:
-      records<NonNullable<ReturnType<ApplicationStore["answers"]["get"]>>>(
-        "answer",
-      ),
-    sessions:
-      records<NonNullable<ReturnType<ApplicationStore["sessions"]["get"]>>>(
-        "session",
-      ),
+    plans: records<NonNullable<ReturnType<ApplicationStore["plans"]["get"]>>>(
+      RecordKind.PLAN,
+    ),
+    repositories: records<
+      NonNullable<ReturnType<ApplicationStore["repositories"]["get"]>>
+    >(RecordKind.REPOSITORY),
+    settings: records<
+      NonNullable<ReturnType<ApplicationStore["settings"]["get"]>>
+    >(RecordKind.SETTINGS),
+    profiles: records<
+      NonNullable<ReturnType<ApplicationStore["profiles"]["get"]>>
+    >(RecordKind.PROFILE),
+    planComments: records<
+      NonNullable<ReturnType<ApplicationStore["planComments"]["get"]>>
+    >(RecordKind.PLAN_COMMENT),
+    storyRuns: records<
+      NonNullable<ReturnType<ApplicationStore["storyRuns"]["get"]>>
+    >(RecordKind.STORY_RUN),
+    storyExecutions: records<
+      NonNullable<ReturnType<ApplicationStore["storyExecutions"]["get"]>>
+    >(RecordKind.STORY_EXECUTION),
+    storyEvidence: records<
+      NonNullable<ReturnType<ApplicationStore["storyEvidence"]["get"]>>
+    >(RecordKind.STORY_EVIDENCE),
+    checks: records<NonNullable<ReturnType<ApplicationStore["checks"]["get"]>>>(
+      RecordKind.CHECKS,
+    ),
+    reviews: records<
+      NonNullable<ReturnType<ApplicationStore["reviews"]["get"]>>
+    >(RecordKind.REVIEW),
+    acceptance: records<
+      NonNullable<ReturnType<ApplicationStore["acceptance"]["get"]>>
+    >(RecordKind.ACCEPTANCE),
+    deliveries: records<
+      NonNullable<ReturnType<ApplicationStore["deliveries"]["get"]>>
+    >(RecordKind.DELIVERY),
+    effects: records<
+      NonNullable<ReturnType<ApplicationStore["effects"]["get"]>>
+    >(RecordKind.EFFECT),
+    artifacts: records<
+      NonNullable<ReturnType<ApplicationStore["artifacts"]["get"]>>
+    >(RecordKind.ARTIFACT),
+    analyses: records<
+      NonNullable<ReturnType<ApplicationStore["analyses"]["get"]>>
+    >(RecordKind.ANALYSIS),
+    bundles: records<
+      NonNullable<ReturnType<ApplicationStore["bundles"]["get"]>>
+    >(RecordKind.BUNDLE),
+    attempts: records<
+      NonNullable<ReturnType<ApplicationStore["attempts"]["get"]>>
+    >(RecordKind.ATTEMPT),
+    runtimes: records<
+      NonNullable<ReturnType<ApplicationStore["runtimes"]["get"]>>
+    >(RecordKind.RUNTIME),
+    parents: records<
+      NonNullable<ReturnType<ApplicationStore["parents"]["get"]>>
+    >(RecordKind.PARENT),
+    approvals: records<
+      NonNullable<ReturnType<ApplicationStore["approvals"]["get"]>>
+    >(RecordKind.APPROVAL),
+    health: records<NonNullable<ReturnType<ApplicationStore["health"]["get"]>>>(
+      RecordKind.HEALTH,
+    ),
+    ownership: records<
+      NonNullable<ReturnType<ApplicationStore["ownership"]["get"]>>
+    >(RecordKind.OWNERSHIP),
+    exclusions: records<
+      NonNullable<ReturnType<ApplicationStore["exclusions"]["get"]>>
+    >(RecordKind.EXCLUSION),
+    preparations: records<
+      NonNullable<ReturnType<ApplicationStore["preparations"]["get"]>>
+    >(RecordKind.PREPARATION),
+    answers: records<
+      NonNullable<ReturnType<ApplicationStore["answers"]["get"]>>
+    >(RecordKind.ANSWER),
+    sessions: records<
+      NonNullable<ReturnType<ApplicationStore["sessions"]["get"]>>
+    >(RecordKind.SESSION),
   };
 }

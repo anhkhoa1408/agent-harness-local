@@ -1,5 +1,13 @@
+import { AttemptStatus } from "../../domain/constants/attempt-status";
+import { StoryRunState } from "../../domain/constants/story-run-state";
+import { errorMessage } from "../utils/index";
+import {
+  ApplicationErrorCode,
+  EventType,
+  WorkerTiming,
+} from "../constants/index";
+import { TaskStatus } from "../../domain/constants/task-status";
 import { StoryService, storyKey } from "../stories";
-import { STAGE_TIMEOUT_MS } from "../limits";
 
 import type { ApplicationStore } from "../ports";
 import type { RuntimePort } from "../runtime";
@@ -29,8 +37,11 @@ export async function executeStageAttempt(
 
   try {
     const result = await handlers[next.stage](
-      task!,
-      AbortSignal.any([abort.signal, AbortSignal.timeout(STAGE_TIMEOUT_MS)]),
+      task,
+      AbortSignal.any([
+        abort.signal,
+        AbortSignal.timeout(WorkerTiming.STAGE_TIMEOUT_MS),
+      ]),
     );
     if (hasLostLease()) return;
     const current = store.tasks.get(next.id);
@@ -40,28 +51,33 @@ export async function executeStageAttempt(
         .find((r) => r.storyId === attempt.storyId);
       if (
         run &&
-        run.state !== "completed" &&
+        run.state !== StoryRunState.COMPLETED &&
         (entry.stop ||
-          ["blocked", "interrupted", "paused"].includes(result.status))
+          [TaskStatus.BLOCKED, TaskStatus.INTERRUPTED, TaskStatus.PAUSED].some(
+            (value) => value === result.status,
+          ))
       )
         store.storyRuns.put(storyKey(run), {
           ...run,
           state:
-            entry.stop || ["paused", "interrupted"].includes(result.status)
-              ? "interrupted"
-              : "blocked",
+            entry.stop ||
+            [TaskStatus.PAUSED, TaskStatus.INTERRUPTED].some(
+              (value) => value === result.status,
+            )
+              ? StoryRunState.INTERRUPTED
+              : StoryRunState.BLOCKED,
           updatedAt: runtime.now(),
         });
       store.attempts.put(attempt.id, {
         ...attempt,
-        ...(store.attempts.get(attempt.id) as object),
-        status: "completed",
+        ...store.attempts.get(attempt.id),
+        status: AttemptStatus.COMPLETED,
         output: result.output,
         nextStage: result.stage,
         nextStatus: entry.stop ?? result.status,
       });
       // Some handlers save a versioned plan and perform their own atomic transition.
-      if (current.status === "running")
+      if (current.status === TaskStatus.RUNNING)
         store.tasks.update(
           current.id,
           current.revision,
@@ -70,7 +86,7 @@ export async function executeStageAttempt(
             status: entry.stop ?? result.status,
             reason: result.reason,
           },
-          event("stage.completed", {
+          event(EventType.STAGE_COMPLETED, {
             stage: next.stage,
             output: result.output,
           }),
@@ -78,29 +94,35 @@ export async function executeStageAttempt(
     });
   } catch (error) {
     if (hasLostLease()) return;
-    const current = store.tasks.get(next.id),
-      message = error instanceof Error ? error.message : String(error);
-    const unknown = message.includes("runtime_state_unknown");
+    const current = store.tasks.get(next.id);
+    const message = errorMessage(error, String);
+    const unknown = message.includes(
+      ApplicationErrorCode.RUNTIME_STATE_UNKNOWN,
+    );
     store.atomic(() => {
       if (unknown)
         store.exclusions.put(current.id, {
           taskId: current.id,
-          reason: "runtime_state_unknown",
+          reason: ApplicationErrorCode.RUNTIME_STATE_UNKNOWN,
           bootId,
         });
       const run = storyService
         .listStoryRuns(next.featureId ?? next.id)
         .find((r) => r.storyId === attempt.storyId);
-      if (run && run.state !== "completed")
+      if (run && run.state !== StoryRunState.COMPLETED)
         store.storyRuns.put(storyKey(run), {
           ...run,
-          state: abort.signal.aborted ? "interrupted" : "blocked",
+          state: abort.signal.aborted
+            ? StoryRunState.INTERRUPTED
+            : StoryRunState.BLOCKED,
           updatedAt: runtime.now(),
         });
       store.attempts.put(attempt.id, {
         ...attempt,
-        ...(store.attempts.get(attempt.id) as object),
-        status: abort.signal.aborted ? "interrupted" : "failed",
+        ...store.attempts.get(attempt.id),
+        status: abort.signal.aborted
+          ? AttemptStatus.INTERRUPTED
+          : AttemptStatus.FAILED,
         output: { error: message },
       });
       store.tasks.update(
@@ -108,13 +130,15 @@ export async function executeStageAttempt(
         current.revision,
         {
           status: unknown
-            ? "interrupted"
-            : (entry.stop ?? (signal.aborted ? "paused" : "blocked")),
-          reason: unknown ? "runtime_state_unknown" : message,
+            ? TaskStatus.INTERRUPTED
+            : (entry.stop ??
+              (signal.aborted ? TaskStatus.PAUSED : TaskStatus.BLOCKED)),
+          reason: unknown
+            ? ApplicationErrorCode.RUNTIME_STATE_UNKNOWN
+            : message,
         },
-        event("stage.stopped", { error: message }),
+        event(EventType.STAGE_STOPPED, { error: message }),
       );
     });
-  } finally {
   }
 }

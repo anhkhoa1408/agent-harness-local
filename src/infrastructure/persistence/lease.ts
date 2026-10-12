@@ -1,3 +1,4 @@
+import { PersistenceErrorCode } from "./constants/persistence-error-code";
 import type { DatabaseSync } from "node:sqlite";
 import { transaction } from "./database";
 import type { Store } from "./store";
@@ -60,7 +61,7 @@ export function assertLease(db: DatabaseSync, lease: Lease, now = Date.now()) {
       )
       .get(lease.owner, lease.epoch, now)
   )
-    throw new Error("lease_lost");
+    throw new Error(PersistenceErrorCode.LEASE_LOST);
 }
 export function releaseLease(db: DatabaseSync, lease: Lease) {
   db.prepare(

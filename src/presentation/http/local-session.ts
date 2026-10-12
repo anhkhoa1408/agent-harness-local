@@ -1,7 +1,6 @@
-import {
-  SessionService,
-  SESSION_TTL_SECONDS,
-} from "../../application/sessions";
+import { HttpStatus } from "./constants/http-status";
+import { SessionLimits } from "../../application/sessions/index";
+import { SessionService } from "../../application/sessions";
 export function validHost(host: string): boolean {
   return /^(127\.0\.0\.1|localhost):\d{1,5}$/.test(host);
 }
@@ -52,8 +51,8 @@ export function bootstrapSession(
   request: Request,
   sessions: SessionService,
 ): Response {
-  const host = request.headers.get("host") ?? "",
-    site = request.headers.get("sec-fetch-site");
+  const host = request.headers.get("host") ?? "";
+  const site = request.headers.get("sec-fetch-site");
   if (
     !validHost(host) ||
     request.headers.get("sec-fetch-mode") !== "navigate" ||
@@ -61,13 +60,13 @@ export function bootstrapSession(
     (request.headers.has("origin") &&
       !validMutationOrigin(request.headers.get("origin"), host))
   )
-    return new Response("Forbidden", { status: 403 });
+    return new Response("Forbidden", { status: HttpStatus.FORBIDDEN });
   const token = sessions.create();
   return new Response(null, {
-    status: 303,
+    status: HttpStatus.SEE_OTHER,
     headers: {
       location: "/",
-      "set-cookie": `harness_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
+      "set-cookie": `harness_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SessionLimits.TTL_SECONDS}`,
       "cache-control": "no-store",
       "content-security-policy": "frame-ancestors 'none'",
     },

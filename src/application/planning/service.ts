@@ -1,3 +1,8 @@
+import { planKey } from "../../domain/utils/record-key";
+import { DomainErrorCode } from "../../domain/constants/domain-error-code";
+import { ApplicationErrorCode, EventType } from "../constants/index";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
+import { TaskStatus } from "../../domain/constants/task-status";
 import type { ValidationPort } from "../validation";
 import type { RuntimePort } from "../runtime";
 import type { ApplicationStore } from "../ports";
@@ -18,19 +23,20 @@ export class PlanService {
     const store = this.store;
 
     return store.atomic(() => {
-      const task = store.tasks.get(taskId),
-        plan = this.validation.plan(raw);
+      const task = store.tasks.get(taskId);
+      const plan = this.validation.plan(raw);
       if (
         plan.taskId !== task.id ||
         plan.sourceCommit !== task.sourceCommit ||
         plan.version !== (task.planVersion ?? 0) + 1
       )
-        throw new Error("stale_plan");
+        throw new Error(DomainErrorCode.STALE_PLAN);
       if (task.splitIntoStories && !plan.stories)
-        throw new Error("stories_required");
+        throw new Error(ApplicationErrorCode.STORIES_REQUIRED);
       this.stories.validateStoryReplan(task, plan);
-      const key = `${taskId}:${plan.version}`;
-      if (store.plans.get(key)) throw new Error("immutable_plan");
+      const key = planKey(taskId, plan.version);
+      if (store.plans.get(key))
+        throw new Error(ApplicationErrorCode.IMMUTABLE_PLAN);
       store.plans.put(key, plan);
       const errors = validatePlan(plan);
       return store.tasks.update(
@@ -39,11 +45,16 @@ export class PlanService {
         {
           planVersion: plan.version,
           approvedPlanVersion: null,
-          stage: "plan",
-          status: errors.length ? "waiting_input" : "waiting_approval",
+          stage: PipelineStage.PLAN,
+          status: errors.length
+            ? TaskStatus.WAITING_INPUT
+            : TaskStatus.WAITING_APPROVAL,
           reason: errors.length ? errors.join(",") : null,
         },
-        { type: "plan.created", data: { version: plan.version, errors } },
+        {
+          type: EventType.PLAN_CREATED,
+          data: { version: plan.version, errors },
+        },
       );
     });
   }
@@ -58,13 +69,18 @@ export class PlanService {
     const store = this.store;
 
     const task = store.tasks.get(taskId);
-    if (task.planVersion !== version) throw new Error("stale_plan");
+    if (task.planVersion !== version)
+      throw new Error(DomainErrorCode.STALE_PLAN);
     if (
-      task.stage !== "plan" ||
-      !["waiting_approval", "waiting_input"].includes(task.status)
+      task.stage !== PipelineStage.PLAN ||
+      ![TaskStatus.WAITING_APPROVAL, TaskStatus.WAITING_INPUT].some(
+        (value) => value === task.status,
+      )
     )
-      throw new Error("invalid_status");
-    const plan = this.validation.plan(store.plans.get(`${taskId}:${version}`));
+      throw new Error(DomainErrorCode.INVALID_STATUS);
+    const plan = this.validation.plan(
+      store.plans.get(planKey(taskId, version)),
+    );
     return { task, plan };
   }
   addPlanComment(taskId: string, raw: unknown) {
@@ -80,7 +96,7 @@ export class PlanService {
         ...plan.checks.map((c) => `check:${c.id}`),
       ];
       if (!targets.includes(input.target))
-        throw new Error("invalid_comment_target");
+        throw new Error(ApplicationErrorCode.INVALID_COMMENT_TARGET);
       const comment: PlanComment = {
         ...input,
         id: this.runtime.id(),
@@ -92,7 +108,7 @@ export class PlanService {
         taskId,
         task.revision,
         {},
-        { type: "plan.commented", data: comment },
+        { type: EventType.PLAN_COMMENTED, data: comment },
       );
       return comment;
     });
@@ -104,17 +120,17 @@ export class PlanService {
     return store.atomic(() => {
       const { task } = this.editablePlan(taskId, version);
       if (!this.planComments(taskId).some((c) => c.version === version))
-        throw new Error("plan_feedback_required");
+        throw new Error(ApplicationErrorCode.PLAN_FEEDBACK_REQUIRED);
       return store.tasks.update(
         taskId,
         task.revision,
         {
           approvedPlanVersion: null,
-          stage: "plan",
-          status: "queued",
+          stage: PipelineStage.PLAN,
+          status: TaskStatus.QUEUED,
           reason: null,
         },
-        { type: "plan.revision_requested", data: { version } },
+        { type: EventType.PLAN_REVISION_REQUESTED, data: { version } },
       );
     });
   }

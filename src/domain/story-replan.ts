@@ -1,3 +1,5 @@
+import { StoryRunState } from "./constants/story-run-state";
+import { DomainErrorCode } from "./constants/domain-error-code";
 import type { Plan, StoryRun } from "./contracts";
 import { projectStoryPlan } from "./stories";
 function comparable(plan: Plan) {
@@ -14,17 +16,17 @@ export function assertCompletedStoryScopeUnchanged(
   plan: Plan,
   runs: StoryRun[],
 ) {
-  for (const run of runs.filter((r) => r.state === "completed")) {
+  for (const run of runs.filter((r) => r.state === StoryRunState.COMPLETED)) {
     if (
       !plan.stories?.some((s) => s.id === run.storyId) ||
       comparable(
         projectStoryPlan(previous, run.storyId, previous.sourceCommit),
       ) !== comparable(projectStoryPlan(plan, run.storyId, plan.sourceCommit))
     )
-      throw new Error("completed_story_changed");
+      throw new Error(DomainErrorCode.COMPLETED_STORY_CHANGED);
     const old = previous.stories!.find((s) => s.id === run.storyId)!;
     const next = plan.stories!.find((s) => s.id === run.storyId)!;
     if (JSON.stringify(old) !== JSON.stringify(next))
-      throw new Error("completed_story_changed");
+      throw new Error(DomainErrorCode.COMPLETED_STORY_CHANGED);
   }
 }

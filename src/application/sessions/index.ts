@@ -1,3 +1,4 @@
+import { SessionLimits } from "./constants/session-limits";
 import type { ApplicationStore, SessionRecord } from "../ports";
 import type { RuntimePort } from "../runtime";
 export interface SessionCryptoPort {
@@ -5,7 +6,7 @@ export interface SessionCryptoPort {
   hash(value: string): string;
   equal(a: string, b: string): boolean;
 }
-export const SESSION_TTL_SECONDS = 86400;
+export { SessionLimits } from "./constants/session-limits";
 export class SessionService {
   constructor(
     private readonly data: Pick<ApplicationStore, "sessions">,
@@ -17,11 +18,11 @@ export class SessionService {
     return session && session.expiresAt > this.runtime.now() ? session : null;
   }
   create() {
-    const token = this.crypto.token(),
-      csrf = this.crypto.token();
+    const token = this.crypto.token();
+    const csrf = this.crypto.token();
     this.data.sessions.put(this.crypto.hash(token), {
       csrf,
-      expiresAt: this.runtime.now() + SESSION_TTL_SECONDS * 1000,
+      expiresAt: this.runtime.now() + SessionLimits.TTL_SECONDS * 1000,
     });
     return token;
   }

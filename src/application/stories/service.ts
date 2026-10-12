@@ -1,7 +1,12 @@
+import { StoryRunState } from "../../domain/constants/story-run-state";
+import { planKey } from "../../domain/utils/record-key";
+import { ApplicationErrorCode, EventType } from "../constants/index";
+import { TaskStatus } from "../../domain/constants/task-status";
+import { PipelineStage } from "../../domain/constants/pipeline-stage";
 import type { ValidationPort } from "../validation";
 import type { RuntimePort } from "../runtime";
-import { storyKey } from "../../domain/story-key";
-export { storyKey } from "../../domain/story-key";
+import { storyKey } from "../../domain/utils/record-key";
+export { storyKey } from "../../domain/utils/record-key";
 import {
   prepareSeparateStory,
   reconcileFeatureStories,
@@ -50,7 +55,7 @@ export class StoryService {
     const execution = this.getExecution(task.id);
     if (!execution || !started(this.listStoryRuns(task.id))) return;
     const previous = this.validation.plan(
-      store.plans.get(`${task.id}:${execution.selection.planVersion}`),
+      store.plans.get(planKey(task.id, execution.selection.planVersion)),
     );
     assertCompletedStoryScopeUnchanged(
       previous,
@@ -67,19 +72,19 @@ export class StoryService {
 
     store.atomic(() => {
       const plan = this.validation.plan(
-        store.plans.get(`${task.id}:${task.planVersion}`),
+        store.plans.get(planKey(task.id, task.planVersion)),
       );
-      const selection = this.validation.storySelection(raw),
-        ordered = selectedStories(plan, selection);
-      const old = this.getExecution(task.id),
-        runs = this.listStoryRuns(task.id);
+      const selection = this.validation.storySelection(raw);
+      const ordered = selectedStories(plan, selection);
+      const old = this.getExecution(task.id);
+      const runs = this.listStoryRuns(task.id);
       if (old && started(runs)) {
         if (
           old.selection.mode !== selection.mode ||
           JSON.stringify([...old.selection.storyIds].sort()) !==
             JSON.stringify([...selection.storyIds].sort())
         )
-          throw new Error("story_selection_locked");
+          throw new Error(ApplicationErrorCode.STORY_SELECTION_LOCKED);
         this.validateStoryReplan(task, plan);
       }
       const retain = !!old && started(runs);
@@ -91,7 +96,7 @@ export class StoryService {
           featureId: task.id,
           planVersion: plan.version,
           storyId: story.id,
-          state: "pending",
+          state: StoryRunState.PENDING,
           baselineCommit: task.sourceCommit,
           ...prior,
           updatedAt: this.runtime.now(),
@@ -102,7 +107,10 @@ export class StoryService {
       const active = ordered.find(
         (s) =>
           !runs.some(
-            (r) => retain && r.storyId === s.id && r.state === "completed",
+            (r) =>
+              retain &&
+              r.storyId === s.id &&
+              r.state === StoryRunState.COMPLETED,
           ),
       );
       store.storyExecutions.put(task.id, {
@@ -126,7 +134,7 @@ export class StoryService {
     const store = this.store;
 
     const plan = this.validation.plan(
-      store.plans.get(`${task.id}:${task.planVersion}`),
+      store.plans.get(planKey(task.id, task.planVersion)),
     );
     const e = this.getExecution(task.id);
     if (
@@ -153,7 +161,7 @@ export class StoryService {
       JSON.stringify(store.storyEvidence.get(task.id)) !==
       JSON.stringify(expected)
     )
-      throw new Error("stale_story_evidence");
+      throw new Error(ApplicationErrorCode.STALE_STORY_EVIDENCE);
   }
   recordEvidence(task: Task) {
     const store = this.store;
@@ -183,17 +191,17 @@ export class StoryService {
     return store.atomic(() => {
       store.storyRuns.put(storyKey(run), {
         ...run,
-        state: "completed",
+        state: StoryRunState.COMPLETED,
         ...checkpoint,
         updatedAt: this.runtime.now(),
       });
       const plan = this.validation.plan(
-        store.plans.get(`${task.id}:${task.planVersion}`),
+        store.plans.get(planKey(task.id, task.planVersion)),
       );
       const next = selectedStories(plan, e.selection).find(
         (s) =>
           !this.listStoryRuns(task.id).some(
-            (r) => r.storyId === s.id && r.state === "completed",
+            (r) => r.storyId === s.id && r.state === StoryRunState.COMPLETED,
           ),
       );
       store.storyExecutions.put(task.id, {
@@ -206,15 +214,15 @@ export class StoryService {
       store.reviews.delete(task.id);
       store.acceptance.delete(task.id);
       store.storyEvidence.delete(task.id);
-      store.events.add(task.id, "story.checkpoint", {
+      store.events.add(task.id, EventType.STORY_CHECKPOINT, {
         storyId: run.storyId,
         ...checkpoint,
       });
       const result = {
-        stage: next ? ("prepare" as const) : ("verify" as const),
+        stage: next ? PipelineStage.PREPARE : PipelineStage.VERIFY,
         status: e.selection.continueAutomatically
-          ? ("queued" as const)
-          : ("paused" as const),
+          ? TaskStatus.QUEUED
+          : TaskStatus.PAUSED,
         reason: e.selection.continueAutomatically ? null : "story_checkpoint",
         output: checkpoint,
       };
@@ -229,7 +237,7 @@ export class StoryService {
           resumeStage: null,
         },
         {
-          type: "story.advanced",
+          type: EventType.STORY_ADVANCED,
           data: { storyId: next?.id ?? null, aggregate: !next },
         },
       );
@@ -269,7 +277,7 @@ export class StoryService {
       execution.aggregate ||
       !execution.activeStoryId
     )
-      throw new Error("story_checkpoint_unavailable");
+      throw new Error(ApplicationErrorCode.STORY_CHECKPOINT_UNAVAILABLE);
     return {
       plan: this.getExecutionPlan(task),
       storyId: execution.activeStoryId,

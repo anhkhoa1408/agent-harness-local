@@ -5,9 +5,9 @@ import { createHandlers } from "./stages";
 import { connectCodex } from "../infrastructure/codex/client";
 import type { AgentClient } from "../infrastructure/codex/types";
 export async function startWorker() {
-  const data = resolve(process.env.HARNESS_DATA_DIR ?? ".harness"),
-    store = openStore(join(data, "harness.db")),
-    abort = new AbortController();
+  const data = resolve(process.env.HARNESS_DATA_DIR ?? ".harness");
+  const store = openStore(join(data, "harness.db"));
+  const abort = new AbortController();
   process.on("SIGINT", () => abort.abort());
   process.on("SIGTERM", () => abort.abort());
   let connected: AgentClient | undefined;

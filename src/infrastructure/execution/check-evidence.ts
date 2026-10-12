@@ -1,3 +1,4 @@
+import { ExecutionErrorCode } from "./constants/execution-error-code";
 import { Parser } from "tap-parser";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import type { CheckSpec } from "../../domain/contracts";
@@ -11,9 +12,9 @@ export async function parseEvidence(
   if (format === "tap")
     return new Promise((resolve) => {
       const parser = new Parser();
-      let executed = 0,
-        skipped = 0,
-        failed = 0;
+      let executed = 0;
+      let skipped = 0;
+      let failed = 0;
       parser.on("result", (result) => {
         if (result.closingTestPoint) return;
         if (result.skip || result.todo) skipped++;
@@ -31,14 +32,15 @@ export async function parseEvidence(
       );
       parser.end(text);
     });
-  if (XMLValidator.validate(text) !== true) throw new Error("invalid_junit");
+  if (XMLValidator.validate(text) !== true)
+    throw new Error(ExecutionErrorCode.INVALID_JUNIT);
   const xml = new XMLParser({
     ignoreAttributes: false,
     processEntities: false,
   }).parse(text);
-  let executed = 0,
-    failed = 0,
-    skipped = 0;
+  let executed = 0;
+  let failed = 0;
+  let skipped = 0;
   function walk(value: unknown) {
     if (!value || typeof value !== "object") return;
     for (const [key, v] of Object.entries(value)) {
@@ -53,7 +55,8 @@ export async function parseEvidence(
       } else walk(v);
     }
   }
-  if (!xml.testsuites && !xml.testsuite) throw new Error("invalid_junit");
+  if (!xml.testsuites && !xml.testsuite)
+    throw new Error(ExecutionErrorCode.INVALID_JUNIT);
   walk(xml);
   return { executed, failed, skipped };
 }

@@ -1,9 +1,11 @@
-import { MAX_SOURCE_DOCUMENT_BYTES } from "../repositories/limits";
+import { contentHash } from "../utils/content-hash";
+import { RepositoryLimits } from "../repositories/constants/repository-limits";
+
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import type { Stage } from "../../domain/contracts";
 import sources from "../../../agents/sources.json";
-import { contentHash, contextFile, type ContextFile } from "./rules";
+import { contextFile, type ContextFile } from "./rules";
 
 type ProfileId = keyof typeof sources;
 export function selectSpecialist(
@@ -47,7 +49,9 @@ async function stackDocuments(root: string) {
           entry.name,
         )
       ) {
-        if ((await stat(path)).size <= MAX_SOURCE_DOCUMENT_BYTES)
+        if (
+          (await stat(path)).size <= RepositoryLimits.MAX_SOURCE_DOCUMENT_BYTES
+        )
           docs.push({
             path: relative(root, path),
             content: await readFile(path, "utf8"),
