@@ -1,12 +1,12 @@
 # Agent Harness
 
-Agent Harness chạy local, nhận task trên repo Git và dùng Codex để viết code, chạy test, review rồi tạo commit hoặc GitHub PR. Plan cần được duyệt trước khi sửa code; mỗi task chạy trên branch/worktree riêng.
+Agent Harness chạy trên máy local và dùng Codex để thực hiện task trên repo Git: viết code, chạy test, review và tạo commit hoặc GitHub PR. Mỗi task chạy trên branch và worktree riêng. Plan phải được duyệt trước khi sửa code.
 
 ## Bắt đầu
 
 ### Chạy trực tiếp trên máy
 
-Cài Node.js **>=24.18.0 và <25**, npm, Git và Codex CLI có `app-server`, native subagents. Phiên bản đã chạy thử trên macOS là `codex-cli 0.159.0-alpha.12.1`.
+Cần cài Node.js từ phiên bản 24.18.0 đến trước phiên bản 25, npm, Git và Codex CLI hỗ trợ `app-server` cùng native subagents. Phiên bản đã chạy thử trên macOS là `codex-cli 0.159.0-alpha.12.1`.
 
 ```sh
 nvm use
@@ -15,17 +15,17 @@ codex login
 npm run dev
 ```
 
-Mở [http://127.0.0.1:3000](http://127.0.0.1:3000) để dùng dashboard. `npm run dev` cũng khởi động worker chạy task ở phía sau. Nhấn `Ctrl+C` để dừng.
+Mở [http://127.0.0.1:3000](http://127.0.0.1:3000) để truy cập dashboard. Lệnh `npm run dev` khởi động cả dashboard và worker xử lý task. Nhấn `Ctrl+C` để dừng.
 
 ### Chạy bằng Docker
 
-Cấu hình `docker-compose.yml` hiện dùng Docker Desktop trên macOS, Docker Compose từ 2.22.0 và SSH agent của Docker Desktop. Cần có file `~/.ssh/known_hosts`; khi dùng remote SSH, agent phải có key được cấp quyền và file này phải chứa host của remote. Thư mục repo mặc định là `~/Documents/Personal`; có thể đổi bằng biến `HARNESS_REPOS_DIR`.
+Cấu hình `docker-compose.yml` hiện yêu cầu Docker Desktop trên macOS, Docker Compose từ phiên bản 2.22.0 và SSH agent của Docker Desktop. Cần có file `~/.ssh/known_hosts`. Nếu kết nối Git remote qua SSH, SSH agent phải có key được cấp quyền truy cập và file này phải chứa host của remote. Thư mục chứa repo mặc định là `~/Documents/Personal`; dùng biến `HARNESS_REPOS_DIR` để đổi thư mục.
 
 ```sh
 docker compose up -d --build
 ```
 
-Để tự build lại khi code thay đổi:
+Để tự động build lại khi code thay đổi, chạy:
 
 ```sh
 docker compose up --build --watch
@@ -33,17 +33,17 @@ docker compose up --build --watch
 
 Mở [http://127.0.0.1:3000](http://127.0.0.1:3000) và đăng nhập Codex. Trong Docker, đăng ký repo bằng đường dẫn `/repos/...`; ví dụ `~/Documents/Personal/my-app` trên máy tương ứng với `/repos/my-app`.
 
-Xem log bằng `docker compose logs -f`, dừng bằng `docker compose down`. Dữ liệu vẫn được giữ. Image có sẵn Node.js, Python, Git và GitHub CLI. Nếu repo dùng Java hoặc runtime khác, cần thêm runtime đó vào image. Xem cấu hình sandbox ở [config/README.md](config/README.md).
+Chạy `docker compose logs -f` để xem log và `docker compose down` để dừng. Lệnh dừng vẫn giữ dữ liệu. Image có sẵn Node.js, Python, Git và GitHub CLI. Nếu repo dùng Java hoặc runtime khác, cần thêm runtime đó vào image. Cấu hình sandbox nằm trong [config/README.md](config/README.md).
 
 ## Tạo task đầu tiên
 
 ![Form tạo task trên dashboard](docs/images/create-task.png)
 
-Chế độ **Duyệt quyền khi cần** yêu cầu xác nhận khi công cụ cần thêm quyền. **Auto sau khi duyệt Plan** không hỏi quyền công cụ; các giới hạn sandbox vẫn áp dụng. Cả hai đều cần duyệt plan trước khi chạy.
+Chế độ **Duyệt quyền khi cần** yêu cầu xác nhận mỗi khi công cụ cần thêm quyền. Chế độ **Auto sau khi duyệt Plan** cho phép công cụ chạy mà không hỏi quyền; các giới hạn sandbox vẫn áp dụng. Cả hai chế độ đều yêu cầu duyệt plan trước khi chạy.
 
-Nhấn **Bật thông báo** ở đầu workspace và cho phép trong trình duyệt để nhận thông báo khi agent cần quyền thực thi. Nhấn thông báo để mở đúng task và yêu cầu **Cho phép / Từ chối**.
+Nhấn **Bật thông báo** ở đầu workspace, rồi cấp quyền thông báo trong trình duyệt. Khi agent cần quyền thực thi, trình duyệt sẽ gửi thông báo. Nhấn vào thông báo để mở task có yêu cầu đang chờ, rồi chọn **Cho phép / Từ chối**.
 
-Cần giữ ít nhất một tab Harness mở trong trình duyệt desktop hỗ trợ Notifications API và Web Locks. Nếu thông báo bị chặn, vẫn có thể duyệt quyền trên dashboard. Thông báo này không dành cho duyệt Plan.
+Cần giữ ít nhất một tab Harness mở trong trình duyệt desktop hỗ trợ Notifications API và Web Locks. Nếu trình duyệt chặn thông báo, vẫn có thể duyệt quyền trên dashboard. Thông báo chỉ áp dụng cho yêu cầu quyền thực thi, không áp dụng cho duyệt plan.
 
 ## Một task chạy thế nào?
 
@@ -61,13 +61,13 @@ flowchart TD
   G -->|Pass| I[Commit và báo cáo local hoặc GitHub PR]
 ```
 
-Nếu yêu cầu, phạm vi hoặc base remote thay đổi, cần duyệt lại plan. Harness tiếp tục sửa khi test hoặc review chưa đạt, **không giới hạn số vòng sửa**. Task vẫn dừng khi cần thông tin/quyền, hết quota, gặp lỗi runtime hoặc thiếu môi trường chạy; dashboard ghi rõ lý do. Có thể pause hoặc cancel trong quá trình chạy.
+Nếu yêu cầu, phạm vi hoặc base remote thay đổi, plan phải được duyệt lại. Khi test hoặc review chưa đạt, Harness tiếp tục sửa và không giới hạn số vòng sửa. Task dừng khi cần thêm thông tin hoặc quyền thực thi, hết quota, gặp lỗi runtime hoặc thiếu môi trường chạy. Dashboard ghi rõ lý do dừng. Có thể pause hoặc cancel task trong quá trình chạy.
 
 ## Ai làm từng bước?
 
-Worker quyết định bước nào chạy tiếp, chạy test và tạo commit/PR. Mỗi task có một agent cha giao việc cho các subagent. Mỗi lượt AI dùng một subagent mới, nhận thông tin cần cho lượt đó thay vì toàn bộ lịch sử của cha. Review dùng subagent riêng và chỉ được đọc code.
+Worker điều phối các bước, chạy test và tạo commit hoặc PR. Mỗi task có một agent cha giao việc cho các subagent. Mỗi lượt AI dùng một subagent mới, chỉ nhận thông tin cần cho lượt đó, không nhận toàn bộ lịch sử của agent cha. Một subagent riêng thực hiện review với quyền chỉ đọc code.
 
-Subagent nhận hai loại hướng dẫn: **profile** nói nó phụ trách việc gì, **skill** nói cách làm việc đó. Nạp nhiều hướng dẫn vẫn chỉ chạy một subagent trong lượt ấy.
+Subagent nhận hai loại hướng dẫn: profile xác định công việc phụ trách, còn skill hướng dẫn cách thực hiện. Mỗi lượt chỉ chạy một subagent, kể cả khi nạp nhiều hướng dẫn.
 
 | Bước        | Ai thực hiện?                            | Công việc                                         |
 | ----------- | ---------------------------------------- | ------------------------------------------------- |
@@ -85,9 +85,9 @@ Danh sách profile và skill cho từng bước nằm trong [agents/README.md](a
 
 ## Giới hạn hiện tại
 
-- Chạy local, một task mỗi lần; không tự merge hoặc deploy.
-- Các kiểm tra bắt buộc trong plan và review phải pass trước khi bàn giao. Test cũ ngoài phạm vi có thể được bỏ qua và phải ghi rõ trong báo cáo.
-- Dữ liệu lưu trong `.harness/` khi chạy trực tiếp, hoặc volumes khi dùng Docker.
+- Harness chạy local và xử lý một task mỗi lần. Harness không tự merge hoặc deploy.
+- Các kiểm tra bắt buộc trong plan và review phải pass trước khi bàn giao. Có thể bỏ qua test cũ ngoài phạm vi task, nhưng báo cáo phải ghi rõ phần đã bỏ qua.
+- Dữ liệu được lưu trong `.harness/` khi chạy trực tiếp, hoặc trong volumes khi dùng Docker.
 
 ## Khi sửa dự án này
 
@@ -101,26 +101,26 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-E2E mô phỏng agent, còn Git, test runner và browser chạy thật. Test này chưa đủ để khẳng định toàn bộ luồng chạy được với model và GitHub thật. Các báo cáo dưới đây ghi rõ phần nào đã thử:
+Test E2E mô phỏng agent và dùng Git, test runner, browser thật. Kết quả E2E chưa xác nhận toàn bộ luồng chạy được với model và GitHub thật. Phạm vi đã kiểm chứng được ghi trong các tài liệu sau:
 
 - [Thiết kế đã duyệt](docs/superpowers/specs/2026-09-23-agent-harness-design.md): yêu cầu và cách dự án hoạt động.
 - [Agent profiles](agents/README.md) và [skills](skills/README.md): các hướng dẫn agent đang dùng và cách cập nhật.
-- [Runtime cha–con](docs/verification/2026-10-05-parent-subagents.md): kết quả thử native subagents và những giới hạn còn lại.
+- [Runtime agent cha và subagent](docs/verification/2026-10-05-parent-subagents.md): kết quả thử native subagents và những giới hạn còn lại.
 - [Prepare và kiểm chứng UI](docs/verification/2026-10-05-prepare-ui-verify.md): đồng bộ base và kiểm tra ảnh giao diện.
 - [Kiểm chứng MVP/Docker](docs/verification.md): kết quả và phần chưa xác nhận.
 
-Xem [kiến trúc backend](docs/backend-architecture.md) để theo dõi application services, worker, adapters và giao tiếp cha–con.
+[Kiến trúc backend](docs/backend-architecture.md) mô tả application services, worker, adapters và giao tiếp giữa agent cha với subagent.
 
 Luồng chạy task nằm ở [pipeline/runtime.ts](src/application/pipeline/runtime.ts) và [pipeline/stages.ts](src/application/pipeline/stages.ts). Code chọn profile và skill nằm ở [context/agents.ts](src/infrastructure/context/agents.ts) và [context/skills.ts](src/infrastructure/context/skills.ts).
 
 ## Chia feature thành stories
 
-Khi tạo task, bật **Chia thành stories để chọn**. Planner đề xuất story có kết quả, tiêu chí nghiệm thu, dependency và point (1, 2, 3, 5, 8). Point thể hiện độ phức tạp và bất định; không quy đổi sang token hoặc phần trăm quota. Chọn story cùng toàn bộ dependency rồi duyệt plan.
+Khi tạo task, bật **Chia thành stories để chọn** để planner đề xuất các story. Mỗi story có kết quả cần đạt, tiêu chí nghiệm thu, dependency và point (1, 2, 3, 5, 8). Point thể hiện độ phức tạp và mức độ bất định, không quy đổi sang token hoặc phần trăm quota. Cần chọn story cùng toàn bộ story mà nó phụ thuộc, rồi duyệt plan.
 
-- **PR riêng từng story:** mỗi story có task và branch riêng, dùng cùng lựa chọn GitHub/local của feature. Story phụ thuộc chỉ chạy khi commit trước đã được tích hợp vào nhánh đích. Harness không tự merge. Base thay đổi yêu cầu duyệt plan mới của task con. Squash/rebase không chứng minh được bằng ancestry thì dừng chờ người dùng xử lý.
-- **Một PR cho toàn feature:** dùng chung branch; từng story qua test và review rồi lưu commit/checkpoint. Sau story cuối, kiểm tra lại toàn bộ phạm vi đã chọn trên snapshot cuối trước khi tạo PR hoặc bàn giao local.
+- **PR riêng từng story:** mỗi story có task và branch riêng, dùng cùng lựa chọn bàn giao qua GitHub hoặc local của feature. Story phụ thuộc chỉ chạy khi commit của story trước đã được tích hợp vào nhánh đích. Harness không tự merge. Nếu base thay đổi, plan mới của task con phải được duyệt. Nếu không thể xác nhận việc tích hợp sau squash hoặc rebase qua quan hệ tổ tiên của commit (ancestry), task dừng để người dùng xử lý.
+- **Một PR cho toàn feature:** các story dùng chung branch. Mỗi story phải qua test và review trước khi lưu commit hoặc checkpoint. Sau story cuối, Harness kiểm tra lại toàn bộ phạm vi đã chọn trên snapshot cuối trước khi tạo PR hoặc bàn giao local.
 
-Mặc định **dừng sau mỗi story**; bấm **Tiếp tục** để chạy phần tiếp theo. Có thể bật **Tự tiếp tục các stories đã chọn**, nhưng các gate về dependency, approval, test và review vẫn áp dụng. Trang feature có tiến độ, checkpoint và link task con/PR. Pause hoặc hết quota giữ checkpoint đã hoàn thành; resume không thực hiện lại story đó. Cách chia này giảm phần việc dang dở, không bảo đảm quota luôn đủ cho một story.
+Mặc định, Harness dừng sau mỗi story; nhấn **Tiếp tục** để chạy story tiếp theo. Khi bật **Tự tiếp tục các stories đã chọn**, Harness vẫn kiểm tra dependency, quyền phê duyệt, test và review trước khi tiếp tục. Trang feature hiển thị tiến độ, checkpoint và liên kết đến task con hoặc PR. Khi pause hoặc hết quota, Harness giữ checkpoint đã hoàn thành. Resume tiếp tục từ checkpoint và không chạy lại story đã hoàn thành. Chia feature thành stories giúp giảm phần việc dang dở, nhưng quota vẫn có thể hết khi một story chưa hoàn thành.
 
 [Thiết kế story delivery](docs/superpowers/specs/2026-10-06-story-delivery-design.md) · [Kế hoạch triển khai](docs/superpowers/plans/2026-10-06-story-delivery.md).
 
