@@ -1,13 +1,13 @@
-# Agent Harness — thiết kế MVP local
+# Agent Harness: thiết kế MVP local
 
 Ngày: 2026-09-23
 Trạng thái: thiết kế đã duyệt ngày 2026-09-23; bổ sung theo yêu cầu người dùng ngày 2026-10-03: agent GitHub theo stage, effort cố định trong code (plan high, còn lại medium), model tiết kiệm ngoài planning và worktree riêng mỗi feature.
 
-Bổ sung đã duyệt ngày 2026-10-05: [một agent cha và các subagent theo stage](2026-10-05-parent-subagents-design.md) thay cơ chế phiên AI độc lập. Một parent thread/task (`gpt-6-luna/medium`), con native mới cho từng attempt AI (`fork_turns="none"`), reviewer là con riêng chỉ đọc. Worker vẫn giữ gates, quyền, test verdict và delivery. Các đoạn “worker tạo phiên reviewer” dưới đây được thực hiện bằng việc cấp stage cho cha spawn đúng một con reviewer; skill của con không tự điều phối thêm. Xem [bằng chứng và giới hạn runtime](../../verification/2026-10-05-parent-subagents.md).
+Bổ sung đã duyệt ngày 2026-10-05: [một agent cha và các subagent theo stage](2026-10-05-parent-subagents-design.md) thay cơ chế phiên AI độc lập. Mỗi task có một parent thread (`gpt-6-luna/medium`); mỗi attempt AI tạo một con native mới (`fork_turns="none"`). Reviewer là con riêng với quyền chỉ đọc. Worker quản lý các điều kiện chuyển bước, quyền thực thi, test verdict và delivery. Với các bước tạo phiên reviewer, worker cấp stage cho cha để spawn đúng một con reviewer; skill của con không tự điều phối thêm. Phạm vi đã kiểm chứng được ghi trong [bằng chứng và giới hạn runtime](../../verification/2026-10-05-parent-subagents.md).
 
 ## 1. Mục tiêu và phạm vi
 
-Xây công cụ cá nhân giúp giao một task trên repo có sẵn, làm rõ requirement, duyệt plan, rồi tự code, viết test, review, sửa và bàn giao PR. Mục tiêu là giảm thời gian người dùng phải can thiệp mà vẫn đáp ứng tiêu chí nghiệm thu.
+Agent Harness nhận task trên repo có sẵn, làm rõ requirement và trình plan để duyệt. Sau approval, Harness tự viết code, viết test, review, sửa lỗi và bàn giao PR. Mục tiêu là giảm thời gian người dùng phải can thiệp mà vẫn đáp ứng tiêu chí nghiệm thu.
 
 Các quyết định sản phẩm đã chốt:
 
@@ -25,7 +25,7 @@ Các quyết định sản phẩm đã chốt:
 - Tạo GitHub PR khi đạt điều kiện; bàn giao local nếu remote không được hỗ trợ hoặc không có remote.
 - Không tự merge task vào base, deploy hoặc xóa worktree. Theo cập nhật 2026-10-05, prepare được phép đồng bộ base remote vào worktree riêng.
 
-Các lựa chọn kỹ thuật cụ thể dưới đây là đề xuất triển khai cho những quyết định trên và thuộc phạm vi review bản spec này.
+Các lựa chọn kỹ thuật trong spec là đề xuất triển khai các quyết định sản phẩm đã chốt và cần được review cùng spec.
 
 ## 2. Kiến trúc đề xuất
 
@@ -43,38 +43,38 @@ flowchart LR
   UI --> F
 ```
 
-- **Web:** Next.js + TypeScript. Nhập task, duyệt plan, xem timeline/test/review và điều khiển pause/resume/cancel. API lưu yêu cầu điều khiển; không giữ agent chạy trong vòng đời HTTP request.
-- **Worker:** tiến trình Node.js + TypeScript độc lập với web. Đọc yêu cầu từ database, chiếm quyền chạy một task, thực thi pipeline, ghi sự kiện và kết quả.
-- **Persistence:** SQLite lưu dữ liệu có cấu trúc; filesystem lưu báo cáo, log lớn và ảnh/trace E2E. Đây là lựa chọn thiết kế phù hợp phạm vi một người dùng local, không yêu cầu dịch vụ database riêng.
-- **Codex adapter:** giao tiếp app-server, cung cấp lấy danh sách model, bắt đầu/tiếp tục/ngắt lượt, nhận sự kiện và chuyển yêu cầu quyền hạn sang dashboard. Không trộn protocol Codex vào logic chuyển trạng thái.
-- **Runner:** thực thi các lệnh đã được xác định cho repo, lấy exit code và báo cáo thật. Kết quả test không do lời khẳng định của model quyết định.
-- **UI cập nhật:** đọc snapshot và sự kiện có sequence tăng dần; MVP dùng polling theo cursor. Đóng tab không dừng worker.
+- Web dùng Next.js và TypeScript để nhập task, duyệt plan, xem timeline/test/review và điều khiển pause/resume/cancel. API lưu yêu cầu điều khiển; agent chạy độc lập với vòng đời HTTP request.
+- Worker là tiến trình Node.js và TypeScript độc lập với web. Worker đọc yêu cầu từ database, chiếm quyền chạy một task, thực thi pipeline, ghi sự kiện và kết quả.
+- SQLite lưu dữ liệu có cấu trúc; filesystem lưu báo cáo, log lớn và ảnh/trace E2E. Cách lưu này phục vụ một người dùng local mà không cần dịch vụ database riêng.
+- Codex adapter giao tiếp với app-server để lấy danh sách model, bắt đầu/tiếp tục/ngắt lượt, nhận sự kiện và chuyển yêu cầu quyền thực thi sang dashboard. Protocol Codex được tách khỏi logic chuyển trạng thái.
+- Runner thực thi các lệnh đã xác định cho repo, thu exit code và báo cáo thực tế. Runner quyết định kết quả test dựa trên bằng chứng, không dựa trên lời khẳng định của model.
+- UI đọc snapshot và sự kiện có sequence tăng dần. MVP dùng polling theo cursor; đóng tab không dừng worker.
 
-Chọn pipeline cố định vì có thể kiểm tra chính xác khi nào được code, retry, chờ người dùng hoặc tạo PR. Không dùng một agent toàn quyền tự chọn mọi bước; không xây workflow engine tùy biến ở MVP.
+Pipeline cố định quy định khi nào được code, retry, chờ người dùng hoặc tạo PR, giúp kiểm tra từng điều kiện chuyển bước. MVP không giao toàn quyền chọn bước cho agent và không có workflow engine tùy biến.
 
 ## 3. Repo discovery và môi trường
 
-Người dùng nhập/chọn đường dẫn local đến repo Git, cấu hình base branch và remote. Hệ thống xác thực đường dẫn và branch tồn tại trước khi nhận task.
+Người dùng nhập hoặc chọn đường dẫn local đến repo Git, rồi cấu hình base branch và remote. Hệ thống kiểm tra đường dẫn và branch tồn tại trước khi nhận task.
 
-Bổ sung đã duyệt ngày 2026-10-09: workspace có Quản lý repository và xác nhận Gỡ và xoá lịch sử. Gỡ xoá đăng ký, toàn bộ task (kể cả task con), sự kiện, lệnh điều khiển, profile, plan, attempt và các bản ghi/báo cáo liên quan trong Harness; giữ thư mục Git gốc và worktree. Chặn khi còn task/attempt/lệnh đang xử lý hoặc chưa xác nhận tiến trình cũ đã dừng. Xoá dữ liệu trong database bằng một transaction, đồng bộ lại lựa chọn repository trên UI. Bộ lọc Hoạt động gần đây mặc định là Tất cả trạng thái.
+Bổ sung đã duyệt ngày 2026-10-09: workspace có Quản lý repository và thao tác Gỡ và xoá lịch sử cần xác nhận. Thao tác này xoá đăng ký repository, toàn bộ task (kể cả task con), sự kiện, lệnh điều khiển, profile, plan, attempt và các bản ghi/báo cáo liên quan trong Harness. Thư mục Git gốc và worktree được giữ nguyên. Hệ thống chặn thao tác khi còn task, attempt hoặc lệnh đang xử lý, hoặc chưa xác nhận tiến trình cũ đã dừng. Dữ liệu trong database được xoá bằng một transaction; UI cập nhật lại lựa chọn repository. Bộ lọc Hoạt động gần đây mặc định là Tất cả trạng thái.
 
 Discovery đọc hướng dẫn repo, manifest, lockfile, cấu trúc source, scripts, CI và cấu hình test. Kết quả là Repo Profile có:
 
 - Repo root, commit đã đọc, các ngôn ngữ và khu vực chức năng.
 - Lệnh setup/build/test, thư mục chạy lệnh, prerequisites và đường dẫn file làm căn cứ.
-- Những điều chưa xác định được; không biến suy đoán thành cấu hình chạy chắc chắn.
+- Những thông tin chưa xác định được, tách rõ khỏi cấu hình chạy đã có căn cứ.
 
-Không đưa toàn bộ repo vào mỗi prompt. Lưu bản đồ tổng quan gắn với revision; mỗi task đọc sâu vùng liên quan. Khi branch/commit thay đổi, kiểm tra lại phần thông tin bị ảnh hưởng.
+Harness lưu bản đồ tổng quan gắn với revision; mỗi task đọc sâu vùng liên quan, không đưa toàn bộ repo vào mỗi prompt. Khi branch hoặc commit thay đổi, Harness kiểm tra lại thông tin bị ảnh hưởng.
 
-Hỗ trợ đa ngôn ngữ thông qua command specification: executable, arguments, cwd, biến môi trường được cho phép, timeout và đường dẫn báo cáo. Không hard-code mọi repo phải dùng npm hoặc cùng test runner. Khi không xác định được command đáng tin cậy, đề xuất command để người dùng xác nhận trong plan.
+Harness hỗ trợ đa ngôn ngữ bằng command specification, gồm executable, arguments, cwd, biến môi trường được cho phép, timeout và đường dẫn báo cáo. Repo không bắt buộc dùng npm hoặc cùng một test runner. Khi chưa xác định được command có căn cứ, Harness đề xuất command để người dùng xác nhận trong plan.
 
-Máy thiếu runtime/database/service thì chuyển sang chờ thiết lập. Có thể cài project dependencies trong môi trường riêng theo plan; cài runtime hoặc thay đổi cấu hình hệ thống cần người dùng duyệt. Không tự thực thi script chỉ để đọc cấu trúc repo.
+Nếu máy thiếu runtime, database hoặc service, task chờ thiết lập môi trường. Harness có thể cài project dependencies trong môi trường riêng theo plan. Việc cài runtime hoặc thay đổi cấu hình hệ thống cần người dùng duyệt. Harness không tự thực thi script chỉ để đọc cấu trúc repo.
 
 Không đọc nội dung secret vào context hay log. Credentials dùng cho môi trường test được truyền riêng khi cần, không ghi vào tài liệu kế hoạch.
 
 ## 4. Requirement và kế hoạch thực thi task
 
-Stage phân tích kết hợp task với Repo Profile, sau đó hỏi người dùng những quyết định nghiệp vụ không thể suy ra từ code. Requirement mơ hồ khiến task chờ câu trả lời, không tự chọn hành vi sản phẩm.
+Stage phân tích đối chiếu task với Repo Profile và hỏi người dùng về các quyết định nghiệp vụ không thể suy ra từ code. Khi requirement chưa rõ, task chờ câu trả lời; agent không tự chọn hành vi sản phẩm.
 
 Plan có phiên bản, bao gồm:
 
@@ -85,13 +85,13 @@ Plan có phiên bản, bao gồm:
 5. Test plan: từng kiểm tra, loại unit/integration/E2E, command, prerequisites, tiêu chí nghiệm thu được kiểm chứng.
 6. Model/effort dự kiến cho từng stage AI; repair không có giới hạn số vòng.
 
-Để model tầm trung có thể implement mà không phải thiết kế lại, plan phải chỉ rõ thứ tự bước và dependency, file/module cần thay đổi, interface và dữ liệu vào/ra khi có, hành vi lỗi liên quan, test cần viết, command kiểm tra và kết quả mong đợi. Bước không áp dụng một mục phải nêu lý do thay vì tạo thêm abstraction. Những quyết định sản phẩm còn mơ hồ phải được làm rõ trước approval.
+Plan phải đủ chi tiết để model tầm trung implement mà không cần thiết kế lại. Plan nêu thứ tự bước và dependency, file/module cần thay đổi, interface và dữ liệu vào/ra khi có, hành vi lỗi liên quan, test cần viết, command kiểm tra và kết quả mong đợi. Nếu một mục không áp dụng cho bước đang xét, plan phải nêu lý do, không tạo thêm abstraction để điền đủ mục. Các quyết định sản phẩm chưa rõ phải được làm rõ trước approval.
 
-Approval gắn với phiên bản plan và phạm vi công việc. Thay requirement, tiêu chí nghiệm thu, dependency hoặc mở rộng phạm vi làm mất hiệu lực approval cũ; trình phần thay đổi rồi chờ duyệt lại. Chi tiết triển khai trong phạm vi đã duyệt do agent tự quyết.
+Approval gắn với phiên bản plan và phạm vi công việc. Khi requirement, tiêu chí nghiệm thu hoặc dependency thay đổi, hoặc phạm vi mở rộng, approval cũ mất hiệu lực. Harness trình phần thay đổi và chờ duyệt lại. Agent tự quyết chi tiết triển khai trong phạm vi đã duyệt.
 
 ## 5. Pipeline và trạng thái
 
-Tách **stage** (đang làm công việc gì) khỏi **status** (công việc đang chạy hay phải chờ). Cách này tránh nhân đôi trạng thái cho mọi nguyên nhân gián đoạn.
+Stage xác định công việc đang thực hiện; status xác định công việc đang chạy hay phải chờ. Hai trường được lưu riêng để không phải tạo thêm trạng thái cho mỗi cặp công việc và nguyên nhân gián đoạn.
 
 Stages: `discover`, `analyze`, `plan`, `prepare`, `implement`, `verify`, `review`, `repair`, `deliver`.
 
@@ -113,13 +113,13 @@ Mỗi trạng thái chờ có reason và hành động cần thiết; ví dụ `
 
 `paused`, `interrupted`, `blocked` giữ stage hiện tại và lần chạy cuối. Resume phải qua bước đối chiếu thực tế trước khi xác định stage tiếp tục. `failed` dành cho lỗi không thể phục hồi của lần chạy, không dùng thay cho chờ hạn mức/môi trường.
 
-Khi quay lại plan giữa vòng sửa, giữ worktree, branch và repair count. Duyệt plan mới không tạo implementation đầu tiên lần thứ hai; repair count chỉ dùng để theo dõi lịch sử.
+Khi quay lại plan giữa vòng sửa, Harness giữ worktree, branch và repair count. Sau khi plan mới được duyệt, task tiếp tục phần việc đang sửa, không bắt đầu lại implementation từ đầu. Repair count chỉ dùng để theo dõi lịch sử.
 
 Mỗi task có nhiều Stage Attempt. Một attempt lưu đầu vào, model/effort thực dùng, phiên Codex, thời điểm, status, revision và output. Sự kiện cũ không được sửa để che một attempt thất bại.
 
 ## 6. Model và context
 
-Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có cấu hình model/effort riêng. Viết test nằm trong implement/repair. Verify chạy command; chỉ gọi model review cho ảnh UI được chọn. Prepare dùng công cụ Git, chỉ gọi model repair khi có conflict. Deliver không gọi model; không thêm lựa chọn model riêng cho hai lượt tùy điều kiện này.
+Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` có cấu hình model/effort riêng. Implement và repair bao gồm viết test. Verify chạy command và chỉ gọi model review khi có ảnh UI được chọn. Prepare dùng công cụ Git và chỉ gọi model repair khi có conflict. Hai lượt AI tùy điều kiện này dùng model của review hoặc repair, không có lựa chọn model riêng. Deliver không gọi model.
 
 Chính sách theo yêu cầu ngày 2026-10-03, thay thế lựa chọn effort trên UI:
 
@@ -131,13 +131,13 @@ Chính sách theo yêu cầu ngày 2026-10-03, thay thế lựa chọn effort tr
 | verify                                       | Runner; ảnh UI dùng model review đã chọn   | medium khi có screenshot |
 | deliver                                      | Worker, không gọi model                    | Không áp dụng            |
 
-Policy nằm trong `src/core/model-policy.ts`; thay effort bằng cách sửa code. UI vẫn cho đổi model nhưng hiển thị effort cố định. API chuẩn hóa effort khi lưu settings, tạo task và áp dụng model vào task; runtime và attempt log dùng effort của policy. Lựa chọn model cũ của task được giữ; lịch sử attempt và context snapshot đã ghi không bị sửa. Cặp model/effort không khả dụng phải blocked, không tự fallback. Model tiết kiệm là lựa chọn cấu hình, không cam kết mức quota hoặc số tiền cụ thể.
+Policy nằm trong `src/core/model-policy.ts`; muốn thay effort phải sửa code. UI cho đổi model và hiển thị effort cố định. API chuẩn hóa effort khi lưu settings, tạo task và áp dụng model vào task. Runtime và attempt log dùng effort của policy. Harness giữ lựa chọn model cũ của task, lịch sử attempt và context snapshot đã ghi. Nếu cặp model/effort không khả dụng, task chuyển sang blocked, không tự fallback. Cấu hình model tiết kiệm không cam kết mức quota hoặc số tiền cụ thể.
 
 - Thứ tự model: snapshot task → cấu hình hệ thống → mặc định trong code.
 - Khi tạo task, sao chép cấu hình mặc định vào task; chụp cấu hình thực dùng thành snapshot khi bắt đầu attempt. Thay setting chung không âm thầm đổi task đã tạo.
 - Danh sách model và effort lấy từ runtime/tài khoản; kiểm tra cặp lựa chọn hợp lệ trước khi chạy.
 - Model không khả dụng: báo và chờ người dùng chọn lại. Không tự fallback.
-- Khi chuyển plan → implement, worker dùng model implement đã lưu mà không hỏi lại. Đây là chuyển model theo stage đã được cho phép, không phải tự động nâng/hạ model ngoài cấu hình.
+- Khi chuyển plan → implement, worker dùng model implement đã lưu mà không hỏi lại, theo cấu hình stage đã được cho phép. Worker không tự nâng hoặc hạ model ngoài cấu hình.
 - Thay model có hiệu lực ở lượt sau. Muốn đổi ngay phải ngắt lượt đang chạy, chờ nó dừng, đối chiếu file/process rồi tiếp tục.
 - Model mới nhận requirement/plan đã duyệt, diff hiện tại, finding và kết quả kiểm tra liên quan. Không phụ thuộc vào trí nhớ ngầm giữa hai phiên.
 - Nếu implement phát hiện plan thiếu quyết định hoặc sai giả định quan trọng, ghi rõ vấn đề và quay lại plan với model planner đã chọn; không tự mở rộng phạm vi. Plan thay đổi phải qua approval trước khi tiếp tục, giữ nguyên branch/worktree và repair count.
@@ -148,48 +148,48 @@ Gói được người dùng mô tả là 25 USD/tháng chưa xác định đư�
 
 ### 6.1. Rule nền và skill theo stage
 
-Nguồn rule nền là [AGENTS.md](../../../AGENTS.md), mục 1–6: suy nghĩ trước khi code, đơn giản, thay đổi có mục tiêu, thành công có bằng chứng và trả lời tiếng Việt. Mục 7 chỉ phục vụ phát triển chính workspace harness, không truyền sang repo khác.
+Nguồn rule nền là [AGENTS.md](../../../AGENTS.md), mục 1 đến 6: suy nghĩ trước khi code, đơn giản, thay đổi có mục tiêu, thành công có bằng chứng và trả lời tiếng Việt. Mục 7 chỉ phục vụ phát triển chính workspace harness, không truyền sang repo khác.
 
 Harness đọc thêm `AGENTS.md` của repo đích và các hướng dẫn trong phạm vi thư mục liên quan. Nếu repo chỉ có `CLAUDE.md`, có thể dùng nội dung đó làm hướng dẫn dự án và ghi rõ nguồn. Không ghi đè những file này để cài rule của harness.
 
-Rule `rules/lighthouse-performance.md` chỉ được nạp khi task liên quan Liquid/Shopify theme/Core Web Vitals của theme. Workspace hiện chưa có nội dung file này. Đây là dependency điều kiện: task không liên quan tiếp tục bình thường; khi áp dụng mà rule không có thì hỏi người dùng cung cấp rule, không giả lập nội dung.
+Rule `rules/lighthouse-performance.md` chỉ được nạp khi task liên quan Liquid/Shopify theme/Core Web Vitals của theme. Workspace hiện chưa có nội dung file này. Task không liên quan tiếp tục bình thường. Nếu task cần rule mà file chưa có, Harness hỏi người dùng cung cấp nội dung, không tự viết thay.
 
-Registry skill đã triển khai trong `src/context/skills.ts`; agent profile được map trong `src/context/agents.ts`. Theo yêu cầu cập nhật ngày 2026-10-04, worker nạp skills và profiles đóng gói trong repo (`skills/`, `agents/`), lưu snapshot nội dung và nguồn theo task. Bỏ cấu hình Skill roots; không phụ thuộc plugin cài trên máy. Task đã có snapshot giữ nguyên nội dung.
+Registry skill được triển khai trong `src/context/skills.ts`; mapping agent profile nằm trong `src/context/agents.ts`. Theo yêu cầu cập nhật ngày 2026-10-04, worker nạp skills và profiles đóng gói trong repo (`skills/`, `agents/`), rồi lưu snapshot nội dung và nguồn theo task. Cấu hình Skill roots được bỏ; Harness không phụ thuộc plugin cài trên máy. Task đã có snapshot giữ nguyên nội dung.
 
-| Stage                        | Skill/bộ hướng dẫn mặc định                                                                                                | Trách nhiệm và kết quả                                                                                                                         |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| discover                     | Hướng dẫn Repo Profile riêng của harness; chưa có file skill độc lập                                                       | Đọc code/manifest/CI, trả profile có căn cứ; không sửa repo. Đây là contract trong mục 3, không giả định có skill Superpowers chuyên discovery |
-| analyze                      | `mattpocock-skills:grilling`                                                                                               | Hỏi các quyết định chưa rõ theo quan hệ phụ thuộc, đưa đề xuất và chờ câu trả lời; trả requirement/acceptance criteria                         |
-| analyze — nhánh thiết kế mới | `superpowers:brainstorming`, khi task cần thiết kế kiến trúc/UI/hành vi chưa chốt                                          | Khảo sát lựa chọn và đánh đổi. Dùng chung luồng hỏi/approval của harness, không mở thêm một vòng phỏng vấn trùng lặp                           |
-| plan                         | `superpowers:writing-plans`                                                                                                | Kế hoạch có bước thực hiện, nơi thay đổi và điều kiện kiểm chứng; đầu ra gắn với PlanVersion                                                   |
-| prepare                      | Worker thực thi Git/môi trường                                                                                             | Không nạp skill điều phối để agent tự tạo thêm worktree. Quyền và side effect thuộc worker                                                     |
-| implement                    | `superpowers:test-driven-development` + rule mục tiêu/đơn giản/thay đổi có mục tiêu từ AGENTS.md                           | Red → green cho feature/bug; triển khai tối thiểu theo plan đã duyệt                                                                           |
-| verify                       | Runner + nguyên tắc `superpowers:verification-before-completion`                                                           | Runner là nguồn bằng chứng; chỉ báo pass khi command/report xác nhận. Không cần thêm lượt AI chỉ để gọi lại test                               |
-| review                       | `superpowers:requesting-code-review` cho bước chuẩn bị; `requesting-code-review/code-reviewer.md` cho phiên reviewer riêng | Worker tạo review package gồm plan, diff/revision và test evidence; reviewer chỉ đọc, trả finding có cấu trúc                                  |
-| repair — nhận review         | `superpowers:receiving-code-review`                                                                                        | Kiểm tra tính đúng đắn của finding; có thể phản biện bằng căn cứ, không sửa máy móc                                                            |
-| repair — chẩn đoán và sửa    | `superpowers:systematic-debugging` → `superpowers:test-driven-development` → `superpowers:verification-before-completion`  | Tái hiện → thu bằng chứng → xác định nguyên nhân → kiểm chứng giả thuyết → test hồi quy → sửa tối thiểu → xác minh                             |
-| deliver                      | Worker + nguyên tắc `superpowers:verification-before-completion`                                                           | Đối chiếu gate và evidence của snapshot cuối, tạo PR hoặc bàn giao local; không thêm một phiên AI để tự quyết merge                            |
+| Stage                       | Skill/bộ hướng dẫn mặc định                                                                                                | Trách nhiệm và kết quả                                                                                                                         |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| discover                    | Hướng dẫn Repo Profile riêng của harness; chưa có file skill độc lập                                                       | Đọc code/manifest/CI, trả profile có căn cứ; không sửa repo. Đây là contract trong mục 3, không giả định có skill Superpowers chuyên discovery |
+| analyze                     | `mattpocock-skills:grilling`                                                                                               | Hỏi các quyết định chưa rõ theo quan hệ phụ thuộc, đưa đề xuất và chờ câu trả lời; trả requirement/acceptance criteria                         |
+| analyze: nhánh thiết kế mới | `superpowers:brainstorming`, khi task cần thiết kế kiến trúc/UI/hành vi chưa chốt                                          | Khảo sát lựa chọn và đánh đổi. Dùng chung luồng hỏi/approval của harness, không mở thêm một vòng phỏng vấn trùng lặp                           |
+| plan                        | `superpowers:writing-plans`                                                                                                | Kế hoạch có bước thực hiện, nơi thay đổi và điều kiện kiểm chứng; đầu ra gắn với PlanVersion                                                   |
+| prepare                     | Worker thực thi Git/môi trường                                                                                             | Không nạp skill điều phối để agent tự tạo thêm worktree. Quyền và side effect thuộc worker                                                     |
+| implement                   | `superpowers:test-driven-development` + rule mục tiêu/đơn giản/thay đổi có mục tiêu từ AGENTS.md                           | Red → green cho feature/bug; triển khai tối thiểu theo plan đã duyệt                                                                           |
+| verify                      | Runner + nguyên tắc `superpowers:verification-before-completion`                                                           | Runner là nguồn bằng chứng; chỉ báo pass khi command/report xác nhận. Không cần thêm lượt AI chỉ để gọi lại test                               |
+| review                      | `superpowers:requesting-code-review` cho bước chuẩn bị; `requesting-code-review/code-reviewer.md` cho phiên reviewer riêng | Worker tạo review package gồm plan, diff/revision và test evidence; reviewer chỉ đọc, trả finding có cấu trúc                                  |
+| repair: nhận review         | `superpowers:receiving-code-review`                                                                                        | Kiểm tra tính đúng đắn của finding; có thể phản biện bằng căn cứ, không sửa máy móc                                                            |
+| repair: chẩn đoán và sửa    | `superpowers:systematic-debugging` → `superpowers:test-driven-development` → `superpowers:verification-before-completion`  | Tái hiện → thu bằng chứng → xác định nguyên nhân → kiểm chứng giả thuyết → test hồi quy → sửa tối thiểu → xác minh                             |
+| deliver                     | Worker + nguyên tắc `superpowers:verification-before-completion`                                                           | Đối chiếu gate và evidence của snapshot cuối, tạo PR hoặc bàn giao local; không thêm một phiên AI để tự quyết merge                            |
 
 `systematic-debugging` cũng kích hoạt ngay khi gặp bug/test failure/unexpected behavior trong analyze hoặc implement. Lỗi có sẵn ngoài phạm vi chỉ được ghi nhận, trừ khi nó chặn kiểm chứng feature. Chưa rõ root cause thì thu thêm bằng chứng hoặc hỏi, không nối tiếp các bản vá phỏng đoán.
 
-Khi dùng TDD, expected failure trong bước red không tự động chuyển pipeline sang repair hoặc tiêu một vòng sửa. Bộ đếm tăng khi worker mở một attempt repair sau một lần verify/review không đạt. Trong repair, các giả thuyết/sửa thử được ghi lại; agent phải điều tra nguyên nhân thay vì nối tiếp các bản vá phỏng đoán. Không dừng chỉ vì đã chạy ba vòng repair; thiếu quyết định thực sự vẫn phải hỏi lại.
+Khi dùng TDD, failure dự kiến ở bước red không tự chuyển pipeline sang repair và không tăng bộ đếm vòng sửa. Bộ đếm chỉ tăng khi worker mở attempt repair sau một lần verify hoặc review không đạt. Trong repair, agent ghi lại giả thuyết và các lần sửa thử, rồi điều tra nguyên nhân bằng bằng chứng. Task không dừng chỉ vì đã chạy ba vòng repair; nếu còn thiếu quyết định cần thiết, agent vẫn phải hỏi lại.
 
 ### 6.2. Phạm vi áp dụng và giải quyết xung đột
 
 Worker giữ quyền chuyển trạng thái, cấp quyền công cụ, tạo phiên reviewer, quản lý branch và đếm retry. Skill là hướng dẫn thực hiện trong stage, không được tự thay những cơ chế đó.
 
-Mỗi bundle có ghi chú tích hợp minh bạch. Không sửa trực tiếp file trong plugin cache:
+Mỗi bundle ghi rõ cách tích hợp với Harness. File trong plugin cache được giữ nguyên:
 
-- **Phạm vi test:** yêu cầu trực tiếp của người dùng được ưu tiên hơn lời yêu cầu chạy toàn bộ suite trong skill TDD. Áp dụng red/green và verification cho Test Plan của feature; phần legacy bỏ qua vẫn xuất hiện trong báo cáo.
-- **Approval:** yêu cầu hỏi/duyệt từ skill được chuyển thành `waiting_input` hoặc `waiting_approval` trên dashboard. Không tạo cổng duyệt thứ hai cho cùng PlanVersion đã được duyệt; thay phạm vi vẫn phải duyệt lại.
-- **Điều phối:** worker tạo reviewer độc lập, dùng model đã chọn. Không để skill tự spawn reviewer trùng, tự chọn model mạnh hơn, merge hoặc xóa worktree.
-- **Sửa theo review:** phản biện được lưu kèm bằng chứng; finding bắt buộc đang tranh luận chưa được coi là đã giải quyết. Reviewer đánh giá lại; nếu vẫn bất đồng thì chuyển sang hỏi người dùng trong giới hạn vòng lặp.
-- **Giữ code:** chỉ sửa trong worktree của task. Không làm theo chỉ dẫn xóa/rewrite code sẵn có chỉ vì nó chưa được viết test-first; áp dụng TDD cho phần thay đổi đang thực hiện.
-- **Đầu ra:** skill có thể sinh báo cáo Markdown, nhưng adapter phải chuẩn hóa và kiểm tra schema trước khi worker dùng output. Lời tự nhận “done” không trực tiếp đổi status thành completed.
+- Yêu cầu trực tiếp của người dùng về phạm vi test được ưu tiên hơn yêu cầu chạy toàn bộ suite trong skill TDD. Red/green và verification áp dụng cho Test Plan của feature; báo cáo ghi rõ legacy test đã bỏ qua.
+- Yêu cầu hỏi hoặc duyệt từ skill được chuyển thành `waiting_input` hoặc `waiting_approval` trên dashboard. Một PlanVersion đã duyệt không cần thêm cổng duyệt thứ hai; thay phạm vi vẫn phải duyệt lại.
+- Worker tạo reviewer độc lập và dùng model đã chọn. Skill không được tự spawn reviewer trùng, chọn model mạnh hơn, merge hoặc xóa worktree.
+- Phản biện review được lưu kèm bằng chứng. Finding bắt buộc sửa vẫn chưa được giải quyết khi còn tranh luận. Reviewer đánh giá lại; nếu vẫn bất đồng, Harness hỏi người dùng trong giới hạn vòng lặp.
+- Agent chỉ sửa trong worktree của task và áp dụng TDD cho phần đang thay đổi. Agent không xóa hoặc rewrite code sẵn có chỉ vì code đó chưa được viết test-first.
+- Skill có thể sinh báo cáo Markdown. Adapter phải chuẩn hóa và kiểm tra schema trước khi worker dùng output; lời tự nhận "done" không trực tiếp đổi status thành completed.
 
 Không nạp tất cả Superpowers vào mỗi stage. `using-superpowers`, `executing-plans`, `subagent-driven-development`, `using-git-worktrees` và `finishing-a-development-branch` không phải bundle mặc định của runtime này vì chúng có thêm quy trình điều phối đã do worker sở hữu. Đây là quyết định về harness đang thiết kế, không thay đổi những skill mà agent phát triển harness phải tuân theo trong phiên hiện tại.
 
-Trong nội dung truyền cho agent: tuân thủ ràng buộc platform trước; áp dụng yêu cầu người dùng/plan đã duyệt; kết hợp baseline và rule repo theo phạm vi; rồi áp dụng skill. Rule repo cụ thể hóa conventions nhưng không được tự đổi approval, quyền công cụ hoặc giới hạn của worker. Xung đột thực sự chưa có quyết định từ người dùng thì ghi rõ nguồn và hỏi, không im lặng bỏ rule nào.
+Hướng dẫn truyền cho agent có thứ tự ưu tiên: ràng buộc platform, yêu cầu người dùng và plan đã duyệt, baseline kết hợp rule repo theo phạm vi, rồi đến skill. Rule repo cụ thể hóa conventions, không được tự đổi approval, quyền công cụ hoặc giới hạn của worker. Nếu có xung đột chưa được người dùng quyết định, agent ghi rõ nguồn và hỏi; không tự bỏ qua rule.
 
 ### 6.3. Cách nạp và truy vết
 
@@ -214,7 +214,7 @@ Trong nội dung truyền cho agent: tuân thủ ràng buộc platform trước;
 
 ## 8. Chính sách test và review
 
-Chính sách cuối cùng theo yêu cầu người dùng: chỉ bắt buộc kiểm chứng tính năng/bug hiện tại; có thể bypass test cũ ngoài phạm vi. Không có gate yêu cầu toàn bộ legacy suite pass.
+Theo chính sách đã chốt, task chỉ bắt buộc kiểm chứng tính năng hoặc bug đang xử lý. Có thể bỏ qua test cũ ngoài phạm vi; toàn bộ legacy suite không bắt buộc phải pass.
 
 - Viết test mới cho feature mới và test hồi quy cho bug đang sửa. Không bổ sung coverage hàng loạt cho code cũ.
 - Test cũ trực tiếp kiểm chứng feature hiện tại có thể được đưa vào Test Plan; legacy test ngoài phạm vi được ghi rõ là không chạy.
@@ -227,15 +227,15 @@ Chính sách cuối cùng theo yêu cầu người dùng: chỉ bắt buộc ki�
 - Runner ghi command, exit code, timeout, test count nếu lấy được, báo cáo và revision. Exit code 0 nhưng không có bằng chứng các test yêu cầu đã được tìm thấy/chạy không đủ để pass.
 - AI không được skip/xóa assertion chỉ để làm test xanh. Reviewer kiểm tra nội dung test với tiêu chí nghiệm thu và ghi nhận mọi thay đổi test.
 
-Reviewer chỉ yêu cầu sửa các lỗi có căn cứ về requirement, tính đúng đắn, bảo mật hoặc quy ước bắt buộc của repo. Góp ý sở thích/style không liên quan không kéo dài vòng sửa. Test runner pass không thay thế việc đáp ứng requirement; reviewer nói pass cũng không thay thế kết quả runner.
+Reviewer chỉ yêu cầu sửa lỗi có căn cứ về requirement, tính đúng đắn, bảo mật hoặc quy ước bắt buộc của repo. Góp ý về sở thích hoặc style ngoài phạm vi không kéo dài vòng sửa. Task phải đáp ứng requirement và có kết quả runner đạt yêu cầu; test runner pass hoặc reviewer pass riêng lẻ chưa đủ để bàn giao.
 
 ## 9. Giới hạn, pause và recovery
 
-Theo yêu cầu đã duyệt ngày 2026-10-07, fail verify hoặc finding review tiếp tục đưa task vào repair mà không giới hạn số vòng. Bộ đếm tăng một lần khi worker mở attempt repair mới; đổi model, restart worker, đổi story hoặc replan không đặt lại số vòng. UI hiển thị `Repair N`. Task chỉ dừng theo các điều kiện input/approval, runtime/môi trường, scope change, pause hoặc cancel; không phát sinh `repair_limit` mới. Task cũ đã blocked vẫn cần người dùng bấm Tiếp tục, không tự chạy lại khi cập nhật ứng dụng.
+Theo yêu cầu đã duyệt ngày 2026-10-07, verify fail hoặc review có finding cần sửa sẽ đưa task vào repair, không giới hạn số vòng. Bộ đếm tăng một lần khi worker mở attempt repair mới và không đặt lại khi đổi model, restart worker, đổi story hoặc replan. UI hiển thị `Repair N`. Task chỉ dừng khi cần input/approval, gặp vấn đề runtime/môi trường, thay đổi phạm vi, pause hoặc cancel; không phát sinh `repair_limit` mới. Task cũ đã blocked cần người dùng nhấn Tiếp tục, không tự chạy lại khi ứng dụng cập nhật.
 
 Runtime bổ sung policy repair hiện hành sau nội dung bundle, kể cả bundle đã frozen của task cũ: không dừng hoặc hỏi lại chỉ vì ba lần sửa thất bại. Agent phải xem lại nguyên nhân và tiếp tục chẩn đoán có bằng chứng; quyết định thực sự còn thiếu và các gate của worker vẫn có hiệu lực.
 
-Mặc định đề xuất: timeout 30 phút cho một lượt AI, 15 phút cho một command ngắn hạn; có thể chỉnh trong cấu hình task/plan. Dịch vụ test dài hạn dùng readiness timeout và vòng đời process riêng. Timeout làm task dừng chờ xem xét, không tự tạo chuỗi retry vô hạn. Mất kết nối điều khiển không đồng nghĩa tiến trình đã dừng.
+Timeout mặc định được đề xuất là 30 phút cho một lượt AI và 15 phút cho một command ngắn hạn; có thể chỉnh trong cấu hình task/plan. Dịch vụ test chạy dài hạn dùng readiness timeout và vòng đời process riêng. Khi timeout, task dừng chờ xem xét, không tự retry vô hạn. Mất kết nối điều khiển chưa xác nhận tiến trình đã dừng.
 
 - Pause ngắt lượt/lệnh đang chạy, xác nhận tiến trình đã dừng và lưu tiến độ. Cancel dừng task nhưng giữ code và artifacts.
 - Worker dùng task lease và fencing token; attempt cũ không được cập nhật kết quả sau khi mất quyền sở hữu.
@@ -258,7 +258,7 @@ Mặc định đề xuất: timeout 30 phút cho một lượt AI, 15 phút cho 
 
 Deliver tạo commit chứa phần thay đổi của task, push branch và mở PR vào target đã lưu. Báo cáo gồm mục tiêu, thay đổi, tiêu chí nghiệm thu, kết quả test, legacy tests bị bỏ qua, giới hạn, finding và quan hệ feature phụ thuộc.
 
-GitHub error/auth thiếu thì giữ trạng thái blocked tại deliver và cho retry hoặc chọn bàn giao local. Repo không có remote hỗ trợ được bàn giao local ngay theo mode đã chọn. `completed` phải ghi delivery mode và PR URL hoặc đường dẫn artifact; không đồng nghĩa đã merge hay deploy.
+Nếu GitHub báo lỗi hoặc thiếu auth, task giữ trạng thái blocked tại deliver. Người dùng có thể retry hoặc chọn bàn giao local. Repo không có remote được hỗ trợ sẽ bàn giao local theo mode đã chọn. `completed` phải ghi delivery mode và PR URL hoặc đường dẫn artifact; trạng thái này không xác nhận đã merge hay deploy.
 
 PR được đối chiếu bằng repo/head/base và task marker để tránh tạo trùng sau mất kết nối. Nếu đã có PR thì dùng lại; nếu push thành công nhưng response bị mất thì xác minh remote head trước retry. Không force-push để giải quyết xung đột ngoài ý muốn.
 
@@ -276,7 +276,7 @@ Các thực thể chính:
 | Event / ControlCommand      | Timeline có thứ tự; lệnh pause/resume/cancel có ID chống lặp                                                  |
 | SideEffect / Artifact       | Intent/result của tác động ngoài DB; đường dẫn và fingerprint báo cáo                                         |
 
-Các màn hình: danh sách repo/task; tạo task; hỏi đáp và duyệt plan; chi tiết task với timeline, tests, review; cấu hình model theo stage; kết quả bàn giao. Task detail thể hiện rõ đang chạy/chờ gì, người dùng cần làm gì và trạng thái worker. Theo yêu cầu ngày 2026-10-04, bỏ tab Diff; người dùng review diff trên GitHub. Pipeline vẫn giữ dữ liệu diff để review và kiểm tra phạm vi thay đổi.
+Các màn hình gồm danh sách repo/task, tạo task, hỏi đáp và duyệt plan, chi tiết task với timeline/tests/review, cấu hình model theo stage và kết quả bàn giao. Task detail hiển thị công việc đang chạy hoặc lý do chờ, hành động cần từ người dùng và trạng thái worker. Theo yêu cầu ngày 2026-10-04, tab Diff được bỏ; người dùng review diff trên GitHub. Pipeline vẫn giữ dữ liệu diff để review và kiểm tra phạm vi thay đổi.
 
 Web và worker chỉ lắng nghe loopback. Mutation endpoint kiểm tra origin/session local; không mở quyền thực thi local ra mạng. Credential không gửi đến browser hoặc lưu trong database/log. Repository-controlled content không được thay policy, approval hoặc giới hạn của harness.
 
@@ -286,11 +286,11 @@ Bổ sung đã duyệt ngày 2026-10-07: người dùng bật thông báo hệ �
 
 Các lát cắt triển khai dự kiến, mỗi lát có kết quả quan sát được:
 
-1. **Kết nối và discovery:** kiểm chứng Codex auth/model/read-only run; resolve skill/rule; nhập repo; hiển thị profile, prerequisites và model catalog.
-2. **Requirement và approval:** tạo task, hỏi đáp, lưu plan version và ngăn code trước approval.
-3. **Thực thi feature:** branch/worktree, một lượt implement, chạy test theo plan và xem bằng chứng trên dashboard.
-4. **Vòng review/sửa:** reviewer độc lập, finding có cấu trúc, repair count và evidence bị vô hiệu khi code đổi.
-5. **Phục hồi và bàn giao:** pause/crash/quota/resume, effect reconciliation, GitHub PR không trùng và fallback local.
+1. Kiểm chứng kết nối Codex: auth, model và lượt chạy read-only. Resolve skill/rule, nhập repo và hiển thị profile, prerequisites, model catalog.
+2. Tạo task, hỏi đáp, lưu plan version và chặn sửa code trước approval.
+3. Tạo branch/worktree, chạy một lượt implement, chạy test theo plan và hiển thị bằng chứng trên dashboard.
+4. Thêm reviewer độc lập, finding có cấu trúc và repair count. Vô hiệu hóa evidence khi code thay đổi.
+5. Kiểm chứng pause/crash/quota/resume, đối chiếu side effect, tạo GitHub PR không trùng và bàn giao local khi cần.
 
 Đây là thứ tự xây ở mức thiết kế; implementation plan chi tiết sẽ tách thành các việc có file, dependency và cách kiểm chứng sau khi bản spec được review.
 
@@ -304,7 +304,7 @@ Kiểm thử chính harness gồm:
 - Live smoke có kiểm soát: một repo frontend và một repo ngôn ngữ khác, dùng runtime có trên máy và tài khoản Codex thật. Kết quả chỉ xác nhận các môi trường được thử, không tuyên bố mọi stack đều đã kiểm chứng.
 - Fault injection: worker chết sau side effect nhưng trước khi ghi kết quả; mất kết nối khi agent còn chạy; hai worker tranh lease; code đổi sau verify; PR tạo xong nhưng response mất.
 
-Theo dõi thời gian người dùng can thiệp, số lần hỏi lại, số vòng sửa, thời gian hoàn thành và tỉ lệ task được chấp nhận mà không cần sửa tay. MVP lưu dữ liệu để đo; chưa đặt một ngưỡng cải thiện không có baseline.
+MVP lưu dữ liệu để đo thời gian người dùng can thiệp, số lần hỏi lại, số vòng sửa, thời gian hoàn thành và tỉ lệ task được chấp nhận mà không cần sửa tay. Chưa đặt ngưỡng cải thiện vì chưa có baseline.
 
 ## 13. Nguồn kỹ thuật
 
@@ -317,7 +317,7 @@ Theo dõi thời gian người dùng can thiệp, số lần hỏi lại, số v
 - [Next.js self-hosting](https://nextjs.org/docs/app/guides/self-hosting): cơ sở chạy web server local.
 - [SQLite appropriate uses](https://www.sqlite.org/whentouse.html): cơ sở chọn lưu trữ ứng dụng local.
 
-### Bổ sung agent mapping — 2026-10-03
+### Bổ sung agent mapping ngày 2026-10-03
 
 - discover: Repo explorer riêng của harness, read-only.
 - analyze: VoltAgent business-analyst + grilling.
@@ -328,29 +328,29 @@ Theo dõi thời gian người dùng can thiệp, số lần hỏi lại, số v
 - implement/repair nạp thêm ECC e2e-runner khi plan đã duyệt có E2E checks. Profile được freeze sẵn vào optional context ngay lúc task bắt đầu; prepare chỉ kích hoạt bản frozen, không đọc lại upstream.
 - prepare/verify/deliver thuộc worker. Prepare chỉ dispatch một child resolve conflict nếu cần; verify chỉ dispatch một child đọc ảnh đã chọn nếu plan có UI verification. Không dispatch AI để chạy lại command. Deliver không dispatch AI.
 
-Đây là profile hướng dẫn cho từng phiên stage, không tự tạo đội agent lồng nhau. Bản nguồn GitHub pin commit cùng license nằm trong `agents/upstream`; runtime chỉ nạp bản rút gọn trong `agents/profiles`. Model/tool metadata, coverage toàn repo, context-manager và hành vi deploy tự động của upstream không được kế thừa. Output schema, quyền thực thi, stage transitions và approval của harness giữ quyền quyết định. Profile cũ đã frozen không tự cập nhật khi đổi ứng dụng; task mới nhận mapping mới.
+Profile hướng dẫn công việc trong từng phiên stage, không tự tạo thêm đội agent lồng nhau. Bản nguồn GitHub đã pin commit, kèm license, nằm trong `agents/upstream`; runtime chỉ nạp bản rút gọn trong `agents/profiles`. Harness không kế thừa model/tool metadata, yêu cầu coverage toàn repo, context-manager hoặc hành vi deploy tự động của upstream. Harness quản lý output schema, quyền thực thi, stage transitions và approval. Profile cũ đã frozen không tự cập nhật khi ứng dụng thay đổi; task mới nhận mapping mới.
 
 Mỗi feature/task luôn có branch và worktree riêng, tạo sau khi duyệt plan. Implement/verify/review/repair/deliver dùng lại worktree đó; pause/resume và replan không tạo worktree mới. Trước approval, các bước chỉ đọc committed source snapshot. Không tự merge task vào base hoặc xóa worktree; prepare được phép đồng bộ base vào worktree riêng theo cập nhật 2026-10-05.
 
-### Cập nhật UI pipeline — 2026-10-04
+### Cập nhật UI pipeline ngày 2026-10-04
 
 Danh sách task và trang chi tiết dùng cùng projection từ attempt history: node tròn xanh/tick khi hoàn tất, cam ở stage hiện tại, đen cho stage chưa tới hoặc cần chạy lại. Nhãn bổ sung phân biệt chờ duyệt, tạm dừng, blocked/failed, cancelled và skipped. Không thể bấm node để thay đổi trạng thái. Repair/replan vô hiệu hóa evidence downstream cần chạy lại; thiếu lịch sử không suy đoán stage đã hoàn tất.
 
 Agent profiles và skills được version-control cùng repo, kèm nguồn, phiên bản và license; không commit credentials hoặc đường dẫn máy cá nhân. UI chỉ giữ lựa chọn model, effort vẫn cố định trong code: planning high, các AI stage khác medium.
 
-## Bổ sung local Docker và đăng nhập — 2026-10-04
+## Bổ sung local Docker và đăng nhập ngày 2026-10-04
 
 Theo yêu cầu người dùng: Docker Compose chạy dashboard và Node.js worker bằng một lệnh; đăng nhập Codex qua trang trong dashboard, dùng browser OAuth của Codex CLI. CLI sở hữu state/PKCE, callback và token exchange; ứng dụng chỉ khởi chạy, hiển thị authorization URL và kiểm tra trạng thái. Không xây OAuth provider hoặc dùng client ID tự tạo.
 
 Trong container, dashboard bind `0.0.0.0` để Docker forward port; cổng host vẫn chỉ bind `127.0.0.1`. Callback CLI tại loopback 1455 được proxy qua cổng container 1456, publish host `127.0.0.1:1455`. Dữ liệu và phiên Codex nằm trong volumes riêng; repository từ Personal được mount tại `/repos`. Không mount phiên Codex trên host.
 
-## Bổ sung góp ý Plan và Auto mode — 2026-10-04
+## Bổ sung góp ý Plan và Auto mode ngày 2026-10-04
 
-Theo yêu cầu người dùng: Plan hỗ trợ comment chung hoặc theo step/criterion/check, gắn với version. Người dùng gửi comments rồi yêu cầu sửa; planner nhận Plan trước và feedback, tạo version mới để duyệt. Version cũ và comments giữ nguyên. Khi version hiện tại có comments, phải tạo version mới trước approval. Replan giữ worktree và repair count.
+Plan hỗ trợ comment chung hoặc theo step/criterion/check, gắn với version. Người dùng gửi comments và yêu cầu sửa. Planner nhận Plan trước cùng feedback, rồi tạo version mới để duyệt. Version cũ và comments được giữ nguyên. Nếu version hiện tại có comments, phải tạo version mới trước approval. Replan giữ worktree và repair count.
 
 Settings có chế độ mặc định cho task mới; task có thể đổi chế độ tại stage boundary. Manual giữ `on-request`; Auto dùng `never` với sandbox hiện tại (`read-only` trước implementation và cho reviewer, `workspace-write` cho implement/repair). Auto không tự mở rộng quyền filesystem/network; request quyền bất ngờ bị decline và ghi event. Approval Plan thuộc worker vẫn bắt buộc, độc lập với policy công cụ. Repair không giới hạn số vòng; test/review gates và quy tắc replan giữ nguyên.
 
-## Bổ sung Prepare và UI Verify tiết kiệm token — 2026-10-05
+## Bổ sung Prepare và UI Verify tiết kiệm token ngày 2026-10-05
 
 Theo yêu cầu đã chốt: mở rộng hai stage hiện có, không thêm stage hoặc cấu hình model mới.
 
@@ -365,7 +365,7 @@ Theo yêu cầu đã chốt: mở rộng hai stage hiện có, không thêm stag
 ### UI Verify
 
 - Planner thêm `uiVerification` cho thay đổi UI nhìn thấy được; task chỉ đổi logic dùng runner như cũ. Plan cũ chưa có trường này tiếp tục runner-only.
-- Plan chọn 1–6 ảnh PNG, mỗi ảnh có `id`, `checkId` của required E2E, đường dẫn từ worktree root, `criterionIds`, `viewport` và `referencePath` local nullable. Tiêu chí mô tả rõ layout/nội dung cần đối chiếu. Không có reference thì chỉ đánh giá theo tiêu chí đã duyệt; không tuyên bố khớp thiết kế không tồn tại.
+- Plan chọn từ 1 đến 6 ảnh PNG, mỗi ảnh có `id`, `checkId` của required E2E, đường dẫn từ worktree root, `criterionIds`, `viewport` và `referencePath` local nullable. Tiêu chí mô tả rõ layout và nội dung cần đối chiếu. Nếu không có reference, chỉ đánh giá theo tiêu chí đã duyệt, không kết luận ảnh khớp một thiết kế chưa được cung cấp.
 - E2E command sở hữu server readiness/cleanup, assertion hành vi và capture ảnh viewport-only, `deviceScaleFactor=1`. Runner xóa ảnh cũ trước check, không ghi đè tracked source, kiểm tra kích thước PNG và lưu bản copy/hash trong artifacts. Generated screenshot không thuộc feature diff và không bị commit.
 - Required checks fail → repair hoặc blocked theo policy hiện có, không gọi AI xem ảnh. Checks pass và có selection → một lượt model review, read-only, chỉ tiêu chí được ánh xạ và ảnh đã chọn. Không truyền toàn bộ DOM/diff/plan hoặc để agent tự duyệt website.
 - Mỗi ảnh cần một verdict với evidence cụ thể; verdict thiếu/trùng, ảnh thiếu/sai viewport, nguồn đổi hoặc ảnh đổi đều không thể pass. Visual fail → repair, dùng chung bộ đếm và không giới hạn số vòng. Lỗi runtime/evidence → blocked.

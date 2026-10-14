@@ -2,11 +2,11 @@
 
 Ngày: 2026-10-05. Trạng thái: người dùng đã duyệt bằng yêu cầu “implement đi”; triển khai theo [báo cáo](../../verification/2026-10-05-parent-subagents.md). Bổ sung spec gốc, thay cơ chế session độc lập theo stage.
 
-Cập nhật đã duyệt ngày 2026-10-06: worker dùng JSON trực tiếp từ subagent đã xác minh; cha chỉ trả receipt `stage`/`attemptId`. Thay yêu cầu cha chép lại toàn bộ output, vì chạy thật đã phát hiện cha đổi ký tự trong Plan và gây `subagent_output_mismatch`.
+Cập nhật đã duyệt ngày 2026-10-06: worker dùng JSON trực tiếp từ subagent đã xác minh; cha chỉ trả receipt `stage`/`attemptId`. Yêu cầu cha chép lại toàn bộ output được bỏ vì lần chạy thật cho thấy cha đổi ký tự trong Plan, gây `subagent_output_mismatch`.
 
 ## Mục tiêu và phạm vi
 
-Theo yêu cầu người dùng, mỗi task có đúng một Codex agent cha giữ bối cảnh điều phối. Các stage AI được giao cho subagent native, mỗi con chỉ làm một nhiệm vụ và không nhận lịch sử của cha. Pipeline cố định, approval, feature tests, repair budget và worktree riêng theo spec `2026-09-23-agent-harness-design.md` tiếp tục có hiệu lực.
+Mỗi task có đúng một Codex agent cha giữ bối cảnh điều phối. Cha giao các stage AI cho subagent native; mỗi con chỉ làm một nhiệm vụ và không nhận lịch sử của cha. Pipeline cố định, approval, feature tests, repair budget và worktree riêng theo spec `2026-09-23-agent-harness-design.md` tiếp tục có hiệu lực.
 
 Thay đổi này thay thế cơ chế tạo session độc lập trực tiếp cho từng stage. Không thêm chạy song song, UI cấu hình đội agent, runtime/provider mới hoặc model fallback.
 
@@ -25,43 +25,43 @@ Nguồn chính thức: [Subagents](https://learn.chatgpt.com/docs/agent-configur
 
 Worker → agent cha của task → đúng một subagent của stage attempt hiện tại.
 
-Worker tạo/resume parent thread, truyền stage envelope và quan sát các child threads. Agent cha giao nhiệm vụ bằng native `spawn_agent` với `fork_turns="none"`, model và effort khai báo rõ, chờ con, nhận kết quả và trả lại worker. Worker kiểm tra kết quả của con trực tiếp trước khi chấp nhận output của cha.
+Worker tạo hoặc resume parent thread, truyền stage envelope và theo dõi child threads. Agent cha giao nhiệm vụ bằng native `spawn_agent` với `fork_turns="none"` và model/effort được khai báo rõ. Cha chờ con, nhận kết quả rồi phản hồi worker. Worker kiểm tra trực tiếp kết quả của con trước khi chấp nhận output của cha.
 
-Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` dùng subagent mới cho mỗi attempt. `prepare`, `verify`, `deliver` vẫn do worker/runner thực thi; không cần subagent AI. Mỗi task có parent riêng, không có một parent chung cho tất cả repository/task.
+Các stage `discover`, `analyze`, `plan`, `implement`, `review`, `repair` dùng subagent mới cho mỗi attempt. `prepare`, `verify`, `deliver` vẫn do worker/runner thực thi, không cần subagent AI. Mỗi task có parent riêng; các repository và task không dùng chung một parent.
 
-Parent model cố định trong code: `gpt-6-luna`, effort `medium`; không thêm tùy chọn UI. Subagent giữ model theo stage của task và policy hiện tại: plan/replan `high`, các AI stage khác `medium`. Kiểm tra catalog cho cả cha và con; thiếu khả năng/model/effort phải blocked, không thay model hoặc quay lại sessions cũ âm thầm.
+Model của parent được cố định trong code là `gpt-6-luna`, effort `medium`, không có tùy chọn trên UI. Subagent dùng model theo stage của task và policy hiện tại: plan/replan `high`, các AI stage khác `medium`. Worker kiểm tra catalog cho cả cha và con. Nếu thiếu khả năng runtime, model hoặc effort cần thiết, task chuyển sang blocked; không tự thay model hoặc quay lại cơ chế session cũ.
 
 ## Context và hợp đồng kết quả
 
-Parent nhận stage hiện tại, attempt ID, model/effort, lời giao việc và đường dẫn packet chứa frozen bundle/input/output schema. Worker ghi packet trước khi giao việc; cha không cần đọc bundle hoặc tool log/code. Parent giữ lịch sử điều phối và kết quả có cấu trúc qua nhiều stage.
+Parent nhận stage hiện tại, attempt ID, model/effort, lời giao việc và đường dẫn packet chứa frozen bundle/input/output schema. Worker ghi packet trước khi giao việc. Cha không cần đọc bundle, tool log hoặc code; cha giữ lịch sử điều phối và kết quả có cấu trúc qua nhiều stage.
 
-Con chỉ nhận nhiệm vụ stage, dữ liệu cần thiết do handler hiện tại cung cấp, frozen rules/profile/skills và output schema. Không truyền toàn bộ task object, lịch sử chat, comments ngoài version liên quan hoặc context của stage khác. Plan có thể nhận profile, requirement/answers và feedback version hiện tại; implement nhận plan đã duyệt; repair nhận plan và checks/findings; reviewer nhận requirement/plan, diff và evidence, không nhận lời tự đánh giá của implementer.
+Con chỉ nhận nhiệm vụ stage, dữ liệu cần thiết từ handler hiện tại, frozen rules/profile/skills và output schema. Không truyền toàn bộ task object, lịch sử chat, comments ngoài version liên quan hoặc context của stage khác. Plan có thể nhận profile, requirement/answers và feedback của version hiện tại. Implement nhận plan đã duyệt; repair nhận plan cùng checks/findings. Reviewer nhận requirement/plan, diff và evidence, không nhận lời tự đánh giá của implementer.
 
-`fork_turns="none"` loại bỏ lịch sử, không loại bỏ system/runtime instructions, sandbox hoặc repo instructions cần thiết. Không hứa con chỉ có duy nhất một message trong context.
+`fork_turns="none"` loại bỏ lịch sử của cha. Con vẫn nhận system/runtime instructions, sandbox và repo instructions cần thiết, nên context có thể chứa nhiều hơn một message.
 
-Giới hạn kiểm chứng của CLI hiện tại: raw events và durable rollout mã hóa `spawn_agent.message`; thread/read không trả task message nguyên văn. Worker kiểm tra task_name, fork_turns, model/effort và metadata native, đối chiếu plaintext khi runtime có cung cấp. Ciphertext không chứng minh nguyên văn message đúng packet hoặc không kèm nội dung bổ sung. Instructions yêu cầu cha chỉ truyền lời giao việc đã cấp; đây là ràng buộc hành vi. Test marker kiểm chứng không fork lịch sử, không phải chứng minh đầy đủ mọi token trong context. Không hứa giảm token vì con vẫn có system/tools/developer context và cha thêm một lượt điều phối.
+CLI hiện tại có giới hạn kiểm chứng: raw events và durable rollout mã hóa `spawn_agent.message`; thread/read không trả task message nguyên văn. Worker kiểm tra task_name, fork_turns, model/effort và metadata native, rồi đối chiếu plaintext nếu runtime cung cấp. Ciphertext chưa đủ để chứng minh message khớp nguyên văn packet hoặc không chứa nội dung bổ sung. Instructions yêu cầu cha chỉ truyền lời giao việc đã cấp, nhưng yêu cầu này là ràng buộc hành vi. Test marker chỉ kiểm chứng việc không fork lịch sử, chưa kiểm chứng đầy đủ mọi token trong context. Cơ chế này không cam kết giảm token: con vẫn có system/tools/developer context và cha cần thêm một lượt điều phối.
 
-Con trả JSON envelope đúng schema của stage. Worker đọc output cuối của child thread đã xác minh parent ID và validate schema. Cha chỉ trả receipt gồm `stage` và `attemptId`; worker đối chiếu receipt với assignment và envelope của con, lấy `result` trực tiếp từ con. Parent không được tự tạo kết quả stage nếu không có child evidence. Child chưa hoàn tất, receipt sai stage/attemptId, JSON con không hợp lệ, con sai model/effort hoặc stage đều không được coi là thành công. Worker vẫn chờ child hoàn tất nếu receipt đến sớm.
+Con trả JSON envelope đúng schema của stage. Worker xác minh parent ID của child thread, đọc output cuối và validate schema. Cha chỉ trả receipt gồm `stage` và `attemptId`; worker đối chiếu receipt với assignment và envelope của con, lấy `result` trực tiếp từ con. Parent không được tự tạo kết quả stage khi thiếu child evidence. Stage không thành công nếu child chưa hoàn tất, receipt sai stage/attemptId, JSON của con không hợp lệ hoặc con dùng sai model/effort hay stage. Nếu receipt đến sớm, worker vẫn chờ child hoàn tất.
 
 ## Quyền và giới hạn
 
-Trước mỗi lượt cha, worker áp dụng cwd hiện tại và sandbox của stage lên parent thread; subagent kế thừa quyền này. Trước approval dùng committed snapshot read-only; sau prepare dùng worktree đã lưu; implement/repair workspace-write; reviewer và các stage phân tích read-only. Approval policy Manual/Auto giữ nguyên.
+Trước mỗi lượt của cha, worker áp dụng cwd hiện tại và sandbox của stage lên parent thread; subagent kế thừa quyền này. Trước approval, agent dùng committed snapshot với quyền read-only. Sau prepare, agent dùng worktree đã lưu. Implement/repair có quyền workspace-write; reviewer và các stage phân tích có quyền read-only. Approval policy Manual/Auto giữ nguyên.
 
-Agent cha chỉ điều phối theo instructions, không trực tiếp sửa code/chạy kiểm tra. Đây là giới hạn hành vi, không phải sandbox riêng: trong lượt implement/repair, cha có cùng sandbox workspace-write cần cho con. Không tuyên bố đã cưỡng chế cha tuyệt đối không thể ghi file. Worker từ chối hoàn tất stage khi cha dùng công cụ sửa code thay cho child evidence và chuyển sang reconciliation nếu có side effect ngoài hợp đồng.
+Instructions giới hạn agent cha ở việc điều phối, không trực tiếp sửa code hoặc chạy kiểm tra. Cha không có sandbox riêng: trong lượt implement/repair, cha có cùng sandbox workspace-write cần cho con và vẫn có khả năng ghi file. Worker từ chối hoàn tất stage nếu cha dùng công cụ sửa code thay cho child evidence. Nếu có side effect ngoài hợp đồng, worker chuyển sang reconciliation.
 
-Không spawn cháu hoặc child thứ hai trong cùng attempt. Instructions quy định giới hạn, worker theo dõi descendant events/metadata; phát hiện vi phạm phải ngắt các lượt liên quan và không chấp nhận kết quả. Nếu runtime không cung cấp đủ visibility để thực hiện kiểm tra này, blocked trước khi cho chạy stage ghi file.
+Mỗi attempt không được spawn cháu hoặc child thứ hai. Instructions quy định giới hạn; worker theo dõi descendant events/metadata. Khi phát hiện vi phạm, worker ngắt các lượt liên quan và từ chối kết quả. Nếu runtime không cung cấp đủ thông tin để kiểm tra, task chuyển sang blocked trước khi chạy stage có quyền ghi file.
 
 Agent cha không được thay approval, stage order, repair budget, plan version, test verdict, tạo worktree hay bàn giao PR. Quyết định chuyển stage nằm trong worker; parent điều phối công việc AI trong stage mà worker đã cấp.
 
 ## Lifecycle và dữ liệu
 
-Lưu parent thread ID bền vững theo task; mỗi attempt lưu parent turn ID và child thread/turn ID, stage, model/effort thực tế, bundle hash, trạng thái và usage riêng cho cha/con nếu runtime cung cấp. Không trộn usage hai phiên hoặc suy ra chi phí subscription.
+Harness lưu parent thread ID bền vững theo task. Mỗi attempt lưu parent turn ID, child thread/turn ID, stage, model/effort thực tế, bundle hash và trạng thái. Usage của cha và con được lưu riêng nếu runtime cung cấp; không trộn usage hai phiên hoặc suy ra chi phí subscription.
 
-Pause/cancel phải ngắt cha và tất cả child/descendant đang chạy, chờ xác nhận dừng. Ngắt cha không được mặc định là con đã dừng. Mất kết nối, timeout hoặc không xác định được writer giữ `runtime_state_unknown` và exclusion hiện có; không tạo parent/child thay thế cho đến khi đối chiếu thực tế.
+Pause/cancel phải ngắt cha cùng tất cả child/descendant đang chạy và chờ xác nhận dừng. Việc ngắt cha chưa xác nhận con đã dừng. Nếu mất kết nối, timeout hoặc không xác định được writer, Harness giữ `runtime_state_unknown` và exclusion hiện có. Chỉ được tạo parent/child thay thế sau khi đối chiếu trạng thái thực tế.
 
-Resume giữ parent thread của task; sau xác nhận writer/process đã dừng, attempt mới tạo con mới với input cập nhật. Khi cwd/sandbox thay đổi, xác nhận settings trước khi giao nhiệm vụ. Không tái dùng committed snapshot tạm đã bị xóa.
+Resume giữ parent thread của task. Sau khi xác nhận writer/process đã dừng, attempt mới tạo con mới với input cập nhật. Nếu cwd hoặc sandbox thay đổi, worker xác nhận settings trước khi giao nhiệm vụ. Committed snapshot tạm đã bị xóa không được dùng lại.
 
-Task cũ chưa có parent nhận parent ở attempt mới sau khi không còn runtime hoạt động. Attempt history, approvals, frozen bundles và output cũ giữ nguyên. Task hoàn tất không migration hồi tố. Không sửa schema Task nếu record runtime riêng đủ lưu mapping.
+Task cũ chưa có parent được cấp parent ở attempt mới, sau khi xác nhận không còn runtime hoạt động. Attempt history, approvals, frozen bundles và output cũ giữ nguyên. Task đã hoàn tất không bị migration hồi tố. Nếu record runtime riêng đủ lưu mapping, giữ nguyên schema Task.
 
 ## Phạm vi thay đổi dự kiến
 
@@ -69,7 +69,7 @@ Task cũ chưa có parent nhận parent ở attempt mới sau khi không còn ru
 - `src/worker/stages.ts`: task/attempt identity, mapping parent, stage envelope và input tối thiểu; không đổi nghiệp vụ transition.
 - `src/worker/engine.ts`, `src/worker/main.ts`: chỉ cập nhật phần runtime exclusion/control hoặc interface wiring thực sự cần.
 - `src/context/prompts.ts`: instructions điều phối và instructions nhiệm vụ riêng cho con.
-- Test adapters/fixtures: biểu diễn đúng parent và child; không chỉ mock output cha rồi gọi đó là bằng chứng subagent.
+- Test adapters/fixtures: biểu diễn cả parent và child; mock output của cha riêng lẻ chưa đủ làm bằng chứng subagent.
 - README/spec gốc: cập nhật cơ chế chạy sau khi thiết kế được duyệt và kiểm chứng.
 
 ## Điều kiện nghiệm thu
@@ -82,4 +82,4 @@ Task cũ chưa có parent nhận parent ở attempt mới sau khi không còn ru
 6. Khởi động lại/resume giữ mapping, không spawn trùng khi child chưa dừng; task cũ tiếp tục ở attempt mới sau reconciliation.
 7. Typecheck và tests liên quan pass. Live smoke bất kỳ phần bắt buộc chưa chạy phải ghi `skipped/blocked`, không báo chuyển đổi đã hoàn tất.
 
-Nếu native runtime không đáp ứng quyền/lifecycle cần thiết, dừng ở evidence cụ thể và đề xuất thiết kế khác; không gọi các thread độc lập là native subagent hoặc mở rộng quyền để làm test pass.
+Nếu native runtime không đáp ứng yêu cầu về quyền hoặc lifecycle, dừng và ghi rõ bằng chứng trước khi đề xuất thiết kế khác. Thread độc lập không được coi là native subagent; không mở rộng quyền chỉ để làm test pass.
