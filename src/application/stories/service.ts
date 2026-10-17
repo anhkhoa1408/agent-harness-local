@@ -1,34 +1,26 @@
-import { StoryRunState } from "../../domain/constants/story-run-state";
 import { planKey } from "../../domain/utils/record-key";
-import { ApplicationErrorCode, EventType } from "../constants/index";
-import { TaskStatus } from "../../domain/constants/task-status";
-import { PipelineStage } from "../../domain/constants/pipeline-stage";
+export { storyKey } from "../../domain/utils/record-key";
+import { ApplicationErrorCode } from "../constants/index";
 import type { ValidationPort } from "../validation";
 import type { RuntimePort } from "../runtime";
-import { storyKey } from "../../domain/utils/record-key";
-export { storyKey } from "../../domain/utils/record-key";
-import {
-  prepareSeparateStory,
-  reconcileFeatureStories,
-  assertSharedHead,
-} from "./orchestration";
-import { assertCompletedStoryScopeUnchanged } from "../../domain/story-replan";
-
 import type { ApplicationStore, StoryRepositoryPort } from "../ports";
-import {
-  type Task,
-  type Plan,
-  type StorySelection,
-  type StoryExecution,
-  type StoryRun,
+import type {
+  Task,
+  Plan,
+  StorySelection,
+  StoryExecution,
+  StoryRun,
 } from "../../domain/contracts";
+import { projectStoryPlan, projectSelectedPlan } from "../../domain/stories";
+import { validateStoryReplan, approveStorySelection } from "./selection";
 import {
-  selectedStories,
-  projectStoryPlan,
-  projectSelectedPlan,
-} from "../../domain/stories";
-const started = (runs: StoryRun[]) =>
-  runs.some((r) => r.state !== "pending" || r.childTaskId);
+  assertEvidence,
+  recordEvidence,
+  completeSharedStory,
+  assertSharedHead,
+} from "./shared-pr";
+import { prepareSeparateStory, reconcileFeatureStories } from "./separate-pr";
+
 export class StoryService {
   constructor(
     private readonly store: ApplicationStore,
@@ -50,76 +42,17 @@ export class StoryService {
     );
   }
   validateStoryReplan(task: Task, plan: Plan) {
-    const store = this.store;
-
-    const execution = this.getExecution(task.id);
-    if (!execution || !started(this.listStoryRuns(task.id))) return;
-    const previous = this.validation.plan(
-      store.plans.get(planKey(task.id, execution.selection.planVersion)),
-    );
-    assertCompletedStoryScopeUnchanged(
-      previous,
-      plan,
-      this.listStoryRuns(task.id),
-    );
-    selectedStories(plan, {
-      ...execution.selection,
-      planVersion: plan.version,
-    });
+    return validateStoryReplan(this.store, this, this.validation, task, plan);
   }
   approveStorySelection(task: Task, raw: StorySelection): void {
-    const store = this.store;
-
-    store.atomic(() => {
-      const plan = this.validation.plan(
-        store.plans.get(planKey(task.id, task.planVersion)),
-      );
-      const selection = this.validation.storySelection(raw);
-      const ordered = selectedStories(plan, selection);
-      const old = this.getExecution(task.id);
-      const runs = this.listStoryRuns(task.id);
-      if (old && started(runs)) {
-        if (
-          old.selection.mode !== selection.mode ||
-          JSON.stringify([...old.selection.storyIds].sort()) !==
-            JSON.stringify([...selection.storyIds].sort())
-        )
-          throw new Error(ApplicationErrorCode.STORY_SELECTION_LOCKED);
-        this.validateStoryReplan(task, plan);
-      }
-      const retain = !!old && started(runs);
-      for (const story of ordered) {
-        const prior = retain
-          ? runs.find((r) => r.storyId === story.id)
-          : undefined;
-        const run: StoryRun = {
-          featureId: task.id,
-          planVersion: plan.version,
-          storyId: story.id,
-          state: StoryRunState.PENDING,
-          baselineCommit: task.sourceCommit,
-          ...prior,
-          updatedAt: this.runtime.now(),
-        };
-        run.planVersion = plan.version;
-        store.storyRuns.put(storyKey(run), run);
-      }
-      const active = ordered.find(
-        (s) =>
-          !runs.some(
-            (r) =>
-              retain &&
-              r.storyId === s.id &&
-              r.state === StoryRunState.COMPLETED,
-          ),
-      );
-      store.storyExecutions.put(task.id, {
-        selection,
-        activeStoryId: active?.id ?? null,
-        baselineCommit: retain ? old!.baselineCommit : task.sourceCommit,
-        aggregate: retain && old!.aggregate,
-      } satisfies StoryExecution);
-    });
+    return approveStorySelection(
+      this.store,
+      this,
+      this.validation,
+      this.runtime,
+      task,
+      raw,
+    );
   }
   getEffectiveTask(task: Task): Task {
     const e = this.getExecution(task.id);
@@ -148,31 +81,10 @@ export class StoryService {
       : projectStoryPlan(plan, e.activeStoryId!, e.baselineCommit);
   }
   assertEvidence(task: Task) {
-    const store = this.store;
-
-    const e = this.getExecution(task.id);
-    if (!e || e.selection.mode !== "shared_pr") return;
-    const expected = {
-      storyId: e.aggregate ? null : e.activeStoryId,
-      planVersion: task.planVersion,
-      baselineCommit: task.sourceCommit,
-    };
-    if (
-      JSON.stringify(store.storyEvidence.get(task.id)) !==
-      JSON.stringify(expected)
-    )
-      throw new Error(ApplicationErrorCode.STALE_STORY_EVIDENCE);
+    return assertEvidence(this.store, this, task);
   }
   recordEvidence(task: Task) {
-    const store = this.store;
-
-    const e = this.getExecution(task.id);
-    if (e?.selection.mode === "shared_pr")
-      store.storyEvidence.put(task.id, {
-        storyId: e.aggregate ? null : e.activeStoryId,
-        planVersion: task.planVersion,
-        baselineCommit: task.sourceCommit,
-      });
+    return recordEvidence(this.store, this, task);
   }
   completeSharedStory(
     task: Task,
@@ -182,67 +94,14 @@ export class StoryService {
       checkpointArtifactId?: string;
     },
   ) {
-    const store = this.store;
-
-    const e = this.getExecution(task.id)!;
-    const run = this.listStoryRuns(task.id).find(
-      (r) => r.storyId === e.activeStoryId,
-    )!;
-    return store.atomic(() => {
-      store.storyRuns.put(storyKey(run), {
-        ...run,
-        state: StoryRunState.COMPLETED,
-        ...checkpoint,
-        updatedAt: this.runtime.now(),
-      });
-      const plan = this.validation.plan(
-        store.plans.get(planKey(task.id, task.planVersion)),
-      );
-      const next = selectedStories(plan, e.selection).find(
-        (s) =>
-          !this.listStoryRuns(task.id).some(
-            (r) => r.storyId === s.id && r.state === StoryRunState.COMPLETED,
-          ),
-      );
-      store.storyExecutions.put(task.id, {
-        ...e,
-        activeStoryId: next?.id ?? null,
-        baselineCommit: checkpoint.commit,
-        aggregate: !next,
-      });
-      store.checks.delete(task.id);
-      store.reviews.delete(task.id);
-      store.acceptance.delete(task.id);
-      store.storyEvidence.delete(task.id);
-      store.events.add(task.id, EventType.STORY_CHECKPOINT, {
-        storyId: run.storyId,
-        ...checkpoint,
-      });
-      const result = {
-        stage: next ? PipelineStage.PREPARE : PipelineStage.VERIFY,
-        status: e.selection.continueAutomatically
-          ? TaskStatus.QUEUED
-          : TaskStatus.PAUSED,
-        reason: e.selection.continueAutomatically ? null : "story_checkpoint",
-        output: checkpoint,
-      };
-      const current = store.tasks.get(task.id);
-      store.tasks.update(
-        task.id,
-        current.revision,
-        {
-          stage: result.stage,
-          status: result.status,
-          reason: result.reason,
-          resumeStage: null,
-        },
-        {
-          type: EventType.STORY_ADVANCED,
-          data: { storyId: next?.id ?? null, aggregate: !next },
-        },
-      );
-      return result;
-    });
+    return completeSharedStory(
+      this.store,
+      this,
+      this.validation,
+      this.runtime,
+      task,
+      checkpoint,
+    );
   }
   prepareSeparateStory(task: Task, signal: AbortSignal) {
     return prepareSeparateStory(
@@ -259,8 +118,6 @@ export class StoryService {
     return reconcileFeatureStories(
       this.store,
       this,
-      this.repository,
-      this.validation,
       this.runtime,
       featureId,
       signal,
