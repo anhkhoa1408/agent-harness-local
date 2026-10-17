@@ -23,6 +23,7 @@ function fixture(
     nativeInteraction?: boolean;
     parentError?: string;
     staleSettingsReads?: number;
+    childCommentary?: string;
   } = {},
 ) {
   const input = new PassThrough(),
@@ -53,6 +54,15 @@ function fixture(
             phase: "final_answer",
             text: options.bad === "json" ? "invalid" : JSON.stringify(envelope),
           },
+          ...(options.childCommentary
+            ? [
+                {
+                  type: "agentMessage",
+                  phase: "commentary",
+                  text: options.childCommentary,
+                },
+              ]
+            : []),
         ],
       },
     ],
@@ -324,6 +334,20 @@ function fixture(
   } as DelegatedStageInput;
   return { client, agentInput, sent, notify };
 }
+
+test("fallback diagnostics in child commentary do not replace the stage JSON result", async () => {
+  const f = fixture({ childCommentary: "context_mode_unavailable" });
+  try {
+    const run = await f.client.runDelegatedStage(
+      f.agentInput,
+      () => {},
+      new AbortController().signal,
+    );
+    expect(run.result).toEqual({ ok: true });
+  } finally {
+    await f.client.close();
+  }
+});
 
 test("retains the actual parent runtime failure instead of hiding it as agent_failed", async () => {
   const message = "invalid_json_schema: Missing 'stories'";

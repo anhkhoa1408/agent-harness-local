@@ -10,7 +10,7 @@ Copyright 2026 Mert Koseoglu. See ../LICENSE and ../../sources.json.
 
 Keep raw data outside the conversation; return findings with source locations and evidence. Use only tools exposed by this runtime and permitted for this stage. These instructions do not install MCP servers or grant execution, network or write permissions.
 
-If the needed tool is unavailable, use permitted normal read/command tools with scoped paths and bounded output. Report `context_mode_unavailable` once in the stage summary; do not invent indexed content or savings, or block approved work solely because the optimization tool is missing.
+If the needed tool is unavailable, use permitted normal read/command tools with scoped paths and bounded output. Report `context_mode_unavailable` once in a separate non-final `commentary` message. Return only the required Harness JSON in the final answer; do not add diagnostic fields or put the marker in task data. Do not invent indexed content or savings, or block approved work solely because the optimization tool is missing.
 
 ## Routing
 
