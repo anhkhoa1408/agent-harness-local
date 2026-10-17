@@ -72,3 +72,18 @@ Cập nhật được duyệt ngày 2026-10-11: constants dùng class với `sta
 - Dashboard nhóm attempts theo task trong từng request, giữ insertion order. Không cache giữa requests. Record repository tạo bốn prepared statements trên connection do store sở hữu; transaction, nested savepoint và fencing vẫn đi qua store.
 
 Đo mẫu bằng `node --import tsx scripts/backend-refactor-benchmark.mjs [checkout]`. Script đo projection trong bộ nhớ và SQLite `:memory:`; số đo không đại diện toàn bộ HTTP/Git/Codex latency. Kết quả và giới hạn tại [verification refactor v2](verification/2026-10-11-backend-refactor-v2.md).
+
+## Stories và pipeline control (refactor ngày 2026-10-17)
+
+`StoryService` giữ constructor, public methods và exports hiện có; tiếp tục sở hữu truy vấn/projection và điều phối nghiệp vụ. Logic nội bộ chia theo trách nhiệm:
+
+- `selection.ts`: validation khi replan, selection lock và approval; giữ completed checkpoints, active baseline và thứ tự stories.
+- `shared-pr.ts`: evidence, checkpoint completion và kiểm tra HEAD khi bàn giao chung một PR.
+- `separate-pr.ts`: tạo child task, kiểm tra dependency ancestry và reconciliation khi bàn giao từng story. Thay cho `orchestration.ts` cũ.
+- `state.ts`: contract truy vấn nội bộ `StoryStatePort`, dùng chung giữa các helper; không import ngược service hoặc thêm public export.
+
+Pipeline giữ `processControlCommand()` làm entrypoint: load task, kiểm tra revision/terminal status, dispatch, xử lý `grant` và ghi command outcome/rejection. `task-control.ts` xử lý pause/cancel/configure/resume/start; `plan-control.ts` xử lý approve/comment/revise/answer. Các helper không tự finish command hoặc thêm transaction bao quanh command.
+
+Việc tách module giữ nguyên vị trí transaction/nested savepoint, thứ tự record/event writes, child command IDs, abort timing và error serialization. Git I/O vẫn ở ngoài transaction. Worker loop, lease fencing, recovery và Codex lifecycle không đổi. Không migration hoặc thay đổi HTTP API/artifact format.
+
+`tests/integration/control-commands.test.ts` bổ sung characterization tests cho command outcomes, revisions/events, enqueue trước abort và nested approval rollback trên SQLite thật. Các test này chạy pass trên implementation cũ trước khi tách. Kết quả trước/sau và giới hạn kiểm chứng tại [verification stories/pipeline](verification/2026-10-17-stories-pipeline-refactor.md).
