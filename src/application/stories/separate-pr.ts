@@ -10,16 +10,9 @@ import type { RuntimePort } from "../runtime";
 
 import { type Task, type StoryRun } from "../../domain/contracts";
 import { selectedStories, projectStoryPlan } from "../../domain/stories";
-import { evidenceExclusions } from "../../domain/evidence";
 import { storyKey } from "../../domain/utils/record-key";
 import type { ApplicationStore, StoryRepositoryPort } from "../ports";
-type StoryStatePort = {
-  getExecution(
-    id: string,
-  ): import("../../domain/contracts").StoryExecution | null;
-  listStoryRuns(id: string): StoryRun[];
-  getExecutionPlan(task: Task): import("../../domain/contracts").Plan;
-};
+import type { StoryStatePort } from "./state";
 export async function prepareSeparateStory(
   store: ApplicationStore,
   stories: StoryStatePort,
@@ -149,8 +142,6 @@ export async function prepareSeparateStory(
 export async function reconcileFeatureStories(
   store: ApplicationStore,
   stories: StoryStatePort,
-  repository: StoryRepositoryPort,
-  validation: ValidationPort,
   runtime: RuntimePort,
   featureId: string,
   signal: AbortSignal,
@@ -254,39 +245,4 @@ export async function reconcileFeatureStories(
         { type: EventType.FEATURE_COMPLETED, data: {} },
       );
   });
-}
-export async function assertSharedHead(
-  store: ApplicationStore,
-  stories: StoryStatePort,
-  repository: StoryRepositoryPort,
-  task: Task,
-  delivery = false,
-) {
-  const e = stories.getExecution(task.id);
-  if (e?.selection.mode !== "shared_pr" || !task.worktree) return;
-  const head = await repository.head(task.worktree);
-  if (head === e.baselineCommit) return;
-  if (delivery && e.aggregate) {
-    const plan = stories.getExecutionPlan(task);
-    const fingerprint = await repository.fingerprintWorktree(
-      task.worktree,
-      evidenceExclusions(plan),
-      task.sourceCommit,
-    );
-    const effect = store.effects.get(`${task.id}:commit:${fingerprint}`) as {
-      state: string;
-      parent: string;
-      commit?: string;
-    } | null;
-    if (effect?.state === "confirmed" && effect.commit === head) return;
-    if (
-      effect?.state === "intent" &&
-      effect.parent === e.baselineCommit &&
-      (await repository.headParent(task.worktree)) === effect.parent &&
-      (await repository.headMessage(task.worktree)) ===
-        `feat: ${task.title}\n\nHarness-Task: ${task.id}`
-    )
-      return;
-  }
-  throw new Error(ApplicationErrorCode.STORY_HEAD_CHANGED);
 }
