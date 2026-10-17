@@ -1,64 +1,66 @@
 # AGENTS.md
 
-Hướng dẫn hành vi để giảm lỗi lập trình phổ biến của LLM. Kết hợp với hướng dẫn riêng của dự án khi cần. Ưu tiên sự thận trọng hơn tốc độ; với tác vụ đơn giản, dùng mức quy trình phù hợp.
+Behavioral guidelines to reduce common LLM coding mistakes. Combine these with project-specific instructions as needed. Prioritize caution over speed; use a proportionate process for simple tasks.
 
-## 1. Suy nghĩ trước khi code
+## 1. Think before coding
 
-Không phỏng đoán hoặc che giấu sự mơ hồ. Nêu rõ các đánh đổi.
+Do not guess or hide ambiguity. State tradeoffs clearly.
 
-- Nêu rõ giả định trước khi triển khai. Nếu không chắc về một quyết định ảnh hưởng hành vi, hãy hỏi.
-- Nếu có nhiều cách hiểu, trình bày các cách hiểu thay vì âm thầm chọn một.
-- Nếu có cách tiếp cận đơn giản hơn, hãy nói ra và phản biện khi cần.
-- Khi requirement chưa rõ, nêu cụ thể điểm mơ hồ và làm rõ trước khi sửa phần code phụ thuộc vào quyết định đó.
+- State assumptions before implementation. If unsure about a decision that affects behavior, ask.
+- If multiple interpretations are possible, present them rather than silently choosing one.
+- If a simpler approach exists, point it out and push back when needed.
+- When a requirement is unclear, identify the specific ambiguity and clarify it before changing code that depends on that decision.
 
-## 2. Ưu tiên sự đơn giản
+## 2. Prioritize simplicity
 
-Viết code tối thiểu để giải quyết đúng yêu cầu.
+Write the minimum code needed to meet the requirements.
 
-- Không thêm tính năng ngoài yêu cầu.
-- Không tạo abstraction cho code chỉ dùng một lần.
-- Không thêm tính linh hoạt hoặc cấu hình chưa được yêu cầu.
-- Không xử lý lỗi cho các tình huống không thể xảy ra.
-- Nếu 50 dòng giải quyết rõ ràng cùng một vấn đề mà đang dùng 200 dòng, hãy đơn giản hóa.
-- Tự kiểm tra: một senior engineer có đánh giá cách làm này quá phức tạp không?
+- Do not add features beyond the requirements.
+- Do not create abstractions for code used only once.
+- Do not add flexibility or configuration that was not requested.
+- Do not handle errors for scenarios that cannot occur.
+- If 50 lines can clearly solve the same problem that currently takes 200 lines, simplify it.
+- Ask yourself: would a senior engineer consider this approach too complex?
 
-## 3. Thay đổi có mục tiêu
+## 3. Make targeted changes
 
-Chỉ chạm vào những gì cần thiết; chỉ dọn dẹp phần dư thừa do thay đổi của mình tạo ra.
+Change only what is necessary; clean up only redundancy introduced by your own changes.
 
-- Giữ nguyên phong cách code hiện tại.
-- Không cải thiện code, comment hoặc định dạng xung quanh ngoài phạm vi task.
-- Không refactor phần không liên quan hoặc không bị hỏng.
-- Nếu phát hiện dead code có sẵn không liên quan, báo lại thay vì xóa.
-- Xóa import, biến hoặc hàm trở thành thừa do chính thay đổi của mình.
-- Mỗi dòng thay đổi phải liên hệ được với yêu cầu của người dùng.
+- Preserve the existing code style.
+- Do not improve surrounding code, comments, or formatting outside the task's scope.
+- Do not refactor unrelated or working code.
+- If you find unrelated pre-existing dead code, report it rather than deleting it.
+- Remove imports, variables, or functions made redundant by your own changes.
+- Every changed line must be traceable to the user's request.
 
-## 4. Thực thi theo mục tiêu
+## 4. Execute toward verifiable goals
 
-Xác định tiêu chí thành công có thể kiểm chứng và lặp đến khi có bằng chứng đáp ứng, trong giới hạn thực thi đã thống nhất.
+Define verifiable success criteria and iterate until there is evidence that they are met, within the agreed execution limits.
 
-- Thêm validation: viết test cho input không hợp lệ, quan sát failure phù hợp, rồi làm test pass.
-- Sửa bug: tái hiện lỗi, tìm nguyên nhân, viết test hồi quy và chứng minh test pass sau sửa.
-- Refactor được yêu cầu: kiểm tra hành vi liên quan trước và sau thay đổi.
-- Với tác vụ nhiều bước, nêu kế hoạch ngắn: mỗi bước đi kèm điều kiện kiểm tra.
-- Nếu mục tiêu chỉ là “làm cho nó chạy”, làm rõ hành vi mong đợi trước khi triển khai.
-- Báo kết quả theo bằng chứng thực tế; phân biệt pass, fail, blocked và skipped.
+- When adding validation: write tests for invalid input, observe the expected failures, then make the tests pass.
+- When fixing a bug: reproduce it, identify the cause, write a regression test, and demonstrate that the test passes after the fix.
+- When performing a requested refactor: verify the relevant behavior before and after the change.
+- For multi-step tasks, provide a short plan with a verification condition for each step.
+- If the goal is merely to "make it work," clarify the expected behavior before implementation.
+- Report results based on actual evidence; distinguish pass, fail, blocked, and skipped.
 
-Đối với Agent Harness này, phạm vi bắt buộc là test của feature hoặc bug đang xử lý. Có thể bỏ qua test cũ ngoài phạm vi; ghi rõ phần không chạy. Viết test cho tính năng mới và bug đang sửa, không bổ sung test hàng loạt cho code cũ. Không bỏ qua test bắt buộc của feature chỉ để báo thành công.
+For this Agent Harness, tests for the feature or bug being addressed are mandatory. Existing tests outside that scope may be skipped; clearly state what was not run. Write tests for new features and bugs being fixed, without adding tests in bulk for existing code. Do not skip required feature tests just to report success.
 
-## 5. Ngôn ngữ
+## 5. Language
 
-Trả lời bằng tiếng Việt, giữ nguyên thuật ngữ tech khi cần. Viết ngắn gọn, rõ ràng, đúng trọng tâm, ưu tiên tính thực tế. Dùng bullet khi giúp đọc dễ hơn.
+Respond in Vietnamese, retaining technical terms when needed. Write concisely, clearly, and to the point, with an emphasis on practicality. Use bullet points when they improve readability.
 
-## 6. Quy tắc theo loại dự án
+## 6. Rules by project type
 
-Chỉ khi task chỉnh sửa Liquid/Shopify theme hoặc tối ưu Core Web Vitals cho theme, đọc `rules/lighthouse-performance.md` trong repo đích trước khi thay đổi phần liên quan. Nếu file chưa có, báo rõ rule còn thiếu và yêu cầu nội dung; không tự suy diễn rule. Những repo và task khác không cần rule này.
+For Node.js/TypeScript backend changes, read and follow [Backend Coding Conventions](rules/backend-coding-conventions.md) before editing backend code or its tests.
 
-## 7. Thiết kế của workspace này
+Only when a task modifies a Liquid/Shopify theme or optimizes Core Web Vitals for a theme, read `rules/lighthouse-performance.md` in the target repository before making the relevant changes. If the file is missing, explicitly report the missing rules and request their contents; do not infer the rules yourself. Other repositories and tasks do not require these rules.
 
-Khi thiết kế hoặc triển khai Agent Harness, đọc [spec](docs/superpowers/specs/2026-09-23-agent-harness-design.md) và dùng phiên bản đã được người dùng duyệt. Đề xuất sửa spec nếu có xung đột; không âm thầm thay requirement.
+## 7. Design of this workspace
 
-`AGENTS.md` này có hiệu lực cho workspace Agent Harness. Khi xây chức năng điều phối repo khác, lấy các quy tắc hành vi ở mục 1–6 làm baseline được quản lý bởi harness, kết hợp với hướng dẫn của repo đích; không chép mục 7 hoặc ghi đè `AGENTS.md` của repo đích.
+When designing or implementing Agent Harness, read the [spec](docs/superpowers/specs/2026-09-23-agent-harness-design.md) and use the version approved by the user. Propose a spec revision if there is a conflict; do not silently change requirements.
+
+This `AGENTS.md` applies to the Agent Harness workspace. When building functionality to orchestrate other repositories, use the behavioral rules in sections 1–6 as a baseline managed by the harness, combined with the target repository's instructions; do not copy section 7 or overwrite the target repository's `AGENTS.md`.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
